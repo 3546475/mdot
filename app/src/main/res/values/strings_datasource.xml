@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="datasource_title">更新与数据源</string>
+    <string name="datasource_section_update">更新</string>
+    <string name="datasource_current_version">当前版本</string>
+    <string name="datasource_check_update">检查更新</string>
+    <string name="datasource_update_url_label">更新 JSON 地址</string>
+    <string name="datasource_section_holiday">节假日库</string>
+    <string name="datasource_current_lib_version">当前库版本</string>
+    <string name="datasource_builtin_default">内置默认</string>
+    <string name="datasource_refresh_now">立即刷新</string>
+    <string name="datasource_builtin_hint">内置库为估算数据（仅节日正日），请配置远程 JSON 获取权威安排；刷新失败自动保留现库。</string>
+    <string name="datasource_holiday_url_label">节假日 JSON 地址</string>
+</resources>

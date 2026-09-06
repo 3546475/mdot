@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 首页（feature/home/HomeScreen.kt） -->
+    <string name="home_cycle_label_hourly">本期工时</string>
+    <string name="home_cycle_label_comprehensive">本期上班工时</string>
+    <string name="home_cycle_label_standard">本期加班时长</string>
+    <string name="home_overtime_prefix">"超时 "</string>
+    <string name="home_overtime_hours">%1$sh</string>
+    <string name="home_overtime_standard_suffix">" · 标准 %1$sh（截至今天）"</string>
+    <string name="home_today_ot">今日 %1$sh</string>
+    <string name="home_cycle_period">考勤周期：%1$s</string>
+    <string name="home_entry_calendar">日历</string>
+    <string name="home_entry_stats">统计</string>
+    <string name="home_record_hourly">记工作</string>
+    <string name="home_record_comprehensive">记上班</string>
+    <string name="home_record_standard">记加班</string>
+    <string name="home_income_hourly">工作收入</string>
+    <string name="home_income_ot">加班收入</string>
+    <string name="home_income_month">本月收入</string>
+    <string name="home_income_go_settings">去设置</string>
+    <string name="home_income_payroll_label">工资</string>
+</resources>

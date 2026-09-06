@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 首启引导（feature/onboarding/OnboardingScreen.kt） -->
+    <string name="onboarding_app_title">马的加班</string>
+    <string name="onboarding_intro">你的加班与工资，只存在你的手机和你自己的网盘。\n无账号 · 无广告 · 不收集任何数据。</string>
+    <string name="onboarding_step_work_system">工时制度</string>
+    <string name="onboarding_step_work_system_desc">选择适合你的计薪方式，之后可在设置中切换。</string>
+    <string name="onboarding_ws_standard">标准工时</string>
+    <string name="onboarding_ws_standard_desc">工资 = 底薪 + 加班工资\n平时 1.5 倍 · 周末 2 倍 · 法定 3 倍\n支持转调休</string>
+    <string name="onboarding_ws_hourly">小时工</string>
+    <string name="onboarding_ws_hourly_desc">工资 = 工时 × 时薪\n平时/周末/法定 三档时薪\n无底薪 · 无转调休</string>
+    <string name="onboarding_ws_comprehensive">综合工时</string>
+    <string name="onboarding_ws_comprehensive_desc">按周期总工时算加班，单日超 8h 不算\n法定节假日 3 倍即时结算\n底薪 + 请假扣款同标准工时</string>
+    <string name="onboarding_hourly_rates_title">三档时薪</string>
+    <string name="onboarding_hourly_rates_desc">设置平时/周末/法定节假日的时薪（元/小时）。均可跳过，之后在工资设定里改。</string>
+    <string name="onboarding_tier_weekday">平时</string>
+    <string name="onboarding_tier_weekend">周末</string>
+    <string name="onboarding_tier_statutory">法定</string>
+    <string name="onboarding_tier_overtime">超时</string>
+    <string name="onboarding_tier_holiday">节假日</string>
+    <string name="onboarding_pay_title">工资与倍率</string>
+    <string name="onboarding_comprehensive_pay_desc">底薪用于折算时薪（底薪 ÷ 21.75 ÷ 8）。周期内总工时超过标准的部分按超时倍率结算，法定节假日上班按 3 倍即时结算。均可跳过，之后在工资设定里改。</string>
+    <string name="onboarding_standard_pay_desc">底薪用于折算时薪（底薪 ÷ 21.75 ÷ 8），三档倍率决定加班费。均可跳过，之后在工资设定里改。</string>
+    <string name="onboarding_base_salary_label">月薪底薪（元，可留空）</string>
+    <string name="onboarding_multiplier_title">加班倍率（倍）</string>
+    <string name="onboarding_skip">跳过</string>
+    <string name="onboarding_next">下一步</string>
+    <string name="onboarding_start">开始使用</string>
+</resources>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cycle_title">考勤周期</string>
+    <string name="cycle_start_day_heading">工资结算区间的起始日</string>
+    <string name="cycle_desc">每到这个日期，加班时长与工资就开启一个新周期重新汇总。</string>
+    <string name="cycle_period_example">当前周期：%1$s</string>
+    <string name="cycle_month_anchor_heading">每月起始日</string>
+    <string name="cycle_anchor_summary">每月%1$d号起</string>
+</resources>

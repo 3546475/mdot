@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 设置中心 -->
+    <string name="settings_title">设置</string>
+    <string name="settings_group_view_share">查看与分享</string>
+    <string name="settings_row_calendar">日历</string>
+    <string name="settings_row_stats">统计</string>
+    <string name="settings_row_share">分享</string>
+    <string name="settings_group_data_backup">数据与备份</string>
+    <string name="settings_row_sync_backup">同步备份</string>
+    <string name="settings_sync_configured">已配置</string>
+    <string name="settings_sync_not_configured">未配置</string>
+    <string name="settings_group_personalization">个性化</string>
+    <string name="settings_row_appearance">外观</string>
+    <string name="settings_group_other">其他</string>
+    <string name="settings_row_about_privacy">关于与隐私</string>
+
+    <!-- 工时设置 -->
+    <string name="settings_worktime_title">工时设置</string>
+    <string name="settings_system_desc_hourly">按小时计薪，纯时薪制，无底薪无转调休</string>
+    <string name="settings_system_desc_comprehensive">按周期总工时算加班，单日超 8h 不算；法定节假日 3 倍即时</string>
+    <string name="settings_system_desc_standard">工资 = 底薪 + 加班工资；超过正常上班 8 小时算加班</string>
+    <string name="settings_switch_action">切换</string>
+    <string name="settings_row_salary">工资设定</string>
+    <string name="settings_salary_per_hour">%1$s 元/小时</string>
+    <string name="settings_salary_per_month">%1$s 元/月</string>
+    <string name="settings_not_set">未设置</string>
+    <string name="settings_manual_rate">手动单价</string>
+    <string name="settings_row_comp_balance">调休余额</string>
+    <string name="settings_row_cycle">考勤周期</string>
+    <string name="settings_cycle_anchor_summary">每月%1$d号起</string>
+    <string name="settings_row_workdays">工作日设定</string>
+    <string name="settings_workdays_standard">周一至周五</string>
+    <string name="settings_workdays_custom_count">自定义 %1$d 天</string>
+    <string name="settings_row_shifts">班次管理</string>
+    <string name="settings_shift_count_summary">%1$d 个</string>
+
+    <!-- 切换工时制度 -->
+    <string name="settings_switch_title">切换工时制度</string>
+    <string name="settings_system_standard">标准工时</string>
+    <string name="settings_system_standard_desc">工资 = 底薪 + 加班工资，超过 8 小时算加班</string>
+    <string name="settings_system_hourly">小时工</string>
+    <string name="settings_system_comprehensive">综合工时</string>
+    <string name="settings_system_comprehensive_desc">按周期总工时算加班，单日超 8h 不算；适合审批过综合工时的岗位</string>
+    <string name="settings_system_construction">工地记工</string>
+    <string name="settings_system_construction_desc">工天、借支、结算、多工人管理</string>
+    <string name="settings_switch_warning">切换到小时工/综合工时将清空调休余额和转调休记录，建议在新考勤周期开始时切换。</string>
+    <string name="settings_switch_confirm_title">切换到%1$s？</string>
+    <string name="settings_switch_confirm_hourly">切换后将采用纯时薪制，无底薪无转调休。\n\n现有调休余额和转调休记录将被清零，历史工资单需重新计算。\n\n确定切换吗？</string>
+    <string name="settings_switch_confirm_comprehensive">切换后加班按考勤周期总工时判定，单日超 8h 不再算加班；法定节假日上班仍按 3 倍即时结算，无转调休。\n\n现有调休余额和转调休记录将被清零；各制度数据互相隔离，切换不丢记录。\n\n确定切换吗？</string>
+    <string name="settings_switch_confirm_standard">切换后将恢复底薪 + 加班倍率制，支持转调休。\n\n历史工资单需重新计算。确定切换吗？</string>
+    <string name="settings_confirm_switch">确定切换</string>
+    <string name="settings_cancel">取消</string>
+    <string name="settings_in_use">当前使用</string>
+    <string name="settings_planned">规划中</string>
+
+    <!-- 关于 -->
+    <string name="settings_about_title">关于</string>
+    <string name="settings_row_app">应用</string>
+    <string name="settings_row_version">版本</string>
+    <string name="settings_row_check_update">检查更新</string>
+    <string name="settings_privacy_title">隐私承诺</string>
+    <string name="settings_privacy_body">本应用不联网收集任何数据：无账号、无统计 SDK、无广告。所有记录只保存在你的手机上；备份只会传到你亲自配置的自己的网盘。</string>
+    <string name="settings_oss_title">开源许可</string>
+    <string name="settings_oss_body">Jetpack Compose / Room / Hilt / OkHttp / kotlinx.serialization / SQLCipher (BSD)</string>
+</resources>

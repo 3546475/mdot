@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 应用图标背景：取自图标设计的主绿色 -->
+    <color name="ic_launcher_background">#3F874E</color>
+</resources>

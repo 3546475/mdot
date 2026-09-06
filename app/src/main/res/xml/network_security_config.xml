@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  用户可自配任意网盘地址（家庭 NAS/局域网 WebDAV 常为 HTTP），
+  故允许明文流量；HTTPS 仍走系统证书校验。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

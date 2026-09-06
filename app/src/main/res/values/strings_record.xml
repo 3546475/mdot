@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 记录弹层（feature/record） -->
+    <string name="record_tab_ot_standard">加班</string>
+    <string name="record_tab_ot_hourly">工作</string>
+    <string name="record_tab_ot_comprehensive">上班</string>
+    <string name="record_tab_leave">请假</string>
+    <string name="record_duration_suffix">时长</string>
+    <string name="record_duration_leave">请假时长</string>
+    <string name="record_mode_hours">小时</string>
+    <string name="record_mode_minutes">分钟</string>
+    <string name="record_cd_collapse">收起</string>
+    <string name="record_cd_expand">展开完整面板</string>
+    <string name="record_shift_pick_title">选择班次</string>
+    <string name="record_tier_statutory_holiday">法定节假日 · %1$s倍 · %2$s元/小时</string>
+    <string name="record_tier_period_counted">计入周期工时（周期末统一判定加班）</string>
+    <string name="record_tier_hourly">%1$s工作 %2$s元/小时</string>
+    <string name="record_tier_standard">%1$s加班 %2$s倍 · %3$s元/小时</string>
+    <string name="record_tier_manual_suffix">" · 已补改"</string>
+    <string name="record_tier_auto">自动</string>
+    <string name="record_tocomp_value">转调休 %1$s</string>
+    <string name="record_deduct_preview">预计扣款 %1$s</string>
+    <string name="record_note_placeholder">备注（选填，≤200 字）</string>
+    <string name="record_delete">删除</string>
+    <string name="record_cancel">取消</string>
+    <string name="record_save">保存</string>
+    <string name="record_ok">确定</string>
+    <string name="record_delete_title">删除这条记录？</string>
+    <string name="record_delete_confirm_text">%1$s 的%2$s记录将被删除。</string>
+    <string name="record_wheel_hour">时</string>
+    <string name="record_wheel_minute">分</string>
+
+    <!-- 全局组件（core/designsystem） -->
+    <string name="ds_confirm_delete">删除</string>
+    <string name="ds_cancel">取消</string>
+    <string name="ds_pick_confirm">确定</string>
+    <string name="ds_topbar_back_cd">返回</string>
+    <string name="ds_slot_home">首页</string>
+    <string name="ds_slot_calendar">日历</string>
+    <string name="ds_slot_stats">统计</string>
+    <string name="ds_slot_payroll">工资</string>
+    <string name="ds_slot_export">分享</string>
+    <string name="ds_slot_sync">同步</string>
+    <string name="ds_slot_settings">设置</string>
+    <string name="ds_slot_profile">我的</string>
+    <string name="ds_palette_classic_blue">经典蓝</string>
+    <string name="ds_palette_teal">青绿</string>
+    <string name="ds_palette_warm_orange">暖橙</string>
+    <string name="ds_palette_violet">紫罗兰</string>
+    <string name="ds_topbar_switch_cd">切换工时制度</string>
+    <string name="ds_topbar_settings_cd">设置</string>
+    <string name="crash_dialog_title">上次异常退出</string>
+    <string name="crash_dialog_text">应用上次意外退出，已在本机记录错误日志（不会自动上传）。</string>
+    <string name="crash_export_log">导出日志</string>
+    <string name="crash_clear">清除</string>
+    <string name="nav_fab_cd">补记/编辑</string>
+</resources>

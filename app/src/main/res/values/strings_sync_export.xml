@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- feature/sync/SyncScreen.kt -->
+    <string name="sync_screen_title">同步备份</string>
+    <string name="sync_status_title">备份状态</string>
+    <string name="sync_status_not_configured">未配置存储源 · 点按设置</string>
+    <string name="sync_status_uploading">正在备份…</string>
+    <string name="sync_status_restoring">正在恢复…</string>
+    <string name="sync_status_processing">处理中…</string>
+    <string name="sync_status_conflict">云端与本地都有改动，请选择方向</string>
+    <string name="sync_status_last_backup_at">上次备份：%1$s</string>
+    <string name="sync_status_never">尚未备份</string>
+    <string name="sync_section_backup_restore">备份与恢复</string>
+    <string name="sync_backup_restore_hint">先点上方「备份状态」配置存储源，再进行备份/恢复</string>
+    <string name="sync_backup_now_cloud">立即备份到云端</string>
+    <string name="sync_restore_from_cloud">从云端恢复…</string>
+    <string name="sync_auto_backup_title">自动备份</string>
+    <string name="sync_auto_backup_desc">数据变更 30 秒后自动上传</string>
+    <string name="sync_history_copy_title">保留云端历史副本</string>
+    <string name="sync_history_copy_desc">滚动保留最近 5 份</string>
+    <string name="sync_local_backup_title">本地文件备份</string>
+    <string name="sync_local_backup_desc">把全部记录与设置保存成一个备份文件，可存到手机或你自己的网盘；换机/重装后可从文件恢复。与网盘备份同格式（明文 ZIP），不含网盘账号等敏感凭据。</string>
+    <string name="sync_local_export">导出备份文件</string>
+    <string name="sync_local_restore">从文件恢复…</string>
+    <string name="sync_restore_confirm_title">从云端恢复？</string>
+    <string name="sync_restore_confirm_text">云端备份：%1$s\n记录 %2$d 条 · 来自 %3$s\n\n恢复前会自动在本机留一份快照；恢复将覆盖当前全部记录与设置。</string>
+    <string name="sync_action_restore">恢复</string>
+    <string name="sync_action_cancel">取消</string>
+    <string name="sync_local_restore_confirm_title">从备份文件恢复？</string>
+    <string name="sync_local_restore_confirm_text">备份包含 %1$d 条记录（导出于 %2$s，App 版本 %3$s）。\n\n恢复会覆盖当前手机上的全部记录与设置，此操作不可撤销。建议先导出一份当前备份。</string>
+    <string name="sync_local_restore_confirm_action">确认恢复</string>
+    <string name="sync_restart_title">恢复完成</string>
+    <string name="sync_restart_text">数据已导入。重启应用后，统计、日历与首页会按新数据重新计算。</string>
+    <string name="sync_restart_now">立即重启</string>
+    <string name="sync_action_later">稍后</string>
+
+    <!-- feature/sync/SyncStorageScreen.kt -->
+    <string name="sync_storage_title">存储源</string>
+    <string name="sync_storage_select_title">选择存储源</string>
+    <string name="sync_storage_save_test">保存并测试连接</string>
+    <string name="sync_storage_tip">提示：备份包为明文 ZIP（含全部记录与设置，不含网盘账号）。请确保你的网盘账号安全；同一时间只在一台设备上开启自动备份。</string>
+    <string name="sync_storage_trust_title">信任自签名证书</string>
+    <string name="sync_storage_trust_desc">仅 HTTPS 自建服务（NAS/MinIO）证书无法验证时开启；开启前请确认服务器可信</string>
+    <string name="sync_storage_webdav_url_label">服务器地址（如 https://dav.jianguoyun.com/dav/）</string>
+    <string name="sync_storage_username_label">账号</string>
+    <string name="sync_storage_password_label">密码（坚果云请用应用密码）</string>
+    <string name="sync_storage_endpoint_label">Endpoint（如 https://oss-cn-hangzhou.aliyuncs.com）</string>
+    <string name="sync_storage_region_label">Region（如 oss-cn-hangzhou）</string>
+    <string name="sync_storage_path_prefix_label">路径前缀（默认 mdot/backup/）</string>
+
+    <!-- feature/export/ExportScreen.kt / ExportViewModel.kt(ExportDimension) -->
+    <string name="export_screen_title">导入导出</string>
+    <string name="export_hint">CSV 可用 Excel/WPS 打开；工资单长图适合发微信核对。点击按钮先预览，再保存或分享。</string>
+    <string name="export_dim_cycle">考勤周期</string>
+    <string name="export_dim_month">自然月</string>
+    <string name="export_dim_custom">自定义</string>
+    <string name="export_custom_from_label">开始：%1$s</string>
+    <string name="export_custom_from_default">本月1日</string>
+    <string name="export_custom_to_label">结束：%1$s</string>
+    <string name="export_custom_to_default">今天</string>
+    <string name="export_range_invalid">请选择有效区间</string>
+    <string name="export_import_csv">导入 CSV（从备份明细恢复）</string>
+    <string name="export_csv_detail">导出 CSV 明细</string>
+    <string name="export_payslip_generate">生成工资单长图</string>
+    <string name="export_preview_payslip_title">工资单预览</string>
+    <string name="export_preview_csv_title">CSV 预览</string>
+    <string name="export_preview_payslip_cd">工资单长图</string>
+    <string name="export_preview_csv_type">Excel / WPS 表格文件</string>
+    <string name="export_action_save">保存</string>
+    <string name="export_action_close">关闭</string>
+    <string name="export_action_share">分享</string>
+</resources>

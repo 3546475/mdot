@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 外观 -->
+    <string name="appearance_title">外观</string>
+    <string name="appearance_theme_heading">深浅色</string>
+    <string name="appearance_theme_light">浅色</string>
+    <string name="appearance_theme_dark">深色</string>
+    <string name="appearance_theme_system">跟随系统</string>
+    <string name="appearance_palette_heading">配色方案</string>
+    <string name="appearance_dynamic_color">动态取色</string>
+    <string name="appearance_dynamic_color_desc">跟随壁纸配色（Android 12+），关闭则使用所选配色</string>
+    <string name="appearance_bottom_bar_config">底栏配置</string>
+    <string name="appearance_bottom_bar_summary">%1$d 个功能</string>
+
+    <!-- 底栏配置页 -->
+    <string name="appearance_bottom_bar_title">底栏配置</string>
+    <string name="appearance_icon_only">仅图标</string>
+    <string name="appearance_icon_only_desc">开启后底栏只显示图标，不显示文字</string>
+    <string name="appearance_preview">预览</string>
+    <string name="appearance_functions">功能</string>
+    <string name="appearance_drag_reorder">拖动排序</string>
+</resources>

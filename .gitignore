@@ -1,0 +1,20 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+build/
+captures/
+.externalNativeBuild
+.cxx
+local.properties
+# 签名密钥（永不入库）
+# signing keys (never commit)
+keystore/
+keystore.properties
+docs/test-webdav.local.md
+# 发布产物（本地构建后复制到根目录，含单架构与双架构包）
+/MDOT-RELEASE*.apk
+
+# ZCode 会话/工具状态
+.zcode/

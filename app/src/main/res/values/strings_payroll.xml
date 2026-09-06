@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 工资设定（feature/payroll） -->
+    <string name="payroll_title">工资设定</string>
+    <string name="payroll_save">保存</string>
+    <string name="payroll_mode_title">计薪模式</string>
+    <string name="payroll_mode_base">底薪折算</string>
+    <string name="payroll_mode_manual">手动单价</string>
+    <string name="payroll_include_base">加班费计入底薪</string>
+    <string name="payroll_base_label">月薪底薪（元）</string>
+    <string name="payroll_hourly_converted">折算时薪 %1$s 元/小时</string>
+    <string name="payroll_hourly_formula">时薪 = 底薪 ÷ 21.75 ÷ 8</string>
+    <string name="payroll_overtime_multiplier">加班倍率</string>
+    <string name="payroll_suffix_x">倍</string>
+    <string name="payroll_suffix_yuan">元</string>
+    <string name="payroll_weekend_law_hint">提示：劳动法周末加班标准应为 2 倍，请确认企业规则</string>
+    <string name="payroll_leave_coef_title">请假扣薪系数</string>
+    <string name="payroll_leave_coef_formula">扣款 = 时薪 × 系数 × 时长</string>
+    <string name="payroll_hourly_title">小时工资</string>
+    <string name="payroll_hourly_rate_label">时薪（元/小时）</string>
+    <string name="payroll_std_title">周期标准工时</string>
+    <string name="payroll_std_label">周期标准工时（小时）</string>
+    <string name="payroll_std_auto_hint">自动：当前周期 %1$s 应出勤 %2$d 小时；法定参考 166.64 小时/月</string>
+    <string name="payroll_std_manual_hint">已手动覆盖（清空恢复自动）；法定参考 166.64 小时/月</string>
+    <string name="payroll_tier_overtime">超时</string>
+    <string name="payroll_tier_statutory">法定</string>
+    <string name="payroll_comp_multiplier_hint">周期内总工时超过标准的部分按「超时」倍率在周期末结算（月中为预演）；法定节假日上班按「法定」倍率即时结算</string>
+    <string name="payroll_cd_collapse">收起</string>
+    <string name="payroll_cd_expand">展开</string>
+</resources>

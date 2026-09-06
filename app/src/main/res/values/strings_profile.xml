@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 我的页（feature/profile/ProfileScreen.kt） -->
+    <string name="profile_avatar_desc">头像</string>
+    <string name="profile_pick_from_gallery">从相册选择</string>
+    <string name="profile_reset_avatar">恢复默认头像</string>
+    <string name="profile_edit_nickname">修改昵称</string>
+    <string name="profile_nickname_label">昵称</string>
+    <string name="profile_nickname_limit">昵称最多 24 个字</string>
+    <string name="profile_motto">记录每一次努力，看见每一份成长</string>
+    <string name="profile_year_ot_label">本年加班</string>
+    <string name="profile_hours_value">%1$s 小时</string>
+    <string name="profile_year_days_label">记录天数</string>
+    <string name="profile_days_value">%1$d 天</string>
+    <string name="profile_comp_balance_label">调休余额</string>
+    <string name="profile_entry_sync">同步备份</string>
+    <string name="profile_sync_configured">已配置</string>
+    <string name="profile_sync_unconfigured">未配置</string>
+    <string name="profile_entry_appearance">外观</string>
+    <string name="profile_entry_about">关于与隐私</string>
+    <string name="profile_save">保存</string>
+    <string name="profile_cancel">取消</string>
+    <string name="profile_close">关闭</string>
+    <string name="profile_crop_avatar_title">裁剪头像</string>
+    <string name="profile_rotate">旋转</string>
+    <string name="profile_flip">翻转</string>
+    <string name="profile_crop_apply">裁切</string>
+</resources>

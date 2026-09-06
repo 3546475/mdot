@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="workdays_title">工作日设定</string>
+    <string name="workdays_desc">勾选你正常上班的日子（如做一休一只勾上班日）。未勾选的日子加班按「周末」档计酬。</string>
+    <string name="workdays_mon">周一</string>
+    <string name="workdays_tue">周二</string>
+    <string name="workdays_wed">周三</string>
+    <string name="workdays_thu">周四</string>
+    <string name="workdays_fri">周五</string>
+    <string name="workdays_sat">周六</string>
+    <string name="workdays_sun">周日</string>
+</resources>
