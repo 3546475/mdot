@@ -374,9 +374,9 @@ private fun SystemCard(
 fun AboutScreen(
     onBack: () -> Unit,
     context: android.content.Context = androidx.compose.ui.platform.LocalContext.current,
-    update: DataSourceViewModel = hiltViewModel(),
+    updateVm: UpdateViewModel = hiltViewModel(),
 ) {
-    val updateMsg by update.message.collectAsStateWithLifecycle()
+    val updateMsg by updateVm.notice.collectAsStateWithLifecycle()
     Column(
         Modifier
             .fillMaxSize()
@@ -397,12 +397,12 @@ fun AboutScreen(
                         "${pi.versionName} (${pi.versionCode})"
                     }.getOrDefault("-"),
                 )
-                // 更新 JSON 托管完成后（v0.5.x）此行接真实更新检查
-                SettingRow(stringResource(R.string.settings_row_check_update), null, onClick = update::checkUpdate)
+                // 点击拉取 update.json → 比对版本 → 提示更新（UpdateFlow 承载弹窗）
+                SettingRow(stringResource(R.string.settings_row_check_update), null, onClick = updateVm::check)
                 updateMsg?.let { msg ->
                     LaunchedEffect(msg) {
-                        kotlinx.coroutines.delay(2500)
-                        update.clearMessage()
+                        kotlinx.coroutines.delay(3000)
+                        updateVm.clearNotice()
                     }
                     Text(
                         msg,
@@ -439,4 +439,5 @@ fun AboutScreen(
         }
         Spacer(Modifier.height(Spacing.xl))
     }
+    UpdateFlow(updateVm)
 }

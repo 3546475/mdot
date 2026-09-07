@@ -282,11 +282,6 @@ class DataSourceViewModel @Inject constructor(
         busy.value = false
     }
 
-    /** 更新检查（本轮占位：URL 未托管时静默提示） */
-    fun checkUpdate() {
-        message.value = "当前已是最新版本（v${com.mdot.app.BuildConfig.VERSION_NAME}）"
-    }
-
     fun clearMessage() {
         message.value = null
     }

@@ -36,12 +36,17 @@ import com.mdot.app.core.navigation.contentBottomPadding
 
 /** 更新与数据源（F7-9 / F8-1） */
 @Composable
-fun DataSourceScreen(onBack: () -> Unit, vm: DataSourceViewModel = hiltViewModel()) {
+fun DataSourceScreen(
+    onBack: () -> Unit,
+    vm: DataSourceViewModel = hiltViewModel(),
+    updateVm: UpdateViewModel = hiltViewModel(),
+) {
     val holidayVersion by vm.holidayVersion.collectAsStateWithLifecycle()
     val holidayUrl by vm.holidayUrl.collectAsStateWithLifecycle()
     val updateUrl by vm.updateUrl.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
+    val updateNotice by updateVm.notice.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val versionText = remember {
         runCatching {
@@ -65,8 +70,20 @@ fun DataSourceScreen(onBack: () -> Unit, vm: DataSourceViewModel = hiltViewModel
                 Text(stringResource(R.string.datasource_section_update), style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(Spacing.s))
                 SettingRow(stringResource(R.string.datasource_current_version), versionText)
-                OutlinedButton(onClick = vm::checkUpdate, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = updateVm::check, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.datasource_check_update))
+                }
+                updateNotice?.let { msg ->
+                    LaunchedEffect(msg) {
+                        kotlinx.coroutines.delay(3000)
+                        updateVm.clearNotice()
+                    }
+                    Text(
+                        msg,
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
                 }
                 Spacer(Modifier.height(Spacing.s))
                 OutlinedTextField(
@@ -127,4 +144,5 @@ fun DataSourceScreen(onBack: () -> Unit, vm: DataSourceViewModel = hiltViewModel
         }
         Spacer(Modifier.height(Spacing.xl))
     }
+    UpdateFlow(updateVm)
 }

@@ -11,4 +11,10 @@
     <string name="datasource_refresh_now">立即刷新</string>
     <string name="datasource_builtin_hint">内置库为估算数据（仅节日正日），请配置远程 JSON 获取权威安排；刷新失败自动保留现库。</string>
     <string name="datasource_holiday_url_label">节假日 JSON 地址</string>
+    <!-- 应用内更新 -->
+    <string name="update_checking">正在检查更新…</string>
+    <string name="update_available_title">发现新版本</string>
+    <string name="update_available_version">新版本 v%1$s</string>
+    <string name="update_action_download">立即更新</string>
+    <string name="update_downloading">正在下载 %1$d%%</string>
 </resources>
