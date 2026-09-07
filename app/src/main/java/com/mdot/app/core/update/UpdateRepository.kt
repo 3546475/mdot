@@ -1,10 +1,10 @@
 package com.mdot.app.core.update
 
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
+import android.content.pm.PackageInstaller
 import android.os.Build
-import androidx.core.content.FileProvider
 import com.mdot.app.BuildConfig
 import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.core.network.JsonFetcher
@@ -99,21 +99,32 @@ class UpdateRepository @Inject constructor(
         }
 
     /**
-     * 调起系统安装器安装已下载的 APK（ACTION_VIEW + FileProvider）。
-     * 不预先申请/检查「安装未知应用」权限：Android 8+ 无权限时系统安装器会自行引导授权。
+     * 用 PackageInstaller Session API 安装已下载的 APK。
+     * 无需 REQUEST_INSTALL_PACKAGES 权限：创建 Session → 写入 APK → commit，
+     * 系统弹出安装确认界面，结果回调 [InstallResultReceiver]。
      */
-    fun install(file: File): Boolean = try {
-        val uri = FileProvider.getUriForFile(
-            context, "${context.packageName}.fileprovider", file,
-        )
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+    suspend fun install(file: File): Boolean = withContext(ioDispatcher) {
+        try {
+            val installer = context.packageManager.packageInstaller
+            val params = PackageInstaller.SessionParams(
+                PackageInstaller.SessionParams.MODE_FULL_INSTALL
+            )
+            val sessionId = installer.createSession(params)
+            installer.openSession(sessionId).use { session ->
+                session.openWrite("base.apk", 0, file.length()).use { out ->
+                    file.inputStream().use { it.copyTo(out) }
+                }
+                val intent = Intent(context, InstallResultReceiver::class.java)
+                val pendingIntent = PendingIntent.getBroadcast(
+                    context, sessionId, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                session.commit(pendingIntent.intentSender)
+            }
+            true
+        } catch (e: Exception) {
+            false
         }
-        context.startActivity(intent)
-        true
-    } catch (e: Exception) {
-        false
     }
 
     /** 已下载 APK 的缓存路径（与 download 的落盘规则一致）。 */

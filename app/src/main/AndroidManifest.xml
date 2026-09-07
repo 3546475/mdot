@@ -38,6 +38,10 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-    </application>
+        <receiver
+        android:name=".core.update.InstallResultReceiver"
+        android:exported="false" />
+
+</application>
 
 </manifest>
