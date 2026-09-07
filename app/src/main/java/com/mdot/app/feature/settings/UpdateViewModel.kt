@@ -21,6 +21,10 @@ sealed interface UpdateState {
     data object Checking : UpdateState
     data class Available(val info: UpdateInfo) : UpdateState
     data class Downloading(val progress: Int) : UpdateState
+    /** 用户点了「后台下载」：弹窗已关、下载继续；完成后转 [Downloaded] */
+    data class BackgroundDownloading(val progress: Int) : UpdateState
+    /** 后台下载完成，等待用户确认安装 */
+    data class Downloaded(val info: UpdateInfo, val file: java.io.File) : UpdateState
 }
 
 @HiltViewModel
@@ -56,29 +60,54 @@ class UpdateViewModel @Inject constructor(
         }
     }
 
-    /** 下载（已下载则复用）并调起安装；未授权「安装未知应用」时引导去系统设置。 */
+    /**
+     * 下载（已下载则复用）；完成后直接调系统安装器（无权限由系统引导），
+     * 后台下载则转入 [UpdateState.Downloaded] 等待用户确认安装。
+     */
     fun downloadAndInstall() {
         val info = (_state.value as? UpdateState.Available)?.info ?: return
         viewModelScope.launch {
             _state.value = UpdateState.Downloading(0)
-            when (val r = updateRepo.download(info) { p -> _state.value = UpdateState.Downloading(p) }) {
+            when (val r = updateRepo.download(info) { p ->
+                _state.value = if (_state.value is UpdateState.BackgroundDownloading) {
+                    UpdateState.BackgroundDownloading(p)
+                } else {
+                    UpdateState.Downloading(p)
+                }
+            }) {
                 is AppResult.Success -> {
-                    if (updateRepo.canInstall()) {
+                    if (_state.value is UpdateState.BackgroundDownloading) {
+                        _state.value = UpdateState.Downloaded(info, r.data)
+                    } else {
                         val ok = updateRepo.install(r.data)
                         _state.value = UpdateState.Idle
                         if (!ok) _notice.value = "无法调起安装器，请稍后重试"
-                    } else {
-                        // 回到可更新弹窗：授权后再次点击会直接复用已下载的包安装
-                        _state.value = UpdateState.Available(info)
-                        updateRepo.openInstallPermissionSettings()
-                        _notice.value = "请先在系统设置中允许安装未知应用，再点击「立即更新」"
                     }
                 }
                 is AppResult.Failure -> {
-                    _state.value = UpdateState.Available(info)
-                    _notice.value = "下载失败，请检查网络后重试"
+                    val bg = _state.value is UpdateState.BackgroundDownloading
+                    _state.value = UpdateState.Idle
+                    _notice.value = if (bg) "后台下载失败，请检查网络后重试" else "下载失败，请检查网络后重试"
                 }
             }
+        }
+    }
+
+    /** 下载中转入后台：关闭弹窗、下载继续；完成后弹「下载完成」确认安装。 */
+    fun backgroundDownload() {
+        val cur = _state.value
+        if (cur is UpdateState.Downloading) {
+            _state.value = UpdateState.BackgroundDownloading(cur.progress)
+        }
+    }
+
+    /** 后台下载完成后的安装确认：直接调系统安装器。 */
+    fun installDownloaded() {
+        val d = (_state.value as? UpdateState.Downloaded) ?: return
+        viewModelScope.launch {
+            val ok = updateRepo.install(d.file)
+            _state.value = UpdateState.Idle
+            if (!ok) _notice.value = "无法调起安装器，请稍后重试"
         }
     }
 

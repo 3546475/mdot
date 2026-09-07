@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.mdot.app.BuildConfig
 import com.mdot.app.core.datastore.SettingsDataSource
@@ -99,12 +98,10 @@ class UpdateRepository @Inject constructor(
             }
         }
 
-    /** 是否被允许安装未知来源应用（Android 8+ 需用户授权）。 */
-    fun canInstall(): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
-            context.packageManager.canRequestPackageInstalls()
-
-    /** 调起系统安装器安装已下载的 APK。 */
+    /**
+     * 调起系统安装器安装已下载的 APK（ACTION_VIEW + FileProvider）。
+     * 不预先申请/检查「安装未知应用」权限：Android 8+ 无权限时系统安装器会自行引导授权。
+     */
     fun install(file: File): Boolean = try {
         val uri = FileProvider.getUriForFile(
             context, "${context.packageName}.fileprovider", file,
@@ -119,16 +116,9 @@ class UpdateRepository @Inject constructor(
         false
     }
 
-    /** 跳转到「允许安装未知应用」系统设置页。 */
-    fun openInstallPermissionSettings() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val intent = Intent(
-                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                Uri.parse("package:${context.packageName}"),
-            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            runCatching { context.startActivity(intent) }
-        }
-    }
+    /** 已下载 APK 的缓存路径（与 download 的落盘规则一致）。 */
+    fun apkFile(info: UpdateInfo): File =
+        File(context.cacheDir, "updates/mdot-${info.versionName}.apk")
 }
 
 @Serializable

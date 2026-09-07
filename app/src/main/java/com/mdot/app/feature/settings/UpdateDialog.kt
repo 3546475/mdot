@@ -30,6 +30,9 @@ fun UpdateFlow(updateVm: UpdateViewModel) {
         UpdateState.Checking,
         UpdateState.Idle -> if (state is UpdateState.Checking) CheckingDialog()
 
+        // 后台下载中：无弹窗，下载完成后转 Downloaded
+        is UpdateState.BackgroundDownloading -> Unit
+
         is UpdateState.Available -> {
             val info = (state as UpdateState.Available).info
             AlertDialog(
@@ -82,7 +85,32 @@ fun UpdateFlow(updateVm: UpdateViewModel) {
                         )
                     }
                 },
-                confirmButton = {},
+                confirmButton = {
+                    TextButton(onClick = updateVm::backgroundDownload) {
+                        Text(stringResource(R.string.update_background_download))
+                    }
+                },
+            )
+        }
+
+        is UpdateState.Downloaded -> {
+            val d = (state as UpdateState.Downloaded)
+            AlertDialog(
+                onDismissRequest = updateVm::dismiss,
+                title = { Text(stringResource(R.string.update_downloaded_title)) },
+                text = {
+                    Text(stringResource(R.string.update_downloaded_text, d.info.versionName))
+                },
+                confirmButton = {
+                    TextButton(onClick = updateVm::installDownloaded) {
+                        Text(stringResource(R.string.update_action_install))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = updateVm::dismiss) {
+                        Text(stringResource(R.string.update_action_later))
+                    }
+                },
             )
         }
     }
