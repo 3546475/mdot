@@ -155,7 +155,7 @@ class SettingsDataSource @Inject constructor(
     companion object {
         val DEFAULT_WORKDAYS = listOf("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY")
         const val DEFAULT_UPDATE_URL =
-            "https://raw.githubusercontent.com/mdjiaban/update/main/update.json"
+            "https://3546475.github.io/mdot/update.json"
         const val DEFAULT_HOLIDAY_URL =
             "https://raw.githubusercontent.com/mdjiaban/update/main/holidays.json"
 
