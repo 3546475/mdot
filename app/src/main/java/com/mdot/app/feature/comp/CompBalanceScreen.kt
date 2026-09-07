@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -36,6 +37,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.ConfirmDialog
 import com.mdot.app.core.designsystem.component.JiabanTopBar
@@ -203,6 +205,7 @@ fun CompBalanceScreen(
                     )
                 }
                 OutlinedTextField(
+                shape = RoundedCornerShape(Radius.textField),
                     value = note,
                     onValueChange = { note = it.take(50) },
                     label = { Text(stringResource(R.string.comp_note_hint)) },

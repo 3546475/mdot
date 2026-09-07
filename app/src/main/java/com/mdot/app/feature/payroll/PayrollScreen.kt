@@ -1,15 +1,11 @@
 package com.mdot.app.feature.payroll
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,14 +16,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -48,7 +42,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -59,9 +52,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.mdot.app.R
 import com.mdot.app.core.datastore.SettingsDataSource
-import com.mdot.app.core.designsystem.Duration
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.component.FloatingLabelTextField
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.domain.CycleCalculator
@@ -345,6 +338,7 @@ private fun SalaryModeSection(state: PayrollUiState, vm: PayrollViewModel) {
 
             if (state.mode == SalaryMode.BASE || state.includeBase) {
                 OutlinedTextField(
+                shape = RoundedCornerShape(Radius.textField),
                     value = state.baseText,
                     onValueChange = vm::onBase,
                     label = { Text(stringResource(R.string.payroll_base_label)) },
@@ -394,6 +388,7 @@ private fun LeaveCoefficientSection(state: PayrollUiState, vm: PayrollViewModel)
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     OutlinedTextField(
+                    shape = RoundedCornerShape(Radius.textField),
                         value = (state.coefPercents[leaveTypes[i]] ?: 0).toString(),
                         onValueChange = { text -> text.toIntOrNull()?.let { vm.onCoef(leaveTypes[i], it) } },
                         label = { Text(leaveTypes[i].displayName) },
@@ -405,6 +400,7 @@ private fun LeaveCoefficientSection(state: PayrollUiState, vm: PayrollViewModel)
                     )
                     if (i + 1 < leaveTypes.size) {
                         OutlinedTextField(
+                        shape = RoundedCornerShape(Radius.textField),
                             value = (state.coefPercents[leaveTypes[i + 1]] ?: 0).toString(),
                             onValueChange = { text -> text.toIntOrNull()?.let { vm.onCoef(leaveTypes[i + 1], it) } },
                             label = { Text(leaveTypes[i + 1].displayName) },
@@ -425,9 +421,7 @@ private fun LeaveCoefficientSection(state: PayrollUiState, vm: PayrollViewModel)
 }
 
 /**
- * 三栏倍率/单价输入框：label 常驻浮在顶边框上（与 M3 有值时的浮动态一致）。
- * 不用 OutlinedTextField 的原因：空且未聚焦时 label 会缩回框内，
- * 窄栏里和后缀一起挤压换行，与有值时两副样式。
+ * 三栏倍率/单价输入框：label 可动（空且未聚焦时在框内，聚焦/有值浮到顶部），复用公共 FloatingLabelTextField。
  */
 @Composable
 private fun TierField(
@@ -437,56 +431,20 @@ private fun TierField(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    val borderColor by animateColorAsState(
-        targetValue = if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-        animationSpec = tween(Duration.normal),
-        label = "tierBorder",
+    FloatingLabelTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = label,
+        modifier = modifier,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        suffix = {
+            Text(
+                suffix,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
     )
-    val labelColor by animateColorAsState(
-        targetValue = if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = tween(Duration.normal),
-        label = "tierLabel",
-    )
-    Box(modifier) {
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            singleLine = true,
-            textStyle = MaterialTheme.typography.titleMedium.copy(
-                color = MaterialTheme.colorScheme.onSurface,
-            ),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            interactionSource = interaction,
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, borderColor, RoundedCornerShape(Radius.small))
-                .padding(start = 12.dp, end = 10.dp, top = 16.dp, bottom = 16.dp),
-            decorationBox = { inner ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.weight(1f)) { inner() }
-                    Text(
-                        suffix,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            },
-        )
-        // 常驻悬浮 label：骑在顶边框上，底色同卡片切断边框
-        Text(
-            label,
-            style = MaterialTheme.typography.labelMedium,
-            color = labelColor,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .offset(x = 12.dp, y = (-8).dp)
-                .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(4.dp))
-                .padding(horizontal = 4.dp),
-        )
-    }
 }
 
 @Composable
@@ -496,6 +454,7 @@ private fun HourlyPayrollContent(state: PayrollUiState, vm: PayrollViewModel) {
             Text(stringResource(R.string.payroll_hourly_title), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Spacing.xs))
             OutlinedTextField(
+            shape = RoundedCornerShape(Radius.textField),
                 value = state.hourlyRateText,
                 onValueChange = vm::onHourlyRate,
                 label = { Text(stringResource(R.string.payroll_hourly_rate_label)) },
@@ -521,6 +480,7 @@ private fun ComprehensivePayrollContent(state: PayrollUiState, vm: PayrollViewMo
             Text(stringResource(R.string.payroll_std_title), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Spacing.xs))
             OutlinedTextField(
+            shape = RoundedCornerShape(Radius.textField),
                 value = state.stdHoursText,
                 onValueChange = vm::onStdHours,
                 label = { Text(stringResource(R.string.payroll_std_label)) },

@@ -368,12 +368,29 @@ fun RecordSheet(
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 modifier = Modifier.weight(1f),
                                             )
-                                            OutlinedButton(onClick = { vm.onToCompDelta(-30) }) {
-                                                Icon(painterResource(R.drawable.ic_ms_remove), null, Modifier.size(18.dp))
-                                            }
-                                            Spacer(Modifier.size(8.dp))
-                                            OutlinedButton(onClick = { vm.onToCompDelta(30) }) {
-                                                Icon(painterResource(R.drawable.ic_ms_add), null, Modifier.size(18.dp))
+                                            Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
+                                                OutlinedButton(
+                                                    onClick = { vm.onToCompDelta(-30) },
+                                                    shape = RoundedCornerShape(
+                                                        topStart = Radius.textField,
+                                                        bottomStart = Radius.textField,
+                                                        topEnd = 4.dp,
+                                                        bottomEnd = 4.dp,
+                                                    ),
+                                                ) {
+                                                    Icon(painterResource(R.drawable.ic_ms_remove), null, Modifier.size(18.dp))
+                                                }
+                                                OutlinedButton(
+                                                    onClick = { vm.onToCompDelta(30) },
+                                                    shape = RoundedCornerShape(
+                                                        topStart = 4.dp,
+                                                        bottomStart = 4.dp,
+                                                        topEnd = Radius.textField,
+                                                        bottomEnd = Radius.textField,
+                                                    ),
+                                                ) {
+                                                    Icon(painterResource(R.drawable.ic_ms_add), null, Modifier.size(18.dp))
+                                                }
                                             }
                                         }
                                     }
@@ -395,9 +412,10 @@ fun RecordSheet(
 
                                 // ---- 备注 ----
                                 OutlinedTextField(
+                                shape = RoundedCornerShape(Radius.textField),
                                     value = state.note,
                                     onValueChange = vm::onNote,
-                                    placeholder = { Text(stringResource(R.string.record_note_placeholder)) },
+                                    label = { Text(stringResource(R.string.record_note_label)) },
                                     modifier = Modifier.fillMaxWidth(),
                                     minLines = 1,
                                     maxLines = 3,

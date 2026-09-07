@@ -20,7 +20,7 @@
     <string name="record_tier_auto">自动</string>
     <string name="record_tocomp_value">转调休 %1$s</string>
     <string name="record_deduct_preview">预计扣款 %1$s</string>
-    <string name="record_note_placeholder">备注（选填，≤200 字）</string>
+    <string name="record_note_label">备注（选填，≤200 字）</string>
     <string name="record_delete">删除</string>
     <string name="record_cancel">取消</string>
     <string name="record_save">保存</string>

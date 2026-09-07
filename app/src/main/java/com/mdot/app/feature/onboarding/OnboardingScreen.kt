@@ -251,6 +251,7 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
                         )
                         Spacer(Modifier.height(16.dp))
                         OutlinedTextField(
+                        shape = RoundedCornerShape(Radius.textField),
                             value = baseText,
                             onValueChange = { baseText = it.filter { c -> c.isDigit() || c == '.' } },
                             label = { Text(stringResource(R.string.onboarding_base_salary_label)) },
@@ -276,6 +277,7 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
                         )
                         Spacer(Modifier.height(16.dp))
                         OutlinedTextField(
+                        shape = RoundedCornerShape(Radius.textField),
                             value = baseText,
                             onValueChange = { baseText = it.filter { c -> c.isDigit() || c == '.' } },
                             label = { Text(stringResource(R.string.onboarding_base_salary_label)) },
@@ -322,6 +324,7 @@ private fun androidx.compose.foundation.layout.RowScope.MultField(
     onChange: (String) -> Unit,
 ) {
     OutlinedTextField(
+    shape = RoundedCornerShape(Radius.textField),
         value = value,
         onValueChange = onChange,
         label = { Text(label) },

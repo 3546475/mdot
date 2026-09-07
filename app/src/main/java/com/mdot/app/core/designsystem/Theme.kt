@@ -5,7 +5,9 @@ import com.mdot.app.R
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -312,6 +314,7 @@ val JiabanTypography: Typography = run {
 
 // ---- 主题唯一入口（04 文档 §4.1） ----
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun JiabanTheme(
     appearance: AppearanceConfig,
@@ -330,8 +333,9 @@ fun JiabanTheme(
         darkTheme -> paletteOf(appearance.paletteId).dark
         else -> paletteOf(appearance.paletteId).light
     }
-    MaterialTheme(
+    MaterialExpressiveTheme(
         colorScheme = colorScheme,
+        motionScheme = MotionScheme.expressive(),
         typography = JiabanTypography,
         shapes = ExpressiveShapes,
         content = content,

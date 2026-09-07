@@ -58,6 +58,7 @@
     <string name="settings_about_title">关于</string>
     <string name="settings_row_app">应用</string>
     <string name="settings_row_version">版本</string>
+    <string name="settings_row_github">GitHub 仓库</string>
     <string name="settings_row_check_update">检查更新</string>
     <string name="settings_privacy_title">隐私承诺</string>
     <string name="settings_privacy_body">本应用不联网收集任何数据：无账号、无统计 SDK、无广告。所有记录只保存在你的手机上；备份只会传到你亲自配置的自己的网盘。</string>

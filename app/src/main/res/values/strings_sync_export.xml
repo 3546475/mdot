@@ -43,7 +43,7 @@
     <string name="sync_storage_edit_title_s3">编辑 S3 存储源</string>
     <string name="sync_storage_add_title_webdav">新增 WebDAV 存储源</string>
     <string name="sync_storage_add_title_s3">新增 S3 存储源</string>
-    <string name="sync_storage_name_label">名称（如：坚果云、自建服务器）</string>
+    <string name="sync_storage_name_label">服务器名称</string>
     <string name="sync_storage_save">保存</string>
     <string name="sync_storage_cancel">取消</string>
     <string name="sync_storage_delete">删除</string>
@@ -59,7 +59,7 @@
     <string name="sync_storage_tip">提示：备份包为明文 ZIP（含全部记录与设置，不含网盘账号）。请确保你的网盘账号安全；同一时间只在一台设备上开启自动备份。切换存储源时会先检测连接，通过后才生效。</string>
     <string name="sync_storage_trust_title">信任自签名证书</string>
     <string name="sync_storage_trust_desc">仅 HTTPS 自建服务（NAS/MinIO）证书无法验证时开启；开启前请确认服务器可信</string>
-    <string name="sync_storage_webdav_url_label">服务器地址（如 https://dav.jianguoyun.com/dav/）</string>
+    <string name="sync_storage_webdav_url_label">服务器地址</string>
     <string name="sync_storage_username_label">账号</string>
     <string name="sync_storage_password_label">密码（坚果云请用应用密码）</string>
     <string name="sync_storage_endpoint_label">Endpoint（如 https://oss-cn-hangzhou.aliyuncs.com）</string>

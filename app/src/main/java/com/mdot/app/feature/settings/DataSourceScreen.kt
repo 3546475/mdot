@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
+import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.JiabanTopBar
@@ -87,6 +89,7 @@ fun DataSourceScreen(
                 }
                 Spacer(Modifier.height(Spacing.s))
                 OutlinedTextField(
+                shape = RoundedCornerShape(Radius.textField),
                     value = updateUrl,
                     onValueChange = vm::setUpdateUrl,
                     label = { Text(stringResource(R.string.datasource_update_url_label)) },
@@ -121,6 +124,7 @@ fun DataSourceScreen(
                 )
                 Spacer(Modifier.height(Spacing.s))
                 OutlinedTextField(
+                shape = RoundedCornerShape(Radius.textField),
                     value = holidayUrl,
                     onValueChange = vm::setHolidayUrl,
                     label = { Text(stringResource(R.string.datasource_holiday_url_label)) },

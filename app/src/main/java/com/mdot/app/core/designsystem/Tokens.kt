@@ -24,6 +24,7 @@ object Radius {
     val bar = 32.dp
     val sheet = 28.dp
     val pill = 100.dp
+    val textField = 20.dp
 }
 
 object Duration {

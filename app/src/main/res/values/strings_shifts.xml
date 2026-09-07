@@ -16,7 +16,8 @@
     <string name="shifts_name_label">名称</string>
     <string name="shifts_ok">确定</string>
     <string name="shifts_cancel">取消</string>
-    <string name="shifts_rename_title">改名：%1$s</string>
+    <string name="shifts_rename_title">重命名班次</string>
+    <string name="shifts_rename_label">班次名称</string>
     <string name="shifts_delete_title">删除班次「%1$s」？</string>
     <string name="shifts_delete_text">已有记录会保留该班次的名称快照，仅从班次列表中移除。</string>
 </resources>

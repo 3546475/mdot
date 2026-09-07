@@ -576,38 +576,32 @@ fun ShiftsScreen(onBack: () -> Unit, vm: ShiftsViewModel = hiltViewModel()) {
 
     // 新建
     if (showCreate) {
-        AlertDialog(
-            onDismissRequest = { showCreate = false },
-            title = { Text(stringResource(R.string.shifts_create_title)) },
-            text = {
-                OutlinedTextField(value = newName, onValueChange = { newName = it.take(10) }, label = { Text(stringResource(R.string.shifts_name_label)) })
+        ShiftNameDialog(
+            title = stringResource(R.string.shifts_create_title),
+            label = stringResource(R.string.shifts_name_label),
+            value = newName,
+            onValueChange = { newName = it.take(10) },
+            onConfirm = {
+                vm.create(newName)
+                newName = ""
+                showCreate = false
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    vm.create(newName)
-                    newName = ""
-                    showCreate = false
-                }) { Text(stringResource(R.string.shifts_ok)) }
-            },
-            dismissButton = { TextButton(onClick = { showCreate = false }) { Text(stringResource(R.string.shifts_cancel)) } },
+            onDismiss = { showCreate = false },
         )
     }
 
     // 改名
     renaming?.let { target ->
-        AlertDialog(
-            onDismissRequest = { renaming = null },
-            title = { Text(stringResource(R.string.shifts_rename_title, target.name)) },
-            text = {
-                OutlinedTextField(value = renameText, onValueChange = { renameText = it.take(10) })
+        ShiftNameDialog(
+            title = stringResource(R.string.shifts_rename_title),
+            label = stringResource(R.string.shifts_rename_label),
+            value = renameText,
+            onValueChange = { renameText = it.take(10) },
+            onConfirm = {
+                vm.rename(target.id, renameText)
+                renaming = null
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    vm.rename(target.id, renameText)
-                    renaming = null
-                }) { Text(stringResource(R.string.shifts_ok)) }
-            },
-            dismissButton = { TextButton(onClick = { renaming = null }) { Text(stringResource(R.string.shifts_cancel)) } },
+            onDismiss = { renaming = null },
         )
     }
 
@@ -623,4 +617,37 @@ fun ShiftsScreen(onBack: () -> Unit, vm: ShiftsViewModel = hiltViewModel()) {
             onDismiss = { deleting = null },
         )
     }
+}
+
+
+/** 班次名称输入弹窗（新建/改名共用）：20dp 圆角 + 浮动 label + 单行输入 */
+@Composable
+private fun ShiftNameDialog(
+    title: String,
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                shape = RoundedCornerShape(Radius.textField),
+                value = value,
+                onValueChange = onValueChange,
+                label = { Text(label) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.shifts_ok)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.shifts_cancel)) }
+        },
+    )
 }

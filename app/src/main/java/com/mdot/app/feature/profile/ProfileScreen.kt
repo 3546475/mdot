@@ -296,6 +296,7 @@ fun ProfileScreen(
             title = { Text(stringResource(R.string.profile_edit_nickname)) },
             text = {
                 OutlinedTextField(
+                shape = RoundedCornerShape(Radius.textField),
                     value = nameText,
                     onValueChange = { raw ->
                         nameOverLimit = raw.length > 24

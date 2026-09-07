@@ -81,7 +81,11 @@ class WebDavProvider @Inject constructor(
     }
 
     override suspend fun ensureBaseDir(): Result<Unit> = runCatching {
-        // 逐级 MKCOL：mdot/ → mdot/backup/ → history/（405=已存在 视为成功）
+        // 1) 先验证 baseUrl 指向真实 WebDAV 端点：PROPFIND Depth 0 必须返回 multistatus XML。
+        //    某些 Web 服务（如 alist 前端）对任意路径/任意方法兜底返回 200 HTML，
+        //    仅靠 MKCOL 2xx 会把无效地址误判为可达。
+        verifyDavEndpoint()
+        // 2) 逐级 MKCOL：mdot/ → mdot/backup/ → history/（405=已存在 视为成功）
         val cfg = requireConfig()
         val base = cfg.baseUrl.trimEnd('/')
         val segments = listOf("mdot", "mdot/backup", "mdot/backup/history")
@@ -99,6 +103,34 @@ class WebDavProvider @Inject constructor(
             }
         }
         Unit
+    }
+
+    /** 校验 baseUrl 是真实 WebDAV 服务：PROPFIND 自身必须返回 multistatus XML（207/2xx 均可） */
+    private suspend fun verifyDavEndpoint() {
+        val cfg = requireConfig()
+        val base = cfg.baseUrl.trimEnd('/')
+        val body = """<?xml version="1.0"?>
+<d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>"""
+        val req = Request.Builder()
+            .url("$base/")
+            .method("PROPFIND", body.toRequestBody("application/xml".toMediaType()))
+            .header("Authorization", authHeader())
+            .header("Depth", "0")
+            .build()
+        httpClient().executeWithBackoff(req, ioDispatcher).use { resp ->
+            if (!resp.isSuccessful && resp.code != 207) {
+                throw mapError(resp.code, resp.body?.string())
+            }
+            val xml = resp.body?.string().orEmpty()
+            // 真正的 WebDAV 服务返回 multistatus XML；兜底 HTML（200）视为无效端点
+            if (!xml.contains("multistatus", ignoreCase = true) &&
+                !xml.contains("<response", ignoreCase = true)
+            ) {
+                throw IOException(
+                    "该地址未返回 WebDAV 目录信息，请确认地址指向 dav 服务（如 https://dav.jianguoyun.com/dav/）"
+                )
+            }
+        }
     }
 
     override suspend fun put(path: String, bytes: ByteArray, ifMatch: String?): Result<PutResult> =

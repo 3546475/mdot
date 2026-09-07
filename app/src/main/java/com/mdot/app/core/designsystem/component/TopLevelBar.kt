@@ -2,10 +2,8 @@ package com.mdot.app.core.designsystem.component
 
 import com.mdot.app.R
 import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -17,8 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -29,7 +27,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
@@ -91,20 +88,13 @@ fun TopLevelBar(
             }
         }
         Spacer(Modifier.weight(1f))
-        // 设置：圆形 tonal 图标按钮（clip 裁剪涟漪到圆形内）
+        // 设置：圆形 tonal 图标按钮（M3E 改造：换 FilledTonalIconButton，涟漪/尺寸由组件自带）
         val settingsInteraction = remember { MutableInteractionSource() }
-        Box(
+        FilledTonalIconButton(
+            onClick = onOpenSettings,
             modifier = Modifier
                 .size(40.dp)
-                .pressScale(settingsInteraction, pressedScale = 0.9f)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape)
-                .clickable(
-                    interactionSource = settingsInteraction,
-                    indication = LocalIndication.current,
-                    onClick = onOpenSettings,
-                ),
-            contentAlignment = Alignment.Center,
+                .pressScale(settingsInteraction, pressedScale = 0.9f),
         ) {
             Icon(
                 painterResource(R.drawable.ic_ms_settings),

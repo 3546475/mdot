@@ -1,5 +1,7 @@
 package com.mdot.app.feature.settings
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -389,6 +391,19 @@ fun AboutScreen(
                 )
                 // 点击拉取 update.json → 比对版本 → 提示更新（UpdateFlow 承载弹窗）
                 SettingRow(stringResource(R.string.settings_row_check_update), null, onClick = updateVm::check)
+
+                // 项目开源地址（公开仓 3546475/mdot），点击跳转 GitHub
+                SettingRow(
+                    stringResource(R.string.settings_row_github),
+                    "github.com/3546475/mdot",
+                    onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/3546475/mdot"))
+                            )
+                        }
+                    },
+                )
                 updateMsg?.let { msg ->
                     LaunchedEffect(msg) {
                         kotlinx.coroutines.delay(3000)

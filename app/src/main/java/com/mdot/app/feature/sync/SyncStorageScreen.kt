@@ -21,7 +21,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,6 +38,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.ConfirmDialog
+import com.mdot.app.core.designsystem.component.FloatingLabelTextField
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.sync.ProviderKind
@@ -327,37 +327,33 @@ private fun AddSourceDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(Spacing.s),
             ) {
-                OutlinedTextField(
+                FloatingLabelTextField(
                     value = name,
                     onValueChange = onNameChange,
-                    label = { Text(stringResource(R.string.sync_storage_name_label)) },
-                    singleLine = true,
+                    label = stringResource(R.string.sync_storage_name_label),
                     modifier = Modifier.fillMaxWidth(),
-                )
+                                    )
                 when (kind) {
                     ProviderKind.WEBDAV -> {
-                        OutlinedTextField(
+                        FloatingLabelTextField(
                             value = webdavForm.baseUrl,
                             onValueChange = { onWebdavChange(webdavForm.copy(baseUrl = it)) },
-                            label = { Text(stringResource(R.string.sync_storage_webdav_url_label)) },
-                            singleLine = true,
+                            label = stringResource(R.string.sync_storage_webdav_url_label),
                             modifier = Modifier.fillMaxWidth(),
-                        )
-                        OutlinedTextField(
+                                                    )
+                        FloatingLabelTextField(
                             value = webdavForm.username,
                             onValueChange = { onWebdavChange(webdavForm.copy(username = it)) },
-                            label = { Text(stringResource(R.string.sync_storage_username_label)) },
-                            singleLine = true,
+                            label = stringResource(R.string.sync_storage_username_label),
                             modifier = Modifier.fillMaxWidth(),
-                        )
-                        OutlinedTextField(
+                                                    )
+                        FloatingLabelTextField(
                             value = webdavForm.password,
                             onValueChange = { onWebdavChange(webdavForm.copy(password = it)) },
-                            label = { Text(stringResource(R.string.sync_storage_password_label)) },
-                            singleLine = true,
+                            label = stringResource(R.string.sync_storage_password_label),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                             modifier = Modifier.fillMaxWidth(),
-                        )
+                                                    )
                         TrustSelfSignedRow(
                             checked = webdavForm.trustSelfSigned,
                             onChange = { onWebdavChange(webdavForm.copy(trustSelfSigned = it)) },
@@ -365,49 +361,43 @@ private fun AddSourceDialog(
                     }
 
                     ProviderKind.S3 -> {
-                        OutlinedTextField(
+                        FloatingLabelTextField(
                             value = s3Form.endpoint,
                             onValueChange = { onS3Change(s3Form.copy(endpoint = it)) },
-                            label = { Text(stringResource(R.string.sync_storage_endpoint_label)) },
-                            singleLine = true,
+                            label = stringResource(R.string.sync_storage_endpoint_label),
                             modifier = Modifier.fillMaxWidth(),
-                        )
-                        OutlinedTextField(
+                                                    )
+                        FloatingLabelTextField(
                             value = s3Form.bucket,
                             onValueChange = { onS3Change(s3Form.copy(bucket = it)) },
-                            label = { Text(stringResource(R.string.sync_storage_bucket_label)) },
-                            singleLine = true,
+                            label = stringResource(R.string.sync_storage_bucket_label),
                             modifier = Modifier.fillMaxWidth(),
-                        )
-                        OutlinedTextField(
+                                                    )
+                        FloatingLabelTextField(
                             value = s3Form.region,
                             onValueChange = { onS3Change(s3Form.copy(region = it)) },
-                            label = { Text(stringResource(R.string.sync_storage_region_label)) },
-                            singleLine = true,
+                            label = stringResource(R.string.sync_storage_region_label),
                             modifier = Modifier.fillMaxWidth(),
-                        )
-                        OutlinedTextField(
+                                                    )
+                        FloatingLabelTextField(
                             value = s3Form.accessKeyId,
                             onValueChange = { onS3Change(s3Form.copy(accessKeyId = it)) },
-                            label = { Text(stringResource(R.string.sync_storage_access_key_label)) },
-                            singleLine = true,
+                            label = stringResource(R.string.sync_storage_access_key_label),
                             modifier = Modifier.fillMaxWidth(),
-                        )
-                        OutlinedTextField(
+                                                    )
+                        FloatingLabelTextField(
                             value = s3Form.secretAccessKey,
                             onValueChange = { onS3Change(s3Form.copy(secretAccessKey = it)) },
-                            label = { Text(stringResource(R.string.sync_storage_secret_key_label)) },
-                            singleLine = true,
+                            label = stringResource(R.string.sync_storage_secret_key_label),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                             modifier = Modifier.fillMaxWidth(),
-                        )
-                        OutlinedTextField(
+                                                    )
+                        FloatingLabelTextField(
                             value = s3Form.pathPrefix,
                             onValueChange = { onS3Change(s3Form.copy(pathPrefix = it)) },
-                            label = { Text(stringResource(R.string.sync_storage_path_prefix_label)) },
-                            singleLine = true,
+                            label = stringResource(R.string.sync_storage_path_prefix_label),
                             modifier = Modifier.fillMaxWidth(),
-                        )
+                                                    )
                         TrustSelfSignedRow(
                             checked = s3Form.trustSelfSigned,
                             onChange = { onS3Change(s3Form.copy(trustSelfSigned = it)) },
