@@ -9,20 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.CloudSync
-import androidx.compose.material.icons.outlined.Dashboard
-import androidx.compose.material.icons.outlined.FileDownload
-import androidx.compose.material.icons.outlined.AccountBalance
-import androidx.compose.material.icons.outlined.Paid
-import androidx.compose.material.icons.outlined.Palette
-import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.material.icons.outlined.SwapHoriz
-import androidx.compose.material.icons.outlined.ViewWeek
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -45,10 +32,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
@@ -71,6 +60,7 @@ fun SettingsScreen(
 ) {
     val appearance by hub.appearance.collectAsStateWithLifecycle()
     val syncStatus by hub.syncStatus.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     Column(
         Modifier
@@ -84,9 +74,9 @@ fun SettingsScreen(
 
         // ---- 查看与分享 ----
         SettingsGroup(stringResource(R.string.settings_group_view_share)) {
-            SettingRow(stringResource(R.string.settings_row_calendar), null, Icons.Outlined.CalendarMonth, onClick = { onOpen(Routes.CALENDAR_PATTERN) })
-            SettingRow(stringResource(R.string.settings_row_stats), null, Icons.Outlined.BarChart, onClick = { onOpen(Routes.STATS) })
-            SettingRow(stringResource(R.string.settings_row_share), null, Icons.Outlined.FileDownload, onClick = { onOpen(Routes.EXPORT) })
+            SettingRow(stringResource(R.string.settings_row_calendar), null, painterResource(R.drawable.ic_ms_calendar_month), onClick = { onOpen(Routes.CALENDAR_PATTERN) })
+            SettingRow(stringResource(R.string.settings_row_stats), null, painterResource(R.drawable.ic_ms_bar_chart), onClick = { onOpen(Routes.STATS) })
+            SettingRow(stringResource(R.string.settings_row_share), null, painterResource(R.drawable.ic_ms_file_download), onClick = { onOpen(Routes.EXPORT) })
         }
 
         Spacer(Modifier.height(Spacing.m))
@@ -97,7 +87,7 @@ fun SettingsScreen(
                 stringResource(R.string.settings_row_sync_backup),
                 if (syncStatus.configured) stringResource(R.string.settings_sync_configured)
                 else stringResource(R.string.settings_sync_not_configured),
-                Icons.Outlined.CloudSync, onClick = { onOpen(Routes.SYNC) },
+                painterResource(R.drawable.ic_ms_cloud_sync), onClick = { onOpen(Routes.SYNC) },
             )
         }
 
@@ -106,8 +96,8 @@ fun SettingsScreen(
         // ---- 个性化 ----
         SettingsGroup(stringResource(R.string.settings_group_personalization)) {
             SettingRow(
-                stringResource(R.string.settings_row_appearance), appearanceSummary(appearance),
-                Icons.Outlined.Palette, onClick = { onOpen(Routes.APPEARANCE) },
+                stringResource(R.string.settings_row_appearance), appearanceSummary(context, appearance),
+                painterResource(R.drawable.ic_ms_palette), onClick = { onOpen(Routes.APPEARANCE) },
             )
         }
 
@@ -115,7 +105,7 @@ fun SettingsScreen(
 
         // ---- 其他 ----
         SettingsGroup(stringResource(R.string.settings_group_other)) {
-            SettingRow(stringResource(R.string.settings_row_about_privacy), null, Icons.Outlined.Shield, onClick = { onOpen(Routes.ABOUT) })
+            SettingRow(stringResource(R.string.settings_row_about_privacy), null, painterResource(R.drawable.ic_ms_shield), onClick = { onOpen(Routes.ABOUT) })
         }
         Spacer(Modifier.height(Spacing.xl))
     }

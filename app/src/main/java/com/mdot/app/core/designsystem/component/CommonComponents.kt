@@ -27,8 +27,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mdot.app.core.designsystem.Radius
@@ -59,7 +59,7 @@ fun SectionCard(
 /** 空状态（03 文档 §6；M3 Expressive：图标置于圆形 tonal 底上） */
 @Composable
 fun EmptyState(
-    icon: ImageVector,
+    icon: Painter,
     title: String,
     hint: String? = null,
     actionText: String? = null,
@@ -135,7 +135,7 @@ fun ConfirmDialog(
 fun SettingRow(
     title: String,
     value: String? = null,
-    icon: ImageVector? = null,
+    icon: Painter? = null,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     trailing: (@Composable () -> Unit)? = null,
@@ -163,13 +163,13 @@ fun SettingRow(
             Box(
                 modifier = Modifier
                     .size(34.dp)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(12.dp)),
+                    .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp),
                 )
             }

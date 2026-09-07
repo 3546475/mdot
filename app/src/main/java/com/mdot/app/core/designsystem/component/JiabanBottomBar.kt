@@ -24,24 +24,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.CloudSync
-import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Paid
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.CloudSync
-import androidx.compose.material.icons.outlined.FileDownload
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Paid
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Settings
+import androidx.annotation.DrawableRes
 import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,7 +37,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
@@ -64,25 +48,25 @@ import com.mdot.app.core.designsystem.BottomBarSpec
 import com.mdot.app.core.designsystem.Radius
 import kotlin.math.roundToInt
 
-/** 底栏功能池槽位定义（03 文档 §4.2）；M3 Expressive：选中态用填充图标变体。label 为资源 id，显示点用 stringResource 解析 */
+/** 底栏功能池槽位定义（03 文档 §4.2）；MD3E：图标为 Material Symbols Rounded 单色形状，选中态由 tint（onSecondaryContainer/primary）+ 弹性放大区分。label 为资源 id，显示点用 stringResource 解析 */
 data class SlotSpec(
     val id: String,
     val labelRes: Int,
     val route: String,
-    val icon: ImageVector,
-    val iconFilled: ImageVector = icon,
+    @DrawableRes val iconRes: Int,
+    @DrawableRes val iconFilledRes: Int = iconRes,
 )
 
 object SlotRegistry {
     val ALL = mapOf(
-        "home" to SlotSpec("home", R.string.ds_slot_home, "home", Icons.Outlined.Home, Icons.Filled.Home),
-        "calendar" to SlotSpec("calendar", R.string.ds_slot_calendar, "calendar", Icons.Outlined.CalendarMonth, Icons.Filled.CalendarMonth),
-        "stats" to SlotSpec("stats", R.string.ds_slot_stats, "stats", Icons.Outlined.BarChart, Icons.Filled.BarChart),
-        "payroll" to SlotSpec("payroll", R.string.ds_slot_payroll, "payroll", Icons.Outlined.Paid, Icons.Filled.Paid),
-        "export" to SlotSpec("export", R.string.ds_slot_export, "export", Icons.Outlined.FileDownload, Icons.Filled.FileDownload),
-        "sync" to SlotSpec("sync", R.string.ds_slot_sync, "sync", Icons.Outlined.CloudSync, Icons.Filled.CloudSync),
-        "settings" to SlotSpec("settings", R.string.ds_slot_settings, "settings", Icons.Outlined.Settings, Icons.Filled.Settings),
-        "profile" to SlotSpec("profile", R.string.ds_slot_profile, "profile", Icons.Outlined.Person, Icons.Filled.Person),
+        "home" to SlotSpec("home", R.string.ds_slot_home, "home", R.drawable.ic_ms_home),
+        "calendar" to SlotSpec("calendar", R.string.ds_slot_calendar, "calendar", R.drawable.ic_ms_calendar_month),
+        "stats" to SlotSpec("stats", R.string.ds_slot_stats, "stats", R.drawable.ic_ms_bar_chart),
+        "payroll" to SlotSpec("payroll", R.string.ds_slot_payroll, "payroll", R.drawable.ic_ms_paid),
+        "export" to SlotSpec("export", R.string.ds_slot_export, "export", R.drawable.ic_ms_file_download),
+        "sync" to SlotSpec("sync", R.string.ds_slot_sync, "sync", R.drawable.ic_ms_cloud_sync),
+        "settings" to SlotSpec("settings", R.string.ds_slot_settings, "settings", R.drawable.ic_ms_settings),
+        "profile" to SlotSpec("profile", R.string.ds_slot_profile, "profile", R.drawable.ic_ms_person),
     )
 
     fun resolve(id: String): SlotSpec? = ALL[id]
@@ -208,7 +192,7 @@ private fun SlotBody(
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(
-            if (selected) slot.iconFilled else slot.icon,
+            painterResource(if (selected) slot.iconFilledRes else slot.iconRes),
             contentDescription = stringResource(slot.labelRes),
             tint = tint,
             modifier = Modifier

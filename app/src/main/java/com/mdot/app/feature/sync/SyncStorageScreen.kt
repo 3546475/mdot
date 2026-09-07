@@ -14,12 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.RadioButtonChecked
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -34,6 +28,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -89,7 +84,7 @@ fun SyncStorageScreen(
                 onClick = vm::openAddDialog,
                 enabled = state.kind == ProviderKind.WEBDAV && !state.adding,
             ) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.sync_storage_add))
+                Icon(painterResource(R.drawable.ic_ms_add), contentDescription = stringResource(R.string.sync_storage_add))
             }
         }
 
@@ -271,7 +266,7 @@ private fun SourceCard(
             } else {
                 IconButton(onClick = onEdit) {
                     Icon(
-                        Icons.Outlined.Edit,
+                        painterResource(R.drawable.ic_ms_edit),
                         contentDescription = stringResource(R.string.sync_storage_edit),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
@@ -279,7 +274,7 @@ private fun SourceCard(
                 }
                 IconButton(onClick = onDelete) {
                     Icon(
-                        Icons.Outlined.Delete,
+                        painterResource(R.drawable.ic_ms_delete),
                         contentDescription = stringResource(R.string.sync_storage_delete),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
@@ -287,7 +282,7 @@ private fun SourceCard(
                 }
             }
             Icon(
-                if (selected) Icons.Filled.RadioButtonChecked else Icons.Outlined.RadioButtonUnchecked,
+                if (selected) painterResource(R.drawable.ic_ms_radio_button_checked) else painterResource(R.drawable.ic_ms_radio_button_unchecked),
                 contentDescription = null,
                 tint = if (selected) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.outlineVariant,

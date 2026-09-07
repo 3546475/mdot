@@ -25,12 +25,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DragIndicator
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -59,8 +53,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -218,7 +213,7 @@ private fun buildExample(anchor: Int): String {
 /** 紧凑 34dp 图标按钮（班次行排序/菜单用）；涟漪已裁剪到圆角内 */
 @Composable
 private fun CompactIconButton(
-    icon: ImageVector,
+    icon: Painter,
     contentDescription: String,
     enabled: Boolean = true,
     onClick: () -> Unit,
@@ -356,7 +351,7 @@ fun ShiftsScreen(onBack: () -> Unit, vm: ShiftsViewModel = hiltViewModel()) {
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Icon(
-                            Icons.Outlined.Add, contentDescription = null,
+                            painterResource(R.drawable.ic_ms_add), contentDescription = null,
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(15.dp),
                         )
@@ -483,7 +478,7 @@ fun ShiftsScreen(onBack: () -> Unit, vm: ShiftsViewModel = hiltViewModel()) {
                                             contentAlignment = Alignment.Center,
                                         ) {
                                             Icon(
-                                                Icons.Filled.DragIndicator,
+                                                painterResource(R.drawable.ic_ms_drag_indicator),
                                                 contentDescription = stringResource(R.string.shifts_drag_reorder),
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.size(20.dp),
@@ -529,14 +524,14 @@ fun ShiftsScreen(onBack: () -> Unit, vm: ShiftsViewModel = hiltViewModel()) {
                                         )
                                         Spacer(Modifier.width(Spacing.xs))
                                         Box {
-                                            CompactIconButton(Icons.Outlined.MoreVert, stringResource(R.string.shifts_more_actions)) { menuFor = shift }
+                                            CompactIconButton(painterResource(R.drawable.ic_ms_more_vert), stringResource(R.string.shifts_more_actions)) { menuFor = shift }
                                             DropdownMenu(
                                                 expanded = menuFor?.id == shift.id,
                                                 onDismissRequest = { menuFor = null },
                                             ) {
                                                 DropdownMenuItem(
                                                     text = { Text(stringResource(R.string.shifts_rename)) },
-                                                    leadingIcon = { Icon(Icons.Outlined.Edit, null) },
+                                                    leadingIcon = { Icon(painterResource(R.drawable.ic_ms_edit), null) },
                                                     onClick = {
                                                         menuFor = null
                                                         renaming = shift
@@ -548,7 +543,7 @@ fun ShiftsScreen(onBack: () -> Unit, vm: ShiftsViewModel = hiltViewModel()) {
                                                         text = { Text(stringResource(R.string.shifts_delete), color = MaterialTheme.colorScheme.error) },
                                                         leadingIcon = {
                                                             Icon(
-                                                                Icons.Outlined.Delete, null,
+                                                                painterResource(R.drawable.ic_ms_delete), null,
                                                                 tint = MaterialTheme.colorScheme.error,
                                                             )
                                                         },

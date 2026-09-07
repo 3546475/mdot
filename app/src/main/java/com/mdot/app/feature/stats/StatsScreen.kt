@@ -23,8 +23,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -40,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
@@ -319,7 +318,7 @@ fun StatsScreen(
         if (out == null || out.breakdowns.isEmpty()) {
             item {
                 EmptyState(
-                    icon = Icons.Outlined.BarChart,
+                    icon = painterResource(R.drawable.ic_ms_bar_chart),
                     title = stringResource(R.string.stats_empty_title),
                     hint = when (state.workSystem) {
                         com.mdot.app.domain.model.WorkSystem.HOURLY -> stringResource(R.string.stats_empty_hint_hourly)

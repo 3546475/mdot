@@ -112,7 +112,7 @@ private fun AppResult<*>.messageOrSuccess(ok: String): String = when (this) {
 }
 
 /** 外观摘要（我的页外观行右值），如"浅色 · 抹茶绿"/"跟随系统 · 动态取色" */
-fun appearanceSummary(config: AppearanceConfig): String {
+fun appearanceSummary(context: android.content.Context, config: AppearanceConfig): String {
     val theme = when (config.themeMode) {
         ThemeMode.LIGHT -> "浅色"
         ThemeMode.DARK -> "深色"
@@ -121,8 +121,9 @@ fun appearanceSummary(config: AppearanceConfig): String {
     if (config.dynamicColor &&
         android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
     ) return "$theme · 动态取色"
-    val palette = com.mdot.app.core.designsystem.paletteOptions()
-        .firstOrNull { it.first == config.paletteId }?.second ?: "自定义"
+    val paletteRes = com.mdot.app.core.designsystem.paletteOptions()
+        .firstOrNull { it.first == config.paletteId }?.second
+    val palette = paletteRes?.let { context.getString(it) } ?: "自定义"
     return "$theme · $palette"
 }
 

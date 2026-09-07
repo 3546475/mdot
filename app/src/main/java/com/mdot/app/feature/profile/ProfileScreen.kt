@@ -25,12 +25,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CameraAlt
-import androidx.compose.material.icons.outlined.CloudSync
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Palette
-import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -69,9 +63,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Flip
-import androidx.compose.material.icons.outlined.Rotate90DegreesCcw
 import androidx.compose.material3.Button
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.graphics.Color
@@ -188,7 +179,7 @@ fun ProfileScreen(
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                Icons.Outlined.CameraAlt, contentDescription = null,
+                                painterResource(R.drawable.ic_ms_photo_camera), contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(14.dp),
                             )
@@ -231,7 +222,7 @@ fun ProfileScreen(
                     )
                     Spacer(Modifier.width(6.dp))
                     Icon(
-                        Icons.Outlined.Edit, contentDescription = stringResource(R.string.profile_edit_nickname),
+                        painterResource(R.drawable.ic_ms_edit), contentDescription = stringResource(R.string.profile_edit_nickname),
                         tint = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.size(16.dp),
                     )
@@ -282,15 +273,15 @@ fun ProfileScreen(
                 SettingRow(
                     stringResource(R.string.profile_entry_sync),
                     if (syncStatus.configured) stringResource(R.string.profile_sync_configured) else stringResource(R.string.profile_sync_unconfigured),
-                    Icons.Outlined.CloudSync, onClick = { onOpen(Routes.SYNC) },
+                    painterResource(R.drawable.ic_ms_cloud_sync), onClick = { onOpen(Routes.SYNC) },
                 )
                 SettingRow(
-                    stringResource(R.string.profile_entry_appearance), appearanceSummary(appearance),
-                    Icons.Outlined.Palette, onClick = { onOpen(Routes.APPEARANCE) },
+                    stringResource(R.string.profile_entry_appearance), appearanceSummary(context, appearance),
+                    painterResource(R.drawable.ic_ms_palette), onClick = { onOpen(Routes.APPEARANCE) },
                 )
                 SettingRow(
                     stringResource(R.string.profile_entry_about), null,
-                    Icons.Outlined.Shield, onClick = { onOpen(Routes.ABOUT) },
+                    painterResource(R.drawable.ic_ms_shield), onClick = { onOpen(Routes.ABOUT) },
                 )
             }
         }
@@ -370,7 +361,7 @@ private fun AvatarCropDialog(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(onClick = onCancel) {
-                            Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.profile_close), tint = MaterialTheme.colorScheme.onSurface)
+                            Icon(painterResource(R.drawable.ic_ms_close), contentDescription = stringResource(R.string.profile_close), tint = MaterialTheme.colorScheme.onSurface)
                         }
                         Text(stringResource(R.string.profile_crop_avatar_title), style = MaterialTheme.typography.titleMedium)
                     }
@@ -412,10 +403,10 @@ private fun AvatarCropDialog(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        ActionIconButton(Icons.Outlined.Rotate90DegreesCcw, stringResource(R.string.profile_rotate)) {
+                        ActionIconButton(painterResource(R.drawable.ic_ms_rotate_90_degrees_ccw), stringResource(R.string.profile_rotate)) {
                             cropper?.rotateImage(90)
                         }
-                        ActionIconButton(Icons.Outlined.Flip, stringResource(R.string.profile_flip)) {
+                        ActionIconButton(painterResource(R.drawable.ic_ms_flip), stringResource(R.string.profile_flip)) {
                             cropper?.flipImageHorizontally()
                         }
                         Button(
@@ -438,7 +429,7 @@ private fun AvatarCropDialog(
 }
 
 @Composable
-private fun ActionIconButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+private fun ActionIconButton(icon: Painter, label: String, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,

@@ -29,9 +29,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -263,7 +261,7 @@ fun CalendarScreen(
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = vm::prevMonth) {
-                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, contentDescription = stringResource(R.string.calendar_prev_month))
+                Icon(painterResource(R.drawable.ic_ms_keyboard_arrow_left), contentDescription = stringResource(R.string.calendar_prev_month))
             }
             AnimatedContent(
                 targetState = state.month,
@@ -283,7 +281,7 @@ fun CalendarScreen(
             }
             TextButton(onClick = vm::goToday) { Text(stringResource(R.string.calendar_back_today)) }
             IconButton(onClick = vm::nextMonth) {
-                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = stringResource(R.string.calendar_next_month))
+                Icon(painterResource(R.drawable.ic_ms_keyboard_arrow_right), contentDescription = stringResource(R.string.calendar_next_month))
             }
         }
 

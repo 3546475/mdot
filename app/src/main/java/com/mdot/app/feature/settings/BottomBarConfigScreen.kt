@@ -25,9 +25,6 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DragIndicator
-import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -45,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -345,14 +343,14 @@ private fun SlotConfigRowContent(
     ) {
         // 拖拽手柄（仅 on 的项可拖）
         Icon(
-            Icons.Filled.DragIndicator,
+            painterResource(R.drawable.ic_ms_drag_indicator),
             contentDescription = if (draggable) stringResource(R.string.appearance_drag_reorder) else null,
             tint = handleColor,
             modifier = Modifier.size(20.dp),
         )
         Spacer(Modifier.width(Spacing.m))
         Icon(
-            spec.icon,
+            painterResource(spec.iconRes),
             contentDescription = null,
             tint = contentColor,
             modifier = Modifier.size(22.dp),

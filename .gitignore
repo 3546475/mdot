@@ -18,3 +18,6 @@ docs/test-webdav.local.md
 
 # ZCode 会话/工具状态
 .zcode/
+
+# archify 架构图导出物（本地产物，不入库）
+docs/结构图/

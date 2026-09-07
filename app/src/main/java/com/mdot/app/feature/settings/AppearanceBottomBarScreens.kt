@@ -23,8 +23,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -40,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -162,7 +161,7 @@ fun AppearanceScreen(
             Column {
                 SettingRow(
                     stringResource(R.string.appearance_bottom_bar_config), stringResource(R.string.appearance_bottom_bar_summary, bottomBarCount),
-                    Icons.Outlined.Dashboard, onClick = onOpenBottomBar,
+                    painterResource(R.drawable.ic_ms_dashboard), onClick = onOpenBottomBar,
                 )
             }
         }

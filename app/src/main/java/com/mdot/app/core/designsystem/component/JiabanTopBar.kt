@@ -1,5 +1,6 @@
 package com.mdot.app.core.designsystem.component
 
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.mdot.app.R
 import androidx.compose.foundation.layout.Box
@@ -11,8 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -54,7 +53,7 @@ fun JiabanTopBar(
             showBack -> {
                 IconButton(onClick = onBack) {
                     Icon(
-                        Icons.AutoMirrored.Outlined.ArrowBack,
+                        painterResource(R.drawable.ic_ms_arrow_back),
                         contentDescription = stringResource(R.string.ds_topbar_back_cd),
                         modifier = Modifier.size(24.dp),
                     )

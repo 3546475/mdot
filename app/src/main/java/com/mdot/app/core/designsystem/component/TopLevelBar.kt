@@ -19,15 +19,13 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -85,7 +83,7 @@ fun TopLevelBar(
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                 )
                 Icon(
-                    Icons.Outlined.SwapHoriz,
+                    painterResource(R.drawable.ic_ms_swap_horiz),
                     contentDescription = stringResource(R.string.ds_topbar_switch_cd),
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -100,7 +98,7 @@ fun TopLevelBar(
                 .size(40.dp)
                 .pressScale(settingsInteraction, pressedScale = 0.9f)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape)
+                .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape)
                 .clickable(
                     interactionSource = settingsInteraction,
                     indication = LocalIndication.current,
@@ -109,10 +107,10 @@ fun TopLevelBar(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                Icons.Outlined.Settings,
+                painterResource(R.drawable.ic_ms_settings),
                 contentDescription = stringResource(R.string.ds_topbar_settings_cd),
                 modifier = Modifier.size(22.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = MaterialTheme.colorScheme.primary,
             )
         }
     }
