@@ -301,7 +301,7 @@ fun CalendarScreen(
         }
         Spacer(Modifier.height(Spacing.xs))
 
-        val dragThreshold = with(LocalDensity.current) { 90.dp.toPx() }
+        val dragThreshold = with(LocalDensity.current) { 50.dp.toPx() }
         Column(
             Modifier
                 .fillMaxWidth()
@@ -322,9 +322,11 @@ fun CalendarScreen(
                 }
         ) {
             // 月切换方向感动画：旧月滑出、新月滑入（滑动与按钮共用）。
-            // 目标态只含月+格子：选日期不改变相等性，不会误触发切换动画
+            // contentKey 只认月份：跨月才转场（旧/新月各自携带自己的格子快照）；
+            // 同月内增删改记录（cells 的 otMinutes/leaveMinutes 变化）只刷新内容，不触发滑动动画
             AnimatedContent(
                 targetState = MonthGridData(state.month, state.cells),
+                contentKey = { it.month },
                 transitionSpec = {
                     val forward = targetState.month > initialState.month
                     val spec = tween<IntOffset>(260)

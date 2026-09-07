@@ -4,6 +4,7 @@
     <string name="sync_screen_title">同步备份</string>
     <string name="sync_status_title">备份状态</string>
     <string name="sync_status_not_configured">未配置存储源 · 点按设置</string>
+    <string name="sync_status_source">存储源：%1$s</string>
     <string name="sync_status_uploading">正在备份…</string>
     <string name="sync_status_restoring">正在恢复…</string>
     <string name="sync_status_processing">处理中…</string>
@@ -34,18 +35,38 @@
     <string name="sync_restart_now">立即重启</string>
     <string name="sync_action_later">稍后</string>
 
-    <!-- feature/sync/SyncStorageScreen.kt -->
+    <!-- feature/sync/SyncStorageScreen.kt（v0.5fix 多存储源） -->
     <string name="sync_storage_title">存储源</string>
-    <string name="sync_storage_select_title">选择存储源</string>
-    <string name="sync_storage_save_test">保存并测试连接</string>
-    <string name="sync_storage_tip">提示：备份包为明文 ZIP（含全部记录与设置，不含网盘账号）。请确保你的网盘账号安全；同一时间只在一台设备上开启自动备份。</string>
+    <string name="sync_storage_add">新增存储源</string>
+    <string name="sync_storage_edit">编辑存储源</string>
+    <string name="sync_storage_edit_title_webdav">编辑 WebDAV 存储源</string>
+    <string name="sync_storage_edit_title_s3">编辑 S3 存储源</string>
+    <string name="sync_storage_add_title_webdav">新增 WebDAV 存储源</string>
+    <string name="sync_storage_add_title_s3">新增 S3 存储源</string>
+    <string name="sync_storage_name_label">名称（如：坚果云、自建服务器）</string>
+    <string name="sync_storage_save">保存</string>
+    <string name="sync_storage_cancel">取消</string>
+    <string name="sync_storage_delete">删除</string>
+    <string name="sync_storage_delete_confirm_title">删除存储源</string>
+    <string name="sync_storage_delete_confirm_text">删除后该配置无法恢复，确定删除「%1$s」？</string>
+    <string name="sync_storage_empty_webdav">还没有 WebDAV 存储源，点右上角 + 新增</string>
+    <string name="sync_storage_empty_s3">还没有 S3 存储源，点右上角 + 新增</string>
+    <string name="sync_storage_in_use">当前使用：%1$s</string>
+    <string name="sync_storage_disconnect">断开当前存储源</string>
+    <string name="sync_storage_disconnect_confirm_title">断开存储源</string>
+    <string name="sync_storage_disconnect_confirm_text">断开后自动备份将停止，配置会保留，可随时重新切换。确定断开？</string>
+    <string name="sync_storage_disconnect_confirm_btn">断开</string>
+    <string name="sync_storage_tip">提示：备份包为明文 ZIP（含全部记录与设置，不含网盘账号）。请确保你的网盘账号安全；同一时间只在一台设备上开启自动备份。切换存储源时会先检测连接，通过后才生效。</string>
     <string name="sync_storage_trust_title">信任自签名证书</string>
     <string name="sync_storage_trust_desc">仅 HTTPS 自建服务（NAS/MinIO）证书无法验证时开启；开启前请确认服务器可信</string>
     <string name="sync_storage_webdav_url_label">服务器地址（如 https://dav.jianguoyun.com/dav/）</string>
     <string name="sync_storage_username_label">账号</string>
     <string name="sync_storage_password_label">密码（坚果云请用应用密码）</string>
     <string name="sync_storage_endpoint_label">Endpoint（如 https://oss-cn-hangzhou.aliyuncs.com）</string>
+    <string name="sync_storage_bucket_label">Bucket</string>
     <string name="sync_storage_region_label">Region（如 oss-cn-hangzhou）</string>
+    <string name="sync_storage_access_key_label">AccessKeyId</string>
+    <string name="sync_storage_secret_key_label">SecretAccessKey</string>
     <string name="sync_storage_path_prefix_label">路径前缀（默认 mdot/backup/）</string>
 
     <!-- feature/export/ExportScreen.kt / ExportViewModel.kt(ExportDimension) -->

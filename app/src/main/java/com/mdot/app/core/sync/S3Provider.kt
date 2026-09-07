@@ -116,7 +116,16 @@ class S3Provider @Inject constructor(
         return IOException(hint + if (body.isNullOrBlank()) "" else "（$code）")
     }
 
-    override suspend fun ensureBaseDir(): Result<Unit> = Result.success(Unit)
+    /** 连接检测 = 对存储桶发 ListObjectsV2（max-keys=1）：凭据/桶/区域任一无效即失败 */
+    override suspend fun ensureBaseDir(): Result<Unit> = runCatching {
+        val probeUrl = objectUrl("probe").newBuilder()
+            .query("list-type=2&max-keys=1&prefix=${SigV4.awsUriEncode(prefix)}")
+            .build()
+        val req = Request.Builder().url(probeUrl).get().build()
+        exec(req).use { resp ->
+            if (!resp.isSuccessful) throw mapError(resp.code, resp.body?.string())
+        }
+    }
 
     override suspend fun put(path: String, bytes: ByteArray, ifMatch: String?): Result<PutResult> =
         runCatching {

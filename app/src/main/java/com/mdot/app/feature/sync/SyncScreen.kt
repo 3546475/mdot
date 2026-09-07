@@ -44,6 +44,12 @@ import com.mdot.app.domain.util.TimeUtils
 import java.time.Instant
 import java.time.ZoneId
 
+private fun selectedSourceName2(state: SyncUiState): String? {
+    val selected = state.sources.selectedId ?: return null
+    return state.sources.webdav.firstOrNull { it.id == selected }?.name
+        ?: state.sources.s3.firstOrNull { it.id == selected }?.name
+}
+
 /** 同步备份页（M6 / 06 文档）：备份状态（入口）+ 备份/恢复 + 自动备份；存储源配置在独立页面 */
 @Composable
 fun SyncScreen(
@@ -87,6 +93,17 @@ fun SyncScreen(
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.sync_status_title), style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.height(Spacing.s))
+                    if (state.status.configured) {
+                        val srcName = selectedSourceName2(state)
+                        if (srcName != null) {
+                            Text(
+                                stringResource(R.string.sync_status_source, srcName),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(Modifier.height(Spacing.xs))
+                        }
+                    }
                     Text(
                         when {
                             !state.status.configured -> stringResource(R.string.sync_status_not_configured)

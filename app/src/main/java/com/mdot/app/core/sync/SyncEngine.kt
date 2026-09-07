@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -59,6 +60,7 @@ class SyncEngine @Inject constructor(
     private val webDavProvider: WebDavProvider,
     private val s3Provider: S3Provider,
     private val dataRevision: com.mdot.app.core.repository.DataRevision,
+    private val client: OkHttpClient,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     @ApplicationScope private val appScope: CoroutineScope,
 ) {
@@ -76,63 +78,224 @@ class SyncEngine @Inject constructor(
         appScope.launch { autoBackupLoop() }
     }
 
-    // ---- 配置 ----
+    // ---- 配置（v0.5fix 多存储源：增/删/切换，切换前先测连接） ----
 
+    /** 重载当前选中的存储源为活动 provider */
     suspend fun reloadConfiguration() {
-        val webDav = vault.loadWebDav()
-        val s3 = vault.loadS3()
+        val sources = vault.loadSources()
+        val webDav = sources.selectedWebDav()
+        val s3 = sources.selectedS3()
         provider = when {
-            webDav != null && webDav.baseUrl.isNotBlank() ->
-                webDavProvider.configure(
-                    WebDavConfig(
-                        baseUrl = webDav.baseUrl,
-                        username = webDav.username,
-                        password = webDav.password,
-                        trustSelfSigned = webDav.trustSelfSigned,
-                    )
+            webDav != null -> webDavProvider.configure(
+                WebDavConfig(
+                    baseUrl = webDav.creds.baseUrl,
+                    username = webDav.creds.username,
+                    password = webDav.creds.password,
+                    trustSelfSigned = webDav.creds.trustSelfSigned,
                 )
+            )
 
-            s3 != null && s3.endpoint.isNotBlank() ->
-                s3Provider.configure(
-                    S3Config(
-                        endpoint = s3.endpoint, bucket = s3.bucket, region = s3.region,
-                        accessKeyId = s3.accessKeyId, secretAccessKey = s3.secretAccessKey,
-                        pathPrefix = s3.pathPrefix,
-                        trustSelfSigned = s3.trustSelfSigned,
-                    )
+            s3 != null -> s3Provider.configure(
+                S3Config(
+                    endpoint = s3.creds.endpoint, bucket = s3.creds.bucket,
+                    region = s3.creds.region,
+                    accessKeyId = s3.creds.accessKeyId,
+                    secretAccessKey = s3.creds.secretAccessKey,
+                    pathPrefix = s3.creds.pathPrefix,
+                    trustSelfSigned = s3.creds.trustSelfSigned,
                 )
+            )
 
             else -> null
         }
-        _status.update { it.copy(configured = provider != null) }
+        _status.update {
+            it.copy(configured = provider != null, providerKind = provider?.kind ?: ProviderKind.NONE)
+        }
     }
 
-    suspend fun saveWebDavConfig(creds: WebDavCreds): AppResult<Unit> {
+    /** 新增 WebDAV 存储源（校验必填；仅入列表，不自动切换） */
+    suspend fun addWebDavSource(name: String, creds: WebDavCreds): AppResult<WebDavSource> {
         if (creds.baseUrl.isBlank() || creds.username.isBlank()) {
-            return Failure(AppError.InvalidName)
+            return Failure(AppError.Storage("请填写服务器地址与账号"))
         }
-        vault.saveWebDav(creds)
-        reloadConfiguration()
-        return Success(Unit)
+        val source = WebDavSource(
+            id = "w-" + java.util.UUID.randomUUID(),
+            name = name.ifBlank { "WebDAV 存储源" },
+            creds = creds,
+        )
+        val sources = vault.loadSources()
+        vault.saveSources(sources.copy(webdav = sources.webdav + source))
+        return Success(source)
     }
 
-    suspend fun saveS3Config(creds: S3Creds): AppResult<Unit> {
+    /** 新增 S3 存储源（校验必填；仅入列表，不自动切换） */
+    suspend fun addS3Source(name: String, creds: S3Creds): AppResult<S3Source> {
         if (creds.endpoint.isBlank() || creds.bucket.isBlank() || creds.accessKeyId.isBlank()) {
-            return Failure(AppError.InvalidName)
+            return Failure(AppError.Storage("请填写 Endpoint、Bucket 与 AccessKeyId"))
         }
-        vault.saveS3(creds)
+        val source = S3Source(
+            id = "s-" + java.util.UUID.randomUUID(),
+            name = name.ifBlank { "S3 存储源" },
+            creds = creds,
+        )
+        val sources = vault.loadSources()
+        vault.saveSources(sources.copy(s3 = sources.s3 + source))
+        return Success(source)
+    }
+
+    /** 更新 WebDAV 存储源配置；被编辑的是当前选中源时先测连接，通过才保存并重载（避免改坏在用配置） */
+    suspend fun updateWebDavSource(id: String, name: String, creds: WebDavCreds): AppResult<Unit> {
+        if (creds.baseUrl.isBlank() || creds.username.isBlank()) {
+            return Failure(AppError.Storage("请填写服务器地址与账号"))
+        }
+        val sources = vault.loadSources()
+        val idx = sources.webdav.indexOfFirst { it.id == id }
+        if (idx < 0) return Failure(AppError.Storage("存储源不存在"))
+        val updatedList = sources.webdav.toMutableList().also {
+            it[idx] = it[idx].copy(name = name.ifBlank { it[idx].name }, creds = creds)
+        }
+        val updated = sources.copy(webdav = updatedList)
+        if (sources.selectedId == id) {
+            when (val r = testProvider(tempWebDavProvider(updatedList[idx]))) {
+                is Failure -> return r
+                is Success -> Unit
+            }
+        }
+        vault.saveSources(updated)
+        if (sources.selectedId == id) {
+            resetSyncAnchors()
+            reloadConfiguration()
+        }
+        return Success(Unit)
+    }
+
+    /** 更新 S3 存储源配置；被编辑的是当前选中源时先测连接，通过才保存并重载 */
+    suspend fun updateS3Source(id: String, name: String, creds: S3Creds): AppResult<Unit> {
+        if (creds.endpoint.isBlank() || creds.bucket.isBlank() || creds.accessKeyId.isBlank()) {
+            return Failure(AppError.Storage("请填写 Endpoint、Bucket 与 AccessKeyId"))
+        }
+        val sources = vault.loadSources()
+        val idx = sources.s3.indexOfFirst { it.id == id }
+        if (idx < 0) return Failure(AppError.Storage("存储源不存在"))
+        val updatedList = sources.s3.toMutableList().also {
+            it[idx] = it[idx].copy(name = name.ifBlank { it[idx].name }, creds = creds)
+        }
+        val updated = sources.copy(s3 = updatedList)
+        if (sources.selectedId == id) {
+            when (val r = testProvider(tempS3Provider(updatedList[idx]))) {
+                is Failure -> return r
+                is Success -> Unit
+            }
+        }
+        vault.saveSources(updated)
+        if (sources.selectedId == id) {
+            resetSyncAnchors()
+            reloadConfiguration()
+        }
+        return Success(Unit)
+    }
+
+    /** 切换存储源：先测连接，通过才持久化选中并重置同步锚点 */
+    suspend fun selectSource(id: String): AppResult<Unit> {
+        val sources = vault.loadSources()
+        val candidate = sources.webdav.firstOrNull { it.id == id } ?: sources.s3.firstOrNull { it.id == id }
+            ?: return Failure(AppError.Storage("存储源不存在"))
+        val testProvider = when {
+            candidate is WebDavSource -> tempWebDavProvider(candidate)
+            else -> tempS3Provider(candidate as S3Source)
+        }
+        when (val r = testProvider(testProvider)) {
+            is Failure -> return r
+            is Success -> Unit
+        }
+        vault.saveSources(sources.copy(selectedId = id))
+        resetSyncAnchors()
         reloadConfiguration()
         return Success(Unit)
     }
 
-    suspend fun testConnection(): AppResult<Unit> {
-        val p = provider ?: return Failure(AppError.Storage("请先选择并保存存储源"))
-        return try {
-            runStep("测试连接") { p.ensureBaseDir().getOrThrow() }
-            Success(Unit)
-        } catch (e: Exception) {
-            Failure(AppError.Storage(e.message ?: "连接失败"))
+    /** 删除存储源；删除的是当前选中源时同时断开 */
+    suspend fun deleteSource(id: String): AppResult<Unit> {
+        val sources = vault.loadSources()
+        val webdav = sources.webdav.filterNot { it.id == id }
+        val s3 = sources.s3.filterNot { it.id == id }
+        if (webdav.size == sources.webdav.size && s3.size == sources.s3.size) {
+            return Failure(AppError.Storage("存储源不存在"))
         }
+        val selectedId = if (sources.selectedId == id) null else sources.selectedId
+        vault.saveSources(sources.copy(webdav = webdav, s3 = s3, selectedId = selectedId))
+        if (selectedId == null) {
+            resetSyncAnchors()
+            reloadConfiguration()
+        }
+        return Success(Unit)
+    }
+
+    /** 断开当前存储源（不删除配置，仅取消选中） */
+    suspend fun disconnectSource(): AppResult<Unit> {
+        val sources = vault.loadSources()
+        if (sources.selectedId == null) return Success(Unit)
+        vault.saveSources(sources.copy(selectedId = null))
+        resetSyncAnchors()
+        reloadConfiguration()
+        return Success(Unit)
+    }
+
+    /** 用指定源配置测试连接（临时 provider，不影响当前活动源） */
+    suspend fun testSource(id: String): AppResult<Unit> {
+        val sources = vault.loadSources()
+        val candidate = sources.webdav.firstOrNull { it.id == id } ?: sources.s3.firstOrNull { it.id == id }
+            ?: return Failure(AppError.Storage("存储源不存在"))
+        val p = when (candidate) {
+            is WebDavSource -> tempWebDavProvider(candidate)
+            else -> tempS3Provider(candidate as S3Source)
+        }
+        return testProvider(p)
+    }
+
+    private fun tempWebDavProvider(source: WebDavSource): StorageProvider =
+        WebDavProvider(client, ioDispatcher).configure(
+            WebDavConfig(
+                baseUrl = source.creds.baseUrl,
+                username = source.creds.username,
+                password = source.creds.password,
+                trustSelfSigned = source.creds.trustSelfSigned,
+            )
+        )
+
+    private fun tempS3Provider(source: S3Source): StorageProvider =
+        S3Provider(client, ioDispatcher).configure(
+            S3Config(
+                endpoint = source.creds.endpoint, bucket = source.creds.bucket,
+                region = source.creds.region,
+                accessKeyId = source.creds.accessKeyId,
+                secretAccessKey = source.creds.secretAccessKey,
+                pathPrefix = source.creds.pathPrefix,
+                trustSelfSigned = source.creds.trustSelfSigned,
+            )
+        )
+
+    /** 连接测试 = 建根目录 + 目录可达（与备份前置步骤一致）；异常归类为可读文案 */
+    private suspend fun testProvider(p: StorageProvider): AppResult<Unit> = try {
+        p.ensureBaseDir().getOrThrow()
+        Success(Unit)
+    } catch (e: Exception) {
+        val reason = when (e) {
+            is java.net.UnknownHostException -> "无法解析服务器地址，请检查地址是否正确"
+            is java.net.ConnectException -> "无法连接到服务器，请检查地址与网络"
+            is java.net.SocketTimeoutException -> "连接超时，请检查网络或服务器状态"
+            is javax.net.ssl.SSLException -> "证书校验失败，可尝试开启「信任自签名证书」"
+            is IllegalArgumentException -> "服务器地址格式不正确，需以 http:// 或 https:// 开头"
+            else -> e.message?.takeIf { it.isNotBlank() } ?: "无法连接服务器，请检查配置"
+        }
+        Failure(AppError.Storage(reason))
+    }
+
+    /** 切换/断开存储源后重置同步锚点：不同源的备份历史与 ETag 相互独立 */
+    private suspend fun resetSyncAnchors() {
+        settings.setLastEtag(null)
+        settings.setLastSyncedRemoteCreatedAt(null)
+        settings.setLastBackupAt(0L)
     }
 
     // ---- 路径约定（05 文档 §4/§5） ----
