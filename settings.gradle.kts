@@ -1,9 +1,9 @@
-// CI（GitHub Actions 等海外 runner）直连官方源；本地国内开发走阿里云镜像加速
-val useOfficialRepos = System.getenv("CI")?.isNotBlank() == true
-
+// 仓库源：CI（GitHub Actions 等海外 runner）直连官方源；本地国内开发走阿里云镜像加速。
+// 注意：pluginManagement {} 块由 Gradle 独立提前编译，看不到脚本顶层变量，故判断写在块内。
 pluginManagement {
+    val onCi = System.getenv("CI")?.isNotBlank() == true
     repositories {
-        if (useOfficialRepos) {
+        if (onCi) {
             google()
             mavenCentral()
             gradlePluginPortal()
@@ -21,8 +21,9 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    val onCi = System.getenv("CI")?.isNotBlank() == true
     repositories {
-        if (useOfficialRepos) {
+        if (onCi) {
             google()
             mavenCentral()
         } else {
