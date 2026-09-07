@@ -51,19 +51,28 @@ jobs:
           cp "$OUT/app-armeabi-v7a-release.apk" "MDOT-RELEASE-${VER}-v7a.apk"
           cp "$OUT/app-universal-release.apk"   "MDOT-RELEASE-${VER}-dual.apk"
 
+      - name: Prepare release notes (from CHANGELOG.md)
+        run: |
+          {
+            echo "## 更新内容"
+            awk -v ver="v${VER}" '$0 ~ "^## "ver"{flag=1;next} /^## v/{flag=0} flag' CHANGELOG.md
+            echo ""
+            echo "---"
+            echo ""
+            echo "## 下载说明"
+            echo "- 大多数现代手机下载 **v8a**（arm64）"
+            echo "- 老款 32 位设备下载 **v7a**"
+            echo "- 不确定就下载 **dual**（双架构通用包，体积更大）"
+            echo ""
+            echo "系统要求：Android 10（API 29）及以上。"
+          } > release_notes.md
+          cat release_notes.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: 马的加班 v${{ env.VER }}
-          body: |
-            马的加班 v${{ env.VER }} 自动构建发布。
-
-            下载说明：
-            - 大多数现代手机下载 **v8a**（arm64）
-            - 老款 32 位设备下载 **v7a**
-            - 不确定就下载 **dual**（双架构通用包，体积更大）
-
-            系统要求：Android 10（API 29）及以上。
+          body_path: release_notes.md
           files: |
             MDOT-RELEASE-${{ env.VER }}-v8a.apk
             MDOT-RELEASE-${{ env.VER }}-v7a.apk
