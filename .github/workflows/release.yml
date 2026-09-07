@@ -55,7 +55,7 @@ jobs:
         run: |
           {
             echo "## 更新内容"
-            awk -v ver="v${VER}" '$0 ~ "^## "ver"{flag=1;next} /^## v/{flag=0} flag' CHANGELOG.md
+            awk -v ver="v${VER}" '$0 ~ "^## " ver {flag=1;next} /^## v/ {flag=0} flag' CHANGELOG.md
             echo ""
             echo "系统要求：Android 10（API 29）及以上。"
           } > release_notes.md
