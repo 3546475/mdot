@@ -57,13 +57,6 @@ jobs:
             echo "## 更新内容"
             awk -v ver="v${VER}" '$0 ~ "^## "ver"{flag=1;next} /^## v/{flag=0} flag' CHANGELOG.md
             echo ""
-            echo "---"
-            echo ""
-            echo "## 下载说明"
-            echo "- 大多数现代手机下载 **v8a**（arm64）"
-            echo "- 老款 32 位设备下载 **v7a**"
-            echo "- 不确定就下载 **dual**（双架构通用包，体积更大）"
-            echo ""
             echo "系统要求：Android 10（API 29）及以上。"
           } > release_notes.md
           cat release_notes.md
