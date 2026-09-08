@@ -81,7 +81,7 @@ class UpdateViewModel @Inject constructor(
                     } else {
                         val ok = updateRepo.install(r.data)
                         _state.value = UpdateState.Idle
-                        if (!ok) _notice.value = "无法调起安装器，请稍后重试"
+                        if (!ok) _notice.value = "无法调起安装器：请在系统设置中允许本应用「安装未知应用」后重试"
                     }
                 }
                 is AppResult.Failure -> {
@@ -107,7 +107,7 @@ class UpdateViewModel @Inject constructor(
         viewModelScope.launch {
             val ok = updateRepo.install(d.file)
             _state.value = UpdateState.Idle
-            if (!ok) _notice.value = "无法调起安装器，请稍后重试"
+            if (!ok) _notice.value = "无法调起安装器：请在系统设置中允许本应用「安装未知应用」后重试"
         }
     }
 
