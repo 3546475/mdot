@@ -28,9 +28,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.domain.model.WorkSystem
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.widthIn
 
 /** 一级页面顶栏高度（不含状态栏） */
 val TopBarHeight = 56.dp
@@ -48,8 +51,11 @@ fun TopLevelBar(
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // 响应式：背景（AppRoot 提供）全宽，内容限宽居中与页面内容对齐（docs 03 §3.2）
+    Box(modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
     Row(
-        modifier = modifier
+        modifier = Modifier
+            .widthIn(max = AdaptiveSpecs.contentMaxWidth)
             .fillMaxWidth()
             .statusBarsPadding()
             .height(TopBarHeight)
@@ -103,6 +109,7 @@ fun TopLevelBar(
                 tint = MaterialTheme.colorScheme.primary,
             )
         }
+    }
     }
 }
 

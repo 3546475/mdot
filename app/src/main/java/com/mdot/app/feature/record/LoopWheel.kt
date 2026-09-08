@@ -119,11 +119,11 @@ fun LoopWheel(
                 val scale by animateFloatAsState(
                     targetValue = if (distance < 0.5f) 1.18f
                     else (1.18f - 0.22f * distance).coerceAtLeast(0.8f),
-                    animationSpec = tween(120), label = "wheelScale",
+                    animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(), label = "wheelScale",
                 )
                 val alpha by animateFloatAsState(
                     targetValue = (1f - 0.45f * distance).coerceIn(0.25f, 1f),
-                    animationSpec = tween(120), label = "wheelAlpha",
+                    animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(), label = "wheelAlpha",
                 )
                 val selected = distance < 0.5f
                 Box(

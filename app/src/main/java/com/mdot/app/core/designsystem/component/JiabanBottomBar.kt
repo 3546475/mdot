@@ -175,7 +175,7 @@ private fun SlotBody(
     val tint by animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
         else MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = tween(com.mdot.app.core.designsystem.Duration.normal),
+        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
         label = "slotTint",
     )
     val iconScale by animateFloatAsState(

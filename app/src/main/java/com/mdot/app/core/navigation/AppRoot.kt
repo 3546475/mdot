@@ -58,9 +58,15 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.mdot.app.AppViewModel
+import com.mdot.app.core.designsystem.AdaptiveContainer
+import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.Duration
 import com.mdot.app.core.designsystem.BottomBarSpec
+import com.mdot.app.core.designsystem.LocalWindowSpec
 import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.WindowSpec
+import com.mdot.app.core.designsystem.rememberContentSideInset
+import com.mdot.app.core.designsystem.rememberWindowSpec
 import com.mdot.app.core.designsystem.component.JiabanBottomBar
 import com.mdot.app.core.designsystem.component.TopLevelBar
 import com.mdot.app.core.designsystem.component.SlotRegistry
@@ -210,6 +216,22 @@ private fun SwipeTabHost(
 
 @Composable
 fun AppRoot(firstLaunchDone: Boolean, appVm: AppViewModel) {
+    // 响应式布局（docs 03 §3.2）：窗口档位全局下发（页面读 LocalWindowSpec 决定单列/双栏）；
+    // 二级页统一经 AdaptiveContainer 限宽居中（下方逐页包裹）；固定一级顶栏/底栏/
+    // 记录弹层/FAB 等悬浮层各自跟随内容宽度对齐
+    val windowSpec = rememberWindowSpec()
+    val fabSideInset = rememberContentSideInset()
+    androidx.compose.runtime.CompositionLocalProvider(LocalWindowSpec provides windowSpec) {
+        AppRootContent(firstLaunchDone, appVm, fabSideInset)
+    }
+}
+
+@Composable
+private fun AppRootContent(
+    firstLaunchDone: Boolean,
+    appVm: AppViewModel,
+    fabSideInset: androidx.compose.ui.unit.Dp,
+) {
     val navController = rememberNavController()
     val request by appVm.recordRequest.collectAsStateWithLifecycle()
     val bottomBar by appVm.bottomBar.collectAsStateWithLifecycle()
@@ -285,7 +307,9 @@ fun AppRoot(firstLaunchDone: Boolean, appVm: AppViewModel) {
             },
         ) {
             composable(Routes.ONBOARDING) {
-                OnboardingScreen(onDone = { navTo(navController, Routes.HOME, slots, clearStack = true) })
+                AdaptiveContainer {
+                    OnboardingScreen(onDone = { navTo(navController, Routes.HOME, slots, clearStack = true) })
+                }
             }
             composable(Routes.HOME) {
                 SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.HOME, onNavigate = { navTo(navController, it, slots) }) {
@@ -321,31 +345,42 @@ fun AppRoot(firstLaunchDone: Boolean, appVm: AppViewModel) {
                 }
             }
             composable(Routes.COMP) {
-                CompBalanceScreen(onBack = { navController.popBackStack() })
+                AdaptiveContainer {
+                    CompBalanceScreen(onBack = { navController.popBackStack() })
+                }
             }
             composable(Routes.PAYROLL) {
                 SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.PAYROLL, onNavigate = { navTo(navController, it, slots) }) {
-                    PayrollScreen(canBack = !inBar("payroll"), onBack = { navController.popBackStack() })
+                    AdaptiveContainer {
+                        PayrollScreen(canBack = !inBar("payroll"), onBack = { navController.popBackStack() })
+                    }
                 }
             }
             composable(Routes.EXPORT) {
                 SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.EXPORT, onNavigate = { navTo(navController, it, slots) }) {
-                    ExportScreen(canBack = !inBar("export"), onBack = { navController.popBackStack() })
+                    AdaptiveContainer {
+                        ExportScreen(canBack = !inBar("export"), onBack = { navController.popBackStack() })
+                    }
                 }
             }
             composable(Routes.SYNC) {
                 SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.SYNC, onNavigate = { navTo(navController, it, slots) }) {
-                    SyncScreen(
-                        canBack = !inBar("sync"),
-                        onBack = { navController.popBackStack() },
-                        onOpenStorage = { navTo(navController, Routes.SYNC_STORAGE, slots) },
-                    )
+                    AdaptiveContainer {
+                        SyncScreen(
+                            canBack = !inBar("sync"),
+                            onBack = { navController.popBackStack() },
+                            onOpenStorage = { navTo(navController, Routes.SYNC_STORAGE, slots) },
+                        )
+                    }
                 }
             }
             composable(Routes.SYNC_STORAGE) {
-                SyncStorageScreen(onBack = { navController.popBackStack() })
+                AdaptiveContainer {
+                    SyncStorageScreen(onBack = { navController.popBackStack() })
+                }
             }
             composable(Routes.SETTINGS) {
+                // EXPANDED 双列分组页（设置中心自管双栏形态），不走统一限宽
                 SettingsScreen(
                     onBack = { navController.popBackStack() },
                     onOpen = { route -> navTo(navController, route, slots) },
@@ -353,35 +388,55 @@ fun AppRoot(firstLaunchDone: Boolean, appVm: AppViewModel) {
             }
             composable(Routes.PROFILE) {
                 SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.PROFILE, onNavigate = { navTo(navController, it, slots) }) {
-                    ProfileScreen(
-                        canBack = !inBar("profile"),
-                        onBack = { navController.popBackStack() },
-                        onOpen = { route -> navTo(navController, route, slots) },
-                    )
+                    AdaptiveContainer {
+                        ProfileScreen(
+                            canBack = !inBar("profile"),
+                            onBack = { navController.popBackStack() },
+                            onOpen = { route -> navTo(navController, route, slots) },
+                        )
+                    }
                 }
             }
             composable(Routes.SYSTEM) {
-                SystemScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpen = { route -> navTo(navController, route, slots) },
-                    onOpenPayroll = { navTo(navController, Routes.PAYROLL, slots) },
-                )
+                AdaptiveContainer {
+                    SystemScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpen = { route -> navTo(navController, route, slots) },
+                        onOpenPayroll = { navTo(navController, Routes.PAYROLL, slots) },
+                    )
+                }
             }
             composable(Routes.SYSTEM_SWITCH) {
-                SystemSwitchScreen(onBack = { navController.popBackStack() })
+                AdaptiveContainer {
+                    SystemSwitchScreen(onBack = { navController.popBackStack() })
+                }
             }
-            composable(Routes.CYCLE) { CycleScreen(onBack = { navController.popBackStack() }) }
-            composable(Routes.WORKDAYS) { WorkdaysScreen(onBack = { navController.popBackStack() }) }
-            composable(Routes.SHIFTS) { ShiftsScreen(onBack = { navController.popBackStack() }) }
+            composable(Routes.CYCLE) {
+                AdaptiveContainer { CycleScreen(onBack = { navController.popBackStack() }) }
+            }
+            composable(Routes.WORKDAYS) {
+                AdaptiveContainer { WorkdaysScreen(onBack = { navController.popBackStack() }) }
+            }
+            composable(Routes.SHIFTS) {
+                AdaptiveContainer { ShiftsScreen(onBack = { navController.popBackStack() }) }
+            }
             composable(Routes.APPEARANCE) {
-                AppearanceScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenBottomBar = { navTo(navController, Routes.BOTTOM_BAR, slots) },
-                )
+                AdaptiveContainer {
+                    AppearanceScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenBottomBar = { navTo(navController, Routes.BOTTOM_BAR, slots) },
+                    )
+                }
             }
-            composable(Routes.BOTTOM_BAR) { BottomBarScreen(onBack = { navController.popBackStack() }) }
-            composable(Routes.DATASOURCE) { DataSourceScreen(onBack = { navController.popBackStack() }) }
-            composable(Routes.ABOUT) { AboutScreen(onBack = { navController.popBackStack() }) }
+            composable(Routes.BOTTOM_BAR) {
+                AdaptiveContainer { BottomBarScreen(onBack = { navController.popBackStack() }) }
+            }
+            composable(Routes.DATASOURCE) {
+                AdaptiveContainer { DataSourceScreen(onBack = { navController.popBackStack() }) }
+            }
+            composable(Routes.ABOUT) {
+                AdaptiveContainer { AboutScreen(onBack = { navController.popBackStack() }) }
+            }
         }
 
         // 一级页面统一固定顶栏（无标题：左=标准工时切换，右=齿轮设置）。
@@ -429,7 +484,7 @@ fun AppRoot(firstLaunchDone: Boolean, appVm: AppViewModel) {
             exit = androidx.compose.animation.fadeOut(tween(120)) + androidx.compose.animation.scaleOut(tween(120)),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = Spacing.page, bottom = fabBottomPadding),
+                .padding(end = Spacing.page + fabSideInset, bottom = fabBottomPadding),
         ) {
             FloatingActionButton(
                 onClick = {

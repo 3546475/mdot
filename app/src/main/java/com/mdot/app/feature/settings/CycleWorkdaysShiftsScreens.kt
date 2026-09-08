@@ -168,19 +168,19 @@ private fun DayCell(
     val bg by animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
         else MaterialTheme.colorScheme.surfaceContainerHigh,
-        animationSpec = tween(Duration.normal),
+        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
         label = "dayBg",
     )
     val stroke by animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.primary
         else androidx.compose.ui.graphics.Color.Transparent,
-        animationSpec = tween(Duration.normal),
+        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
         label = "dayStroke",
     )
     val textColor by animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
         else MaterialTheme.colorScheme.onSurface,
-        animationSpec = tween(Duration.normal),
+        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
         label = "dayText",
     )
     Box(

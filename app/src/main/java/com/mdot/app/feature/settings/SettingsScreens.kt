@@ -42,8 +42,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.layout.wrapContentWidth
 import com.mdot.app.R
+import com.mdot.app.core.designsystem.AdaptiveSpecs
+import com.mdot.app.core.designsystem.LocalWindowSpec
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.widthIn
+import com.mdot.app.core.designsystem.component.TopBarHeight
 import com.mdot.app.core.designsystem.Radius
+import com.mdot.app.core.designsystem.WindowSpec
 import com.mdot.app.core.designsystem.Spacing
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.core.designsystem.component.JiabanTopBar
@@ -64,52 +73,112 @@ fun SettingsScreen(
     val syncStatus by hub.syncStatus.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .contentBottomPadding(showBottomBar = false)
-            .padding(horizontal = Spacing.page),
-    ) {
-        JiabanTopBar(title = stringResource(R.string.settings_title), onBack = onBack)
-        Spacer(Modifier.height(Spacing.m))
+    // 响应式（docs 03 §3.2）：EXPANDED 分组两列（720dp 居中）；其余单列 600dp 居中
+    val twoPane = LocalWindowSpec.current == WindowSpec.EXPANDED
 
-        // ---- 查看与分享 ----
-        SettingsGroup(stringResource(R.string.settings_group_view_share)) {
-            SettingRow(stringResource(R.string.settings_row_calendar), null, painterResource(R.drawable.ic_ms_calendar_month), onClick = { onOpen(Routes.CALENDAR_PATTERN) })
-            SettingRow(stringResource(R.string.settings_row_stats), null, painterResource(R.drawable.ic_ms_bar_chart), onClick = { onOpen(Routes.STATS) })
-            SettingRow(stringResource(R.string.settings_row_share), null, painterResource(R.drawable.ic_ms_file_download), onClick = { onOpen(Routes.EXPORT) })
+    if (twoPane) {
+        Row(
+            Modifier
+                .fillMaxSize()
+                .wrapContentWidth(Alignment.CenterHorizontally)
+                .widthIn(max = AdaptiveSpecs.twoPaneMaxWidth),
+        ) {
+            Column(
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .contentBottomPadding(showBottomBar = false)
+                    .padding(horizontal = Spacing.page),
+            ) {
+                JiabanTopBar(title = stringResource(R.string.settings_title), onBack = onBack)
+                Spacer(Modifier.height(Spacing.m))
+                // ---- 查看与分享 ----
+                SettingsGroup(stringResource(R.string.settings_group_view_share)) {
+                    SettingRow(stringResource(R.string.settings_row_calendar), null, painterResource(R.drawable.ic_ms_calendar_month), onClick = { onOpen(Routes.CALENDAR_PATTERN) })
+                    SettingRow(stringResource(R.string.settings_row_stats), null, painterResource(R.drawable.ic_ms_bar_chart), onClick = { onOpen(Routes.STATS) })
+                    SettingRow(stringResource(R.string.settings_row_share), null, painterResource(R.drawable.ic_ms_file_download), onClick = { onOpen(Routes.EXPORT) })
+                }
+                Spacer(Modifier.height(Spacing.m))
+                // ---- 个性化 ----
+                SettingsGroup(stringResource(R.string.settings_group_personalization)) {
+                    SettingRow(
+                        stringResource(R.string.settings_row_appearance), appearanceSummary(context, appearance),
+                        painterResource(R.drawable.ic_ms_palette), onClick = { onOpen(Routes.APPEARANCE) },
+                    )
+                }
+                Spacer(Modifier.height(Spacing.xl))
+            }
+            Column(
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .contentBottomPadding(showBottomBar = false)
+                    .padding(horizontal = Spacing.page),
+            ) {
+                // 右栏顶栏占位（与左栏 JiabanTopBar 等高，首卡对齐）
+                Spacer(Modifier.height(WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + TopBarHeight))
+                Spacer(Modifier.height(Spacing.m))
+                // ---- 数据与备份 ----
+                SettingsGroup(stringResource(R.string.settings_group_data_backup)) {
+                    SettingRow(
+                        stringResource(R.string.settings_row_sync_backup),
+                        if (syncStatus.configured) stringResource(R.string.settings_sync_configured)
+                        else stringResource(R.string.settings_sync_not_configured),
+                        painterResource(R.drawable.ic_ms_cloud_sync), onClick = { onOpen(Routes.SYNC) },
+                    )
+                }
+                Spacer(Modifier.height(Spacing.m))
+                // ---- 其他 ----
+                SettingsGroup(stringResource(R.string.settings_group_other)) {
+                    SettingRow(stringResource(R.string.settings_row_about_privacy), null, painterResource(R.drawable.ic_ms_shield), onClick = { onOpen(Routes.ABOUT) })
+                }
+                Spacer(Modifier.height(Spacing.xl))
+            }
         }
-
-        Spacer(Modifier.height(Spacing.m))
-
-        // ---- 数据与备份 ----
-        SettingsGroup(stringResource(R.string.settings_group_data_backup)) {
-            SettingRow(
-                stringResource(R.string.settings_row_sync_backup),
-                if (syncStatus.configured) stringResource(R.string.settings_sync_configured)
-                else stringResource(R.string.settings_sync_not_configured),
-                painterResource(R.drawable.ic_ms_cloud_sync), onClick = { onOpen(Routes.SYNC) },
-            )
+    } else {
+        // ---- 手机：单列（原布局，600dp 居中） ----
+        Column(
+            Modifier
+                .fillMaxSize()
+                .wrapContentWidth(Alignment.CenterHorizontally)
+                .verticalScroll(rememberScrollState())
+                .contentBottomPadding(showBottomBar = false)
+                .widthIn(max = AdaptiveSpecs.contentMaxWidth)
+                .padding(horizontal = Spacing.page),
+        ) {
+            JiabanTopBar(title = stringResource(R.string.settings_title), onBack = onBack)
+            Spacer(Modifier.height(Spacing.m))
+            // ---- 查看与分享 ----
+            SettingsGroup(stringResource(R.string.settings_group_view_share)) {
+                SettingRow(stringResource(R.string.settings_row_calendar), null, painterResource(R.drawable.ic_ms_calendar_month), onClick = { onOpen(Routes.CALENDAR_PATTERN) })
+                SettingRow(stringResource(R.string.settings_row_stats), null, painterResource(R.drawable.ic_ms_bar_chart), onClick = { onOpen(Routes.STATS) })
+                SettingRow(stringResource(R.string.settings_row_share), null, painterResource(R.drawable.ic_ms_file_download), onClick = { onOpen(Routes.EXPORT) })
+            }
+            Spacer(Modifier.height(Spacing.m))
+            // ---- 数据与备份 ----
+            SettingsGroup(stringResource(R.string.settings_group_data_backup)) {
+                SettingRow(
+                    stringResource(R.string.settings_row_sync_backup),
+                    if (syncStatus.configured) stringResource(R.string.settings_sync_configured)
+                    else stringResource(R.string.settings_sync_not_configured),
+                    painterResource(R.drawable.ic_ms_cloud_sync), onClick = { onOpen(Routes.SYNC) },
+                )
+            }
+            Spacer(Modifier.height(Spacing.m))
+            // ---- 个性化 ----
+            SettingsGroup(stringResource(R.string.settings_group_personalization)) {
+                SettingRow(
+                    stringResource(R.string.settings_row_appearance), appearanceSummary(context, appearance),
+                    painterResource(R.drawable.ic_ms_palette), onClick = { onOpen(Routes.APPEARANCE) },
+                )
+            }
+            Spacer(Modifier.height(Spacing.m))
+            // ---- 其他 ----
+            SettingsGroup(stringResource(R.string.settings_group_other)) {
+                SettingRow(stringResource(R.string.settings_row_about_privacy), null, painterResource(R.drawable.ic_ms_shield), onClick = { onOpen(Routes.ABOUT) })
+            }
+            Spacer(Modifier.height(Spacing.xl))
         }
-
-        Spacer(Modifier.height(Spacing.m))
-
-        // ---- 个性化 ----
-        SettingsGroup(stringResource(R.string.settings_group_personalization)) {
-            SettingRow(
-                stringResource(R.string.settings_row_appearance), appearanceSummary(context, appearance),
-                painterResource(R.drawable.ic_ms_palette), onClick = { onOpen(Routes.APPEARANCE) },
-            )
-        }
-
-        Spacer(Modifier.height(Spacing.m))
-
-        // ---- 其他 ----
-        SettingsGroup(stringResource(R.string.settings_group_other)) {
-            SettingRow(stringResource(R.string.settings_row_about_privacy), null, painterResource(R.drawable.ic_ms_shield), onClick = { onOpen(Routes.ABOUT) })
-        }
-        Spacer(Modifier.height(Spacing.xl))
     }
 }
 

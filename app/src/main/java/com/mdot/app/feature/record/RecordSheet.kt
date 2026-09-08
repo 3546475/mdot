@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -66,6 +67,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
+import com.mdot.app.core.designsystem.LocalWindowSpec
+import com.mdot.app.core.designsystem.WindowSpec
+import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.Duration
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
@@ -138,12 +142,19 @@ fun RecordSheet(
                         .pointerInput(Unit) { detectTapGestures { requestDismiss() } }
                 )
                 // 面板
+                val wide = LocalWindowSpec.current == WindowSpec.EXPANDED
                 Column(
                     Modifier
                         .align(Alignment.BottomCenter)
+                        // 响应式：宽屏下弹层限宽居中 + 四角全圆 + 底部留边（悬浮面板形态），窄屏全宽贴底
+                        .widthIn(max = AdaptiveSpecs.sheetMaxWidth)
                         .fillMaxWidth()
                         .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.92f).dp)
-                        .clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
+                        .padding(bottom = if (wide) Spacing.l else 0.dp)
+                        .clip(
+                            if (wide) RoundedCornerShape(Radius.sheet)
+                            else RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet)
+                        )
                         .background(MaterialTheme.colorScheme.surfaceContainer)
                         .clickable(enabled = false) { }
                         .imePadding()

@@ -110,13 +110,13 @@ fun AppearanceScreen(
                         // 选中描边宽度/颜色平滑过渡 + 按压缩放
                         val borderWidth by animateDpAsState(
                             targetValue = if (isSelected) 3.dp else 1.dp,
-                            animationSpec = tween(Duration.normal),
+                            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
                             label = "paletteBorderW",
                         )
                         val borderColor by animateColorAsState(
                             targetValue = if (isSelected) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.outlineVariant,
-                            animationSpec = tween(Duration.normal),
+                            animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
                             label = "paletteBorderC",
                         )
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {

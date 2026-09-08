@@ -2,6 +2,7 @@ package com.mdot.app.feature.calendar
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -55,10 +56,16 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.layout.wrapContentWidth
 import com.mdot.app.R
+import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.Duration
+import com.mdot.app.core.designsystem.LocalWindowSpec
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.WindowSpec
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.TopBarHeight
@@ -236,7 +243,9 @@ class CalendarViewModel @Inject constructor(
     }
 }
 
-/** 日历页（03 文档 §5.3 线框） */
+/** 日历页（03 文档 §5.3 线框）
+ *  响应式（docs 03 §3.2）：EXPANDED（≥840dp）双栏——左月历 | 右小结卡纵向堆叠，总宽 720dp 居中；
+ *  其余档位单列（原布局）。 */
 @Composable
 fun CalendarScreen(
     initialMonth: String? = null,
@@ -247,181 +256,238 @@ fun CalendarScreen(
     androidx.compose.runtime.LaunchedEffect(initialMonth) { vm.initMonth(initialMonth) }
     val state by vm.uiState.collectAsStateWithLifecycle()
     val colorScheme = MaterialTheme.colorScheme
+    val twoPane = LocalWindowSpec.current == WindowSpec.EXPANDED
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .contentBottomPadding(showBottomBar = !canBack)
-            .padding(horizontal = Spacing.page),
-    ) {
+    val topBar: @Composable () -> Unit = {
         if (canBack) {
             JiabanTopBar(title = stringResource(R.string.calendar_title), onBack = onBack)
         } else {
             Spacer(Modifier.height(WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + TopBarHeight + Spacing.xs))
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = vm::prevMonth) {
-                Icon(painterResource(R.drawable.ic_ms_keyboard_arrow_left), contentDescription = stringResource(R.string.calendar_prev_month))
+    }
+
+    if (twoPane) {
+        Row(
+            Modifier
+                .fillMaxSize()
+                .wrapContentWidth(Alignment.CenterHorizontally)
+                .contentBottomPadding(showBottomBar = !canBack)
+                .padding(horizontal = Spacing.page)
+                .widthIn(max = AdaptiveSpecs.twoPaneMaxWidth),
+        ) {
+            // 左栏：月历（月份行 + 星期行 + 网格）
+            Column(Modifier.weight(1f)) {
+                topBar()
+                MonthHeaderRow(vm)
+                Spacer(Modifier.height(Spacing.s))
+                WeekdayHeaderRow()
+                Spacer(Modifier.height(Spacing.xs))
+                MonthGrid(state, vm)
             }
-            AnimatedContent(
-                targetState = state.month,
-                transitionSpec = {
-                    val forward = targetState > initialState
-                    val spec = tween<IntOffset>(260)
-                    (slideInHorizontally(spec) { if (forward) it else -it } + fadeIn(tween(200))) togetherWith
-                        (slideOutHorizontally(spec) { if (forward) -it else it } + fadeOut(tween(160)))
-                },
-                modifier = Modifier.weight(1f),
-                label = "monthTitle",
-            ) { m ->
-                Text(
-                    stringResource(R.string.calendar_month_title, m.year, m.monthValue),
-                    style = MaterialTheme.typography.titleLarge,
-                )
-            }
-            TextButton(onClick = vm::goToday) { Text(stringResource(R.string.calendar_back_today)) }
-            IconButton(onClick = vm::nextMonth) {
-                Icon(painterResource(R.drawable.ic_ms_keyboard_arrow_right), contentDescription = stringResource(R.string.calendar_next_month))
+            Spacer(Modifier.width(Spacing.l))
+            // 右栏：两张小结卡纵向堆叠（随切月/选中联动）
+            Column(Modifier.weight(1f)) {
+                topBar()
+                Spacer(Modifier.height(Spacing.xs))
+                SummaryCards(state, colorScheme)
             }
         }
-
-        Spacer(Modifier.height(Spacing.s))
-        Row(Modifier.fillMaxWidth()) {
-            listOf(stringResource(R.string.calendar_weekday_mon), stringResource(R.string.calendar_weekday_tue), stringResource(R.string.calendar_weekday_wed), stringResource(R.string.calendar_weekday_thu), stringResource(R.string.calendar_weekday_fri), stringResource(R.string.calendar_weekday_sat), stringResource(R.string.calendar_weekday_sun)).forEach {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-            }
-        }
-        Spacer(Modifier.height(Spacing.xs))
-
-        val dragThreshold = with(LocalDensity.current) { 50.dp.toPx() }
+    } else {
+        // ---- 手机：单列（原布局） ----
         Column(
             Modifier
-                .fillMaxWidth()
-                // 左右滑动切换月份（与 ‹ › 按钮等效）；只消费横向拖动，不影响点选与页面纵向滚动
-                .pointerInput(dragThreshold) {
-                    var totalDrag = 0f
-                    detectHorizontalDragGestures(
-                        onDragStart = { totalDrag = 0f },
-                        onHorizontalDrag = { change, dragAmount ->
-                            change.consume()
-                            totalDrag += dragAmount
-                        },
-                        onDragEnd = {
-                            if (totalDrag < -dragThreshold) vm.nextMonth()
-                            else if (totalDrag > dragThreshold) vm.prevMonth()
-                        },
-                    )
-                }
+                .fillMaxSize()
+                .wrapContentWidth(Alignment.CenterHorizontally)
+                .contentBottomPadding(showBottomBar = !canBack)
+                .widthIn(max = AdaptiveSpecs.contentMaxWidth)
+                .padding(horizontal = Spacing.page),
         ) {
-            // 月切换方向感动画：旧月滑出、新月滑入（滑动与按钮共用）。
-            // contentKey 只认月份：跨月才转场（旧/新月各自携带自己的格子快照）；
-            // 同月内增删改记录（cells 的 otMinutes/leaveMinutes 变化）只刷新内容，不触发滑动动画
-            AnimatedContent(
-                targetState = MonthGridData(state.month, state.cells),
-                contentKey = { it.month },
-                transitionSpec = {
-                    val forward = targetState.month > initialState.month
-                    val spec = tween<IntOffset>(260)
-                    (slideInHorizontally(spec) { if (forward) it else -it } + fadeIn(tween(200))) togetherWith
-                        (slideOutHorizontally(spec) { if (forward) -it else it } + fadeOut(tween(160)))
-                },
-                label = "monthGrid",
-            ) { page ->
-                val today = LocalDate.now()
-                Column {
-                    page.cells.chunked(7).forEach { week ->
-                        Row(Modifier.fillMaxWidth()) {
-                            week.forEach { cell ->
-                                CalendarCellView(
-                                    cell = cell,
-                                    isToday = cell.date == today,
-                                    isSelected = cell.date == state.selectedDate,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .aspectRatio(0.95f),
-                                    onClick = { cell.date?.let { vm.selectDate(it) } },
-                                )
-                            }
-                            if (week.size < 7) repeat(7 - week.size) {
-                                Spacer(Modifier.weight(1f))
-                            }
+            topBar()
+            MonthHeaderRow(vm)
+            Spacer(Modifier.height(Spacing.s))
+            WeekdayHeaderRow()
+            Spacer(Modifier.height(Spacing.xs))
+            MonthGrid(state, vm)
+            Spacer(Modifier.height(Spacing.m))
+            SummaryCards(state, colorScheme)
+        }
+    }
+}
+
+/** 月份标题行：‹ 2026年9月 › + 回到今天（AnimatedContent 方向感滑动） */
+@Composable
+private fun MonthHeaderRow(vm: CalendarViewModel) {
+    val state by vm.uiState.collectAsStateWithLifecycle()
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = vm::prevMonth) {
+            Icon(painterResource(R.drawable.ic_ms_keyboard_arrow_left), contentDescription = stringResource(R.string.calendar_prev_month))
+        }
+        AnimatedContent(
+            targetState = state.month,
+            transitionSpec = {
+                val forward = targetState > initialState
+                val spec = spring<IntOffset>(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
+                (slideInHorizontally(spec) { if (forward) it else -it } + fadeIn(spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium))) togetherWith
+                    (slideOutHorizontally(spec) { if (forward) -it else it } + fadeOut(spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium)))
+            },
+            modifier = Modifier.weight(1f),
+            label = "monthTitle",
+        ) { m ->
+            Text(
+                stringResource(R.string.calendar_month_title, m.year, m.monthValue),
+                style = MaterialTheme.typography.titleLarge,
+            )
+        }
+        TextButton(onClick = vm::goToday) { Text(stringResource(R.string.calendar_back_today)) }
+        IconButton(onClick = vm::nextMonth) {
+            Icon(painterResource(R.drawable.ic_ms_keyboard_arrow_right), contentDescription = stringResource(R.string.calendar_next_month))
+        }
+    }
+}
+
+/** 星期表头：一 ~ 日 */
+@Composable
+private fun WeekdayHeaderRow() {
+    Row(Modifier.fillMaxWidth()) {
+        listOf(stringResource(R.string.calendar_weekday_mon), stringResource(R.string.calendar_weekday_tue), stringResource(R.string.calendar_weekday_wed), stringResource(R.string.calendar_weekday_thu), stringResource(R.string.calendar_weekday_fri), stringResource(R.string.calendar_weekday_sat), stringResource(R.string.calendar_weekday_sun)).forEach {
+            Text(
+                it,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+        }
+    }
+}
+
+/** 月网格：左右滑动切月（阈值 50dp）+ 方向感滑动动画（contentKey 只认月份，同月改记录不重播） */
+@Composable
+private fun MonthGrid(state: CalendarUiState, vm: CalendarViewModel) {
+    val dragThreshold = with(LocalDensity.current) { 50.dp.toPx() }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .pointerInput(dragThreshold) {
+                var totalDrag = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { totalDrag = 0f },
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        totalDrag += dragAmount
+                    },
+                    onDragEnd = {
+                        if (totalDrag < -dragThreshold) vm.nextMonth()
+                        else if (totalDrag > dragThreshold) vm.prevMonth()
+                    },
+                )
+            }
+    ) {
+        AnimatedContent(
+            targetState = MonthGridData(state.month, state.cells),
+            contentKey = { it.month },
+            transitionSpec = {
+                val forward = targetState.month > initialState.month
+                val spec = spring<IntOffset>(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
+                (slideInHorizontally(spec) { if (forward) it else -it } + fadeIn(spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium))) togetherWith
+                    (slideOutHorizontally(spec) { if (forward) -it else it } + fadeOut(spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium)))
+            },
+            label = "monthGrid",
+        ) { page ->
+            val today = LocalDate.now()
+            Column {
+                page.cells.chunked(7).forEach { week ->
+                    Row(Modifier.fillMaxWidth()) {
+                        week.forEach { cell ->
+                            CalendarCellView(
+                                cell = cell,
+                                isToday = cell.date == today,
+                                isSelected = cell.date == state.selectedDate,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(0.95f),
+                                onClick = { cell.date?.let { vm.selectDate(it) } },
+                            )
+                        }
+                        if (week.size < 7) repeat(7 - week.size) {
+                            Spacer(Modifier.weight(1f))
                         }
                     }
                 }
             }
         }
+    }
+}
 
-        Spacer(Modifier.height(Spacing.m))
-        SectionCard {
-            Column {
-                Text(
-                    stringResource(R.string.calendar_day_summary, TimeUtils.mdCn(state.selectedDate)),
-                    style = MaterialTheme.typography.titleSmall,
+/** 小结卡组：今日（选中日）小结 + 本月小结 */
+@Composable
+private fun SummaryCards(
+    state: CalendarUiState,
+    colorScheme: androidx.compose.material3.ColorScheme,
+) {
+    SectionCard {
+        Column {
+            Text(
+                stringResource(R.string.calendar_day_summary, TimeUtils.mdCn(state.selectedDate)),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Spacer(Modifier.height(Spacing.s))
+            Row {
+                com.mdot.app.core.designsystem.component.KeyValue(
+                    stringResource(otNoun(state.workSystem)), TimeUtils.prettyDuration(state.selectedOtMinutes),
+                    valueColor = colorScheme.primary, modifier = Modifier.weight(1f),
                 )
-                Spacer(Modifier.height(Spacing.s))
-                Row {
-                    com.mdot.app.core.designsystem.component.KeyValue(
-                        stringResource(otNoun(state.workSystem)), TimeUtils.prettyDuration(state.selectedOtMinutes),
-                        valueColor = colorScheme.primary, modifier = Modifier.weight(1f),
-                    )
-                    com.mdot.app.core.designsystem.component.KeyValue(
-                        stringResource(R.string.calendar_leave), TimeUtils.prettyDuration(state.selectedLeaveMinutes),
-                        valueColor = colorScheme.error, modifier = Modifier.weight(1f),
-                    )
-                    com.mdot.app.core.designsystem.component.KeyValue(
-                        stringResource(R.string.calendar_ot_pay), state.selectedOtPayCents?.let { Money.yuanWithSign(it) } ?: "-",
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                state.selectedShiftName?.let {
-                    Spacer(Modifier.height(Spacing.xs))
-                    Text(
-                        stringResource(R.string.calendar_shift, it),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Spacer(Modifier.height(Spacing.s))
+                com.mdot.app.core.designsystem.component.KeyValue(
+                    stringResource(R.string.calendar_leave), TimeUtils.prettyDuration(state.selectedLeaveMinutes),
+                    valueColor = colorScheme.error, modifier = Modifier.weight(1f),
+                )
+                com.mdot.app.core.designsystem.component.KeyValue(
+                    stringResource(R.string.calendar_ot_pay), state.selectedOtPayCents?.let { Money.yuanWithSign(it) } ?: "-",
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            state.selectedShiftName?.let {
+                Spacer(Modifier.height(Spacing.xs))
                 Text(
-                    stringResource(R.string.calendar_summary_hint),
+                    stringResource(R.string.calendar_shift, it),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            Spacer(Modifier.height(Spacing.s))
+            Text(
+                stringResource(R.string.calendar_summary_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
+    }
 
-        Spacer(Modifier.height(Spacing.m))
-        SectionCard {
-            Column {
-                Text(stringResource(R.string.calendar_month_summary), style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.height(Spacing.s))
-                Row {
-                    com.mdot.app.core.designsystem.component.KeyValue(
-                        stringResource(otNoun(state.workSystem)), TimeUtils.prettyDuration(state.monthOtMinutes),
-                        valueColor = colorScheme.primary, modifier = Modifier.weight(1f),
-                    )
-                    com.mdot.app.core.designsystem.component.KeyValue(
-                        stringResource(R.string.calendar_leave), TimeUtils.prettyDuration(state.monthLeaveMinutes),
-                        valueColor = colorScheme.error, modifier = Modifier.weight(1f),
-                    )
-                    com.mdot.app.core.designsystem.component.KeyValue(
-                        stringResource(R.string.calendar_ot_pay), state.monthOtPayCents?.let { Money.yuanWithSign(it) } ?: "-",
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                Spacer(Modifier.height(Spacing.s))
-                Text(
-                    stringResource(R.string.calendar_month_recorded, state.month.monthValue, state.recordedDays),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+    Spacer(Modifier.height(Spacing.m))
+    SectionCard {
+        Column {
+            Text(stringResource(R.string.calendar_month_summary), style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(Spacing.s))
+            Row {
+                com.mdot.app.core.designsystem.component.KeyValue(
+                    stringResource(otNoun(state.workSystem)), TimeUtils.prettyDuration(state.monthOtMinutes),
+                    valueColor = colorScheme.primary, modifier = Modifier.weight(1f),
+                )
+                com.mdot.app.core.designsystem.component.KeyValue(
+                    stringResource(R.string.calendar_leave), TimeUtils.prettyDuration(state.monthLeaveMinutes),
+                    valueColor = colorScheme.error, modifier = Modifier.weight(1f),
+                )
+                com.mdot.app.core.designsystem.component.KeyValue(
+                    stringResource(R.string.calendar_ot_pay), state.monthOtPayCents?.let { Money.yuanWithSign(it) } ?: "-",
+                    modifier = Modifier.weight(1f),
                 )
             }
+            Spacer(Modifier.height(Spacing.s))
+            Text(
+                stringResource(R.string.calendar_month_recorded, state.month.monthValue, state.recordedDays),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -436,7 +502,7 @@ private fun CalendarCellView(
 ) {
     val colorScheme = MaterialTheme.colorScheme
     // 选中态与记加班弹窗时长格同款：深主题色描边 + 浅主题色填充，颜色缓切过渡
-    val colorSpec = tween<Color>(Duration.normal)
+    val colorSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Color>()
     val bgColor by animateColorAsState(
         targetValue = when {
             isSelected || isToday -> colorScheme.primaryContainer
@@ -473,7 +539,7 @@ private fun CalendarCellView(
     )
     val indicatorAlpha by animateFloatAsState(
         targetValue = if (isSelected || isToday) 1f else 0f,
-        animationSpec = tween(Duration.normal),
+        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
         label = "calBloomAlpha",
     )
     val haptic = LocalHapticFeedback.current

@@ -47,10 +47,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.widthIn
 import com.mdot.app.R
 import com.mdot.app.core.datastore.SettingsDataSource
+import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.Duration
+import com.mdot.app.core.designsystem.LocalWindowSpec
 import com.mdot.app.core.designsystem.Radius
+import com.mdot.app.core.designsystem.WindowSpec
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.EmptyState
 import com.mdot.app.core.designsystem.component.KeyValue
@@ -252,6 +257,8 @@ fun StatsScreen(
     val pieMode by vm.pieMode.collectAsStateWithLifecycle()
     val selectedBar by vm.selectedBar.collectAsStateWithLifecycle()
     var picking by remember { mutableStateOf<String?>(null) } // "from" | "to"
+    // 响应式（docs 03 §3.2）：EXPANDED 时柱状图/饼图并排双列
+    val twoPane = LocalWindowSpec.current == WindowSpec.EXPANDED
 
     val topGap = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + TopBarHeight + Spacing.xs
     Column(Modifier.fillMaxSize()) {
@@ -260,9 +267,105 @@ fun StatsScreen(
         } else {
             Spacer(Modifier.height(topGap))
         }
+    @Composable
+    fun BarChartCard(modifier: Modifier = Modifier) {
+        SectionCard(modifier) {
+    Column {
+        Text(if (state.workSystem == com.mdot.app.domain.model.WorkSystem.HOURLY) stringResource(R.string.stats_bar_title_hourly) else stringResource(R.string.stats_bar_title), style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(Spacing.s))
+        if (state.bars.isEmpty()) {
+            Text(if (state.workSystem == com.mdot.app.domain.model.WorkSystem.HOURLY) stringResource(R.string.stats_bar_empty_hourly) else stringResource(R.string.stats_bar_empty), style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            DailyBarChart(
+                bars = state.bars,
+                selectedLabel = selectedBar,
+                onSelect = vm::selectBar,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp),
+            )
+            state.bars.firstOrNull { it.label == selectedBar }?.let { bar ->
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    stringResource(R.string.stats_bar_selected, bar.label, TimeUtils.prettyDuration(bar.minutes)),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+}
+
+Spacer(Modifier.height(Spacing.m))
+    }
+
+    @Composable
+    fun PieChartCard(modifier: Modifier = Modifier) {
+        SectionCard(modifier) {
+    Column {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PieMode.entries.forEach { mode ->
+                FilterChip(
+                    selected = pieMode == mode,
+                    onClick = { vm.onPieMode(mode) },
+                    label = { Text(stringResource(mode.labelRes)) },
+                )
+            }
+        }
+        Spacer(Modifier.height(Spacing.s))
+        val slices = if (pieMode == PieMode.SHIFT) state.pieShift else state.pieLeave
+        if (slices.isEmpty()) {
+            Text(
+                if (pieMode == PieMode.SHIFT) { if (state.workSystem == com.mdot.app.domain.model.WorkSystem.HOURLY) stringResource(R.string.stats_pie_empty_hourly) else stringResource(R.string.stats_pie_empty) } else stringResource(R.string.stats_pie_empty_leave),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            PieChart(
+                slices = slices,
+                modifier = Modifier
+                    .size(160.dp)
+                    .align(Alignment.CenterHorizontally),
+            )
+            Spacer(Modifier.height(Spacing.m))
+            val total = slices.sumOf { it.minutes }.coerceAtLeast(1)
+            slices.forEachIndexed { index, slice ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        Modifier
+                            .size(10.dp)
+                            .background(pieColor(index), CircleShape)
+                    )
+                    Spacer(Modifier.size(Spacing.s))
+                    Text(slice.label, style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f))
+                    Text(
+                        stringResource(
+                            R.string.stats_pie_legend,
+                            TimeUtils.prettyDuration(slice.minutes),
+                            slice.minutes * 100 / total,
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+    }
+
         LazyColumn(
             Modifier
                 .fillMaxSize()
+                .wrapContentWidth(Alignment.CenterHorizontally)
+                .widthIn(max = if (twoPane) AdaptiveSpecs.twoPaneMaxWidth else AdaptiveSpecs.contentMaxWidth)
                 .padding(horizontal = Spacing.page),
             contentPadding = com.mdot.app.core.navigation.contentPaddingValues(showBottomBar = !canBack),
         ) {
@@ -396,97 +499,18 @@ fun StatsScreen(
 
         Spacer(Modifier.height(Spacing.m))
 
-        // ---- 柱状图 ----
-        SectionCard {
-            Column {
-                Text(if (state.workSystem == com.mdot.app.domain.model.WorkSystem.HOURLY) stringResource(R.string.stats_bar_title_hourly) else stringResource(R.string.stats_bar_title), style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.height(Spacing.s))
-                if (state.bars.isEmpty()) {
-                    Text(if (state.workSystem == com.mdot.app.domain.model.WorkSystem.HOURLY) stringResource(R.string.stats_bar_empty_hourly) else stringResource(R.string.stats_bar_empty), style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else {
-                    DailyBarChart(
-                        bars = state.bars,
-                        selectedLabel = selectedBar,
-                        onSelect = vm::selectBar,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(160.dp),
-                    )
-                    state.bars.firstOrNull { it.label == selectedBar }?.let { bar ->
-                        Spacer(Modifier.height(Spacing.xs))
-                        Text(
-                            stringResource(R.string.stats_bar_selected, bar.label, TimeUtils.prettyDuration(bar.minutes)),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-            }
-        }
-
         Spacer(Modifier.height(Spacing.m))
-
-        // ---- 饼图 ----
-        SectionCard {
-            Column {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PieMode.entries.forEach { mode ->
-                        FilterChip(
-                            selected = pieMode == mode,
-                            onClick = { vm.onPieMode(mode) },
-                            label = { Text(stringResource(mode.labelRes)) },
-                        )
-                    }
-                }
-                Spacer(Modifier.height(Spacing.s))
-                val slices = if (pieMode == PieMode.SHIFT) state.pieShift else state.pieLeave
-                if (slices.isEmpty()) {
-                    Text(
-                        if (pieMode == PieMode.SHIFT) { if (state.workSystem == com.mdot.app.domain.model.WorkSystem.HOURLY) stringResource(R.string.stats_pie_empty_hourly) else stringResource(R.string.stats_pie_empty) } else stringResource(R.string.stats_pie_empty_leave),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    PieChart(
-                        slices = slices,
-                        modifier = Modifier
-                            .size(160.dp)
-                            .align(Alignment.CenterHorizontally),
-                    )
-                    Spacer(Modifier.height(Spacing.m))
-                    val total = slices.sumOf { it.minutes }.coerceAtLeast(1)
-                    slices.forEachIndexed { index, slice ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Box(
-                                Modifier
-                                    .size(10.dp)
-                                    .background(pieColor(index), CircleShape)
-                            )
-                            Spacer(Modifier.size(Spacing.s))
-                            Text(slice.label, style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(1f))
-                            Text(
-                                stringResource(
-                                    R.string.stats_pie_legend,
-                                    TimeUtils.prettyDuration(slice.minutes),
-                                    slice.minutes * 100 / total,
-                                ),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
+        // ---- 柱状图 + 饼图：宽屏双列，窄屏纵向堆叠 ----
+        if (twoPane) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
+                BarChartCard(Modifier.weight(1f))
+                PieChartCard(Modifier.weight(1f))
             }
+        } else {
+            BarChartCard()
+            Spacer(Modifier.height(Spacing.m))
+            PieChartCard()
         }
-
-        Spacer(Modifier.height(Spacing.m))
         }
 
         // ---- 明细列表 ----
@@ -583,10 +607,11 @@ private fun DailyBarChart(
 ) {
     val primary = MaterialTheme.colorScheme.primary
     val outline = MaterialTheme.colorScheme.outlineVariant
+    val slowSpec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
     val progress = remember { Animatable(0f) }
     LaunchedEffect(bars) {
         progress.snapTo(0f)
-        progress.animateTo(1f, tween(Duration.slow, easing = FastOutSlowInEasing))
+        progress.animateTo(1f, slowSpec)
     }
     Canvas(
         modifier
@@ -624,10 +649,11 @@ private fun DailyBarChart(
 private fun PieChart(slices: List<PieSlice>, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
     val colors = List(slices.size) { pieColor(it, scheme) }
+    val slowSpec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
     val progress = remember { Animatable(0f) }
     LaunchedEffect(slices) {
         progress.snapTo(0f)
-        progress.animateTo(1f, tween(Duration.slow, easing = FastOutSlowInEasing))
+        progress.animateTo(1f, slowSpec)
     }
     Canvas(modifier) {
         val total = slices.sumOf { it.minutes }.toFloat().coerceAtLeast(1f)

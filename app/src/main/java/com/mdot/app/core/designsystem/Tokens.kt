@@ -60,3 +60,17 @@ object BottomBarSpec {
     /** 仅图标模式单槽基准宽 */
     val slotWidthIconOnly = 60.dp
 }
+
+/** 响应式断点与限宽（docs 03 §3.2：两档断点 600/840，宽屏限宽居中 + 一级页双栏） */
+object AdaptiveSpecs {
+    /** MEDIUM 断点：≥600dp 进入限宽居中（平板竖屏/折叠屏展开） */
+    val mediumBreakpoint = 600.dp
+    /** EXPANDED 断点：≥840dp 启用双栏布局（平板横屏/桌面窗口） */
+    val expandedBreakpoint = 840.dp
+    /** 单列内容限宽（MEDIUM/EXPANDED 统一） */
+    val contentMaxWidth = 600.dp
+    /** EXPANDED 双栏布局总宽 */
+    val twoPaneMaxWidth = 720.dp
+    /** 记录弹层限宽（宽屏下底部弹层居中，不全宽拉通） */
+    val sheetMaxWidth = 640.dp
+}

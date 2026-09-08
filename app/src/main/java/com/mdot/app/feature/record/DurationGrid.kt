@@ -218,18 +218,18 @@ private fun DurationCell(
     val bg by animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
         else MaterialTheme.colorScheme.surfaceContainerHigh,
-        animationSpec = tween(Duration.normal),
+        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
         label = "cellBg",
     )
     val stroke by animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
-        animationSpec = tween(Duration.normal),
+        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
         label = "cellStroke",
     )
     val textColor by animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
         else MaterialTheme.colorScheme.onSurface,
-        animationSpec = tween(Duration.normal),
+        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
         label = "cellText",
     )
     Box(
