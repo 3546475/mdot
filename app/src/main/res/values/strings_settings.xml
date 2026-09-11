@@ -13,6 +13,7 @@
     <string name="settings_group_personalization">个性化</string>
     <string name="settings_row_appearance">外观</string>
     <string name="settings_group_other">其他</string>
+    <string name="settings_row_update_datasource">更新与数据源</string>
     <string name="settings_row_about_privacy">关于与隐私</string>
 
     <!-- 工时设置 -->

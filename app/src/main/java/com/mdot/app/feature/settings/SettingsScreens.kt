@@ -127,6 +127,10 @@ fun SettingsScreen(
                         else stringResource(R.string.settings_sync_not_configured),
                         painterResource(R.drawable.ic_ms_cloud_sync), onClick = { onOpen(Routes.SYNC) },
                     )
+                    SettingRow(
+                        stringResource(R.string.settings_row_update_datasource), null,
+                        painterResource(R.drawable.ic_ms_settings), onClick = { onOpen(Routes.DATASOURCE) },
+                    )
                 }
                 Spacer(Modifier.height(Spacing.m))
                 // ---- 其他 ----
@@ -163,6 +167,10 @@ fun SettingsScreen(
                     if (syncStatus.configured) stringResource(R.string.settings_sync_configured)
                     else stringResource(R.string.settings_sync_not_configured),
                     painterResource(R.drawable.ic_ms_cloud_sync), onClick = { onOpen(Routes.SYNC) },
+                )
+                SettingRow(
+                    stringResource(R.string.settings_row_update_datasource), null,
+                    painterResource(R.drawable.ic_ms_settings), onClick = { onOpen(Routes.DATASOURCE) },
                 )
             }
             Spacer(Modifier.height(Spacing.m))
