@@ -1,11 +1,11 @@
 {
-  "versionName": "0.6.0",
-  "versionCode": 28,
-  "tag": "v0.6.0",
-  "releaseNotes": "马的加班 v0.6.0 已发布。",
+  "versionName": "0.6.1",
+  "versionCode": 29,
+  "tag": "v0.6.1",
+  "releaseNotes": "马的加班 v0.6.1 已发布。",
   "apkUrl": {
-    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.6.0/MDOT-RELEASE-0.6.0-v8a.apk",
-    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.6.0/MDOT-RELEASE-0.6.0-v7a.apk",
-    "universal": "https://github.com/3546475/mdot/releases/download/v0.6.0/MDOT-RELEASE-0.6.0-dual.apk"
+    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.6.1/MDOT-RELEASE-0.6.1-v8a.apk",
+    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.6.1/MDOT-RELEASE-0.6.1-v7a.apk",
+    "universal": "https://github.com/3546475/mdot/releases/download/v0.6.1/MDOT-RELEASE-0.6.1-dual.apk"
   }
 }
