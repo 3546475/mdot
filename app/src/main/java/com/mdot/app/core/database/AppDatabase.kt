@@ -160,10 +160,19 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        /** v3→v4：site_settlement 加 is_partial（部分结算单，从待结余额扣减、不锁记录） */
+        /** v3→v4：site_settlement 加 is_partial（部分结算单，从待结余额扣减、不锁记录）。
+         *  ⚠️ 防御式补列：2→3 的建表脚本已含 is_partial，v2 老库顺序执行 2→3→4 时列已存在，
+         *  直接 ALTER 会 duplicate column 闪退（v0.6.0 首发踩坑）——先查列再补。 */
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE site_settlement ADD COLUMN is_partial INTEGER NOT NULL DEFAULT 0")
+                val columns = mutableListOf<String>()
+                db.query("PRAGMA table_info(site_settlement)").use { c ->
+                    val nameIdx = c.getColumnIndexOrThrow("name")
+                    while (c.moveToNext()) columns.add(c.getString(nameIdx))
+                }
+                if ("is_partial" !in columns) {
+                    db.execSQL("ALTER TABLE site_settlement ADD COLUMN is_partial INTEGER NOT NULL DEFAULT 0")
+                }
             }
         }
 
