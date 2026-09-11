@@ -4,13 +4,11 @@
     <string name="datasource_section_update">更新</string>
     <string name="datasource_current_version">当前版本</string>
     <string name="datasource_check_update">检查更新</string>
-    <string name="datasource_update_url_label">更新 JSON 地址</string>
     <string name="datasource_section_holiday">节假日库</string>
     <string name="datasource_current_lib_version">当前库版本</string>
     <string name="datasource_builtin_default">内置默认</string>
     <string name="datasource_refresh_now">立即刷新</string>
     <string name="datasource_builtin_hint">内置库为估算数据（仅节日正日），请配置远程 JSON 获取权威安排；刷新失败自动保留现库。</string>
-    <string name="datasource_holiday_url_label">节假日 JSON 地址</string>
     <!-- 应用内更新 -->
     <string name="update_checking">正在检查更新…</string>
     <string name="update_available_title">发现新版本</string>
@@ -22,4 +20,8 @@
     <string name="update_downloaded_text">新版本 v%1$s 已下载，是否现在安装？</string>
     <string name="update_action_install">立即安装</string>
     <string name="update_action_later">稍后</string>
+    <string name="datasource_add_url">添加地址</string>
+    <string name="datasource_add_url_hint">需以 http(s):// 开头</string>
+    <string name="datasource_ok">确定</string>
+    <string name="datasource_cancel">取消</string>
 </resources>

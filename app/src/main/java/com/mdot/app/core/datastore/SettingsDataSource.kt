@@ -90,6 +90,14 @@ class SettingsDataSource @Inject constructor(
     suspend fun setUpdateUrl(url: String) = dataStore.edit { it[UPDATE_URL] = url }
     suspend fun setHolidayUrl(url: String) = dataStore.edit { it[HOLIDAY_URL] = url }
 
+    // ---- 更新与数据源：URL 多选一列表（JSON 数组存储；空 = 未配置，UI 以单值兜底） ----
+    val updateUrlsFlow: Flow<List<String>> = dataStore.data.map { decode(it[UPDATE_URLS], emptyList()) }
+    val holidayUrlsFlow: Flow<List<String>> = dataStore.data.map { decode(it[HOLIDAY_URLS], emptyList()) }
+    suspend fun setUpdateUrls(urls: List<String>) =
+        dataStore.edit { it[UPDATE_URLS] = json.encodeToString(urls.filter { u -> u.isNotBlank() }) }
+    suspend fun setHolidayUrls(urls: List<String>) =
+        dataStore.edit { it[HOLIDAY_URLS] = json.encodeToString(urls.filter { u -> u.isNotBlank() }) }
+
     /** 节假日库最近一次成功拉取时间（毫秒；自动刷新节流用，失败按 1 天短节流回退） */
     val holidayLastFetchAtFlow: Flow<Long> = dataStore.data.map { it[HOLIDAY_LAST_FETCH_AT] ?: 0L }
 
@@ -174,6 +182,16 @@ class SettingsDataSource @Inject constructor(
         const val DEFAULT_HOLIDAY_URL =
             "https://3546475.github.io/mdot/holidays.json"
 
+        /** 出厂内置候选源（更新 JSON / 节假日 JSON 各两条：CNB raw 默认 + GitHub Pages 备用，多选一切换用） */
+        val DEFAULT_UPDATE_URLS = listOf(
+            DEFAULT_UPDATE_URL,
+            "https://3546475.github.io/mdot/update.json",
+        )
+        val DEFAULT_HOLIDAY_URLS = listOf(
+            DEFAULT_HOLIDAY_URL,
+            "https://3546475.github.io/mdot/holidays.json",
+        )
+
         private val SALARY = stringPreferencesKey("salary_config")
         private val CYCLE_ANCHOR_DAY = intPreferencesKey("cycle_anchor_day")
         private val WORKDAYS = stringPreferencesKey("workdays")
@@ -183,6 +201,8 @@ class SettingsDataSource @Inject constructor(
         private val FIRST_LAUNCH_DONE = booleanPreferencesKey("first_launch_done")
         private val UPDATE_URL = stringPreferencesKey("update_url")
         private val HOLIDAY_URL = stringPreferencesKey("holiday_url")
+        private val UPDATE_URLS = stringPreferencesKey("update_urls")
+        private val HOLIDAY_URLS = stringPreferencesKey("holiday_urls")
         private val HOLIDAY_LAST_FETCH_AT = longPreferencesKey("holiday_last_fetch_at")
         private val LAST_UPDATE_CHECK_AT = longPreferencesKey("last_update_check_at")
         private val AUTO_BACKUP_ENABLED = booleanPreferencesKey("auto_backup_enabled")

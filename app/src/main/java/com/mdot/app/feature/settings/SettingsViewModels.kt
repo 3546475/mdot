@@ -267,6 +267,8 @@ class DataSourceViewModel @Inject constructor(
 
     val holidayUrl = MutableStateFlow("")
     val updateUrl = MutableStateFlow("")
+    val holidayUrls = MutableStateFlow<List<String>>(emptyList())
+    val updateUrls = MutableStateFlow<List<String>>(emptyList())
     val message = MutableStateFlow<String?>(null)
     val busy = MutableStateFlow(false)
 
@@ -274,6 +276,8 @@ class DataSourceViewModel @Inject constructor(
         viewModelScope.launch {
             holidayUrl.value = settings.holidayUrlFlow.first()
             updateUrl.value = settings.updateUrlFlow.first()
+            updateUrls.value = settings.updateUrlsFlow.first().ifEmpty { SettingsDataSource.DEFAULT_UPDATE_URLS }
+            holidayUrls.value = settings.holidayUrlsFlow.first().ifEmpty { SettingsDataSource.DEFAULT_HOLIDAY_URLS }
         }
     }
 
@@ -285,6 +289,72 @@ class DataSourceViewModel @Inject constructor(
     fun setUpdateUrl(url: String) = viewModelScope.launch {
         updateUrl.value = url
         settings.setUpdateUrl(url.trim())
+    }
+
+    /** 添加候选地址（非法/重复时置 message，不入库） */
+    fun addUpdateUrl(url: String) = addUrl(updateUrls, url) { list -> settings.setUpdateUrls(list) }
+
+    fun removeUpdateUrl(url: String) = removeUrl(updateUrls, updateUrl, url, SettingsDataSource.DEFAULT_UPDATE_URLS) { list ->
+        settings.setUpdateUrls(list)
+    }
+
+    fun addHolidayUrl(url: String) = addUrl(holidayUrls, url) { list -> settings.setHolidayUrls(list) }
+
+    fun removeHolidayUrl(url: String) = removeUrl(holidayUrls, holidayUrl, url, SettingsDataSource.DEFAULT_HOLIDAY_URLS) { list ->
+        settings.setHolidayUrls(list)
+    }
+
+    private inline fun MutableStateFlow<List<String>>.mod(
+        crossinline persist: suspend (List<String>) -> Unit,
+        crossinline block: (List<String>) -> List<String>,
+    ) = viewModelScope.launch {
+        val next = block(value)
+        value = next
+        persist(next)
+    }
+
+    private fun addUrl(
+        flow: MutableStateFlow<List<String>>,
+        raw: String,
+        persist: suspend (List<String>) -> Unit,
+    ) = viewModelScope.launch {
+        val u = raw.trim()
+        when {
+            !(u.startsWith("http://") || u.startsWith("https://")) ->
+                message.value = "地址需以 http:// 或 https:// 开头"
+            u in flow.value -> message.value = "该地址已在列表中"
+            else -> {
+                flow.value = flow.value + u
+                persist(flow.value)
+                message.value = null
+            }
+        }
+    }
+
+    private fun removeUrl(
+        flow: MutableStateFlow<List<String>>,
+        current: MutableStateFlow<String>,
+        url: String,
+        fallback: List<String>,
+        persist: suspend (List<String>) -> Unit,
+    ) = viewModelScope.launch {
+        val next = (flow.value - url).ifEmpty { fallback }
+        flow.value = next
+        persist(next)
+        // 删掉的是当前生效值 → 自动切到列表首个
+        if (current.value !in next) {
+            current.value = next.first()
+            persistSelected(current.value, fallback)
+        }
+    }
+
+    private suspend fun persistSelected(url: String, fallback: List<String>) {
+        // update/holiday 的选中值落库（setUpdateUrl/setHolidayUrl）
+        if (fallback === SettingsDataSource.DEFAULT_UPDATE_URLS || fallback == SettingsDataSource.DEFAULT_UPDATE_URLS) {
+            settings.setUpdateUrl(url)
+        } else {
+            settings.setHolidayUrl(url)
+        }
     }
 
     fun refreshHoliday() = viewModelScope.launch {
