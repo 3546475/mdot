@@ -40,7 +40,8 @@ class BackupRestoreGuardTest {
     @Test
     fun `未知制度显式拒绝`() {
         try {
-            validateBackupWorkSystems(file("STANDARD", "SITE"))
+            // SITE 已于工地记工批次成为合法制度（v0.6.x 落地）；未知值改用 FUTURE 表达
+            validateBackupWorkSystems(file("STANDARD", "FUTURE"))
             fail("未知 workSystem 应被拒绝")
         } catch (e: IllegalArgumentException) {
             assertTrue(e.message!!.contains("工时制度"))
@@ -51,13 +52,13 @@ class BackupRestoreGuardTest {
     @Test
     fun `拒绝信息列出全部未知值且不重复`() {
         try {
-            validateBackupWorkSystems(file("SITE", "SITE", "FUTURE"))
+            validateBackupWorkSystems(file("OLD", "OLD", "FUTURE"))
             fail("未知 workSystem 应被拒绝")
         } catch (e: IllegalArgumentException) {
             val msg = e.message!!
-            assertTrue(msg.contains("SITE"))
+            assertTrue(msg.contains("OLD"))
             assertTrue(msg.contains("FUTURE"))
-            assertEquals(1, msg.split("SITE").size - 1)
+            assertEquals(1, msg.split("OLD").size - 1)
         }
     }
 
