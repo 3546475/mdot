@@ -99,7 +99,7 @@ data class HomeCardsConfig(
 ) {
     companion object {
         /** 卡片功能池（含默认隐藏的统计卡；「记加班」主按钮为固定悬浮胶囊，不参与配置） */
-        val POOL = listOf("data", "income", "entries", "heatmap", "weekbar")
+        val POOL = listOf("data", "income", "entries", "heatmap", "weekbar", "monthbar")
         /** 出厂默认显示顺序（热点图/本周柱状默认隐藏，可在配置页开启） */
         val DEFAULT_CARDS = listOf("data", "income", "entries")
         /** 至少保留的卡片数（防整页清空无从下手） */

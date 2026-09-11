@@ -233,8 +233,8 @@ private fun HomeCardContent(
         }
     })
     "heatmap" -> ({
-        // 显隐与数据解耦：所有制度同序列（配置驱动），无数据渲染空格子热图，end 兜底今天
-        HomeHeatmapCard(site.daily, state.salary.workSystem == WorkSystem.SITE)
+        // 显隐与数据解耦：所有制度同序列（配置驱动）；固定六个月窗口（本月向前推五个月），与统计页同款
+        HomeHeatmapCard(site.heatValues, state.salary.workSystem == WorkSystem.SITE)
     })
     "weekbar" -> ({
         // 本周柱状卡（与统计页同款共享组件）：从本月 daily 过滤本周；强度随制度（工地=工数，其他=加班分钟）
@@ -250,6 +250,25 @@ private fun HomeCardContent(
             isSite = isSite,
         )
     })
+    "monthbar" -> ({
+        // 月柱状卡（与统计页同款共享组件）：本月自然月每日柱，强度随制度（工地=工数，其他=加班分钟）
+        val isSite = state.salary.workSystem == WorkSystem.SITE
+        val today = java.time.LocalDate.now()
+        val from = today.withDayOfMonth(1)
+        val days = today.lengthOfMonth()
+        val byDate = site.daily.associateBy { it.date }
+        val values = (0 until days).map { off ->
+            val p = byDate[from.plusDays(off.toLong())]
+            if (p == null) 0f else if (isSite) p.worksMilli / 1000f else p.otMinutes.toFloat()
+        }
+        SectionCard {
+            com.mdot.app.core.designsystem.component.MonthBarCard(
+                values = values,
+                from = from,
+                workSystem = state.salary.workSystem,
+            )
+        }
+    })
     else -> null
 }
 
@@ -258,16 +277,35 @@ private fun HomeCardContent(
 private fun DataSection(state: HomeUiState, onOpenStats: () -> Unit, onOpenRecord: () -> Unit) {
     Row(verticalAlignment = Alignment.Bottom) {
         Column(Modifier.weight(1f)) {
-            Text(
-                when (state.salary.workSystem) {
-                    WorkSystem.HOURLY -> stringResource(R.string.home_cycle_label_hourly)
-                    WorkSystem.COMPREHENSIVE -> stringResource(R.string.home_cycle_label_comprehensive)
-                    WorkSystem.STANDARD -> stringResource(R.string.home_cycle_label_standard)
-                    WorkSystem.SITE -> stringResource(R.string.site_cycle_label)
-                },
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            // 考勤周期胶囊（点击进统计），取代原「本期加班时长」标签行
+            val periodInteraction = remember { MutableInteractionSource() }
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(Radius.pill))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .clickable(
+                        interactionSource = periodInteraction,
+                        indication = LocalIndication.current,
+                        onClick = onOpenStats,
+                    )
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_ms_calendar_month), null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    state.period?.let { period ->
+                        stringResource(R.string.home_cycle_period, "${TimeUtils.mdCn(period.from)} – ${TimeUtils.mdCn(period.to)}")
+                    } ?: "",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.height(6.dp))
             // 数值变化时轻微缩放淡入
             AnimatedContent(
                 targetState = state.cycleOtMinutes,
@@ -323,12 +361,6 @@ private fun DataSection(state: HomeUiState, onOpenStats: () -> Unit, onOpenRecor
             } else {
                 TodayPill(text = stringResource(R.string.home_today_empty), filled = false, onRecord = onOpenRecord)
             }
-            Text(
-                text = state.period?.let { stringResource(R.string.home_cycle_period, it) } ?: "",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.clickable { onOpenStats() },
-            )
         }
     }
 }
@@ -682,16 +714,15 @@ private fun HomeWeekBarCard(
     )
 }
 
-/** 首页热点图卡：GitHub 贡献图风格，与统计页一致（无标题）；强度按制度取值（工地=工数，其他=加班小时） */
+/** 首页热点图卡：GitHub 贡献图风格，与统计页一致（无标题）；固定六个月窗口（本月向前推五个月），强度随制度（工地=工数，其他=加班分钟） */
 @Composable
-private fun HomeHeatmapCard(daily: List<HomeDayPoint>, isSite: Boolean) {
+private fun HomeHeatmapCard(heatValues: Map<LocalDate, Float>, isSite: Boolean) {
     SectionCard {
-        val values = daily.associate {
-            it.date to (if (isSite) it.worksMilli / 1000f else it.otMinutes / 60f)
-        }
+        val today = LocalDate.now()
         WorkHeatmap(
-            values = values,
-            end = daily.maxOfOrNull { it.date } ?: LocalDate.now(),
+            values = heatValues,
+            start = today.withDayOfMonth(1).minusMonths(5),
+            end = today,
         )
     }
 }

@@ -36,28 +36,30 @@ fun WorkHeatmap(
     end: LocalDate,
     modifier: Modifier = Modifier,
     weeks: Int = 26,
+    /** 显式起点（如「本月向前六个月」的月初）：给了则铺 start..end，忽略 weeks */
+    start: LocalDate? = null,
     cellAspect: Float = 1f,
     gap: Dp = 2.dp,
 ) {
-    val total = weeks * 7
-    val start = end.minusDays((total - 1).toLong())
+    val total = if (start != null) (end.toEpochDay() - start.toEpochDay()).toInt() + 1 else weeks * 7
+    val realStart = start ?: end.minusDays((total - 1).toLong())
     // 起始列对齐周一
-    val leading = (start.dayOfWeek.value + 6) % 7
+    val leading = (realStart.dayOfWeek.value + 6) % 7
     val cols = (leading + total + 6) / 7
     val grid: List<LocalDate?> = List(leading) { null } +
-        (0 until total).map { start.plusDays(it.toLong()) } +
+        (0 until total).map { realStart.plusDays(it.toLong()) } +
         List((cols * 7 - leading - total) % 7) { null }
     val maxV = values.values.maxOrNull()?.coerceAtLeast(1f) ?: 1f
     val monthFormatter = DateTimeFormatter.ofPattern("MMMM", Locale.CHINA)
 
-    // 月份标注：每列首个日期为某月 1 号（且月份与上一标注不同）时标该月
+    // 月份标注：某月 1 号落在哪列就标哪月（跨年/月中起始都能标全，如四月~九月六个月）
     var lastMonth = -1
     val monthLabels = (0 until cols).map { c ->
-        val first = (0..6).mapNotNull { r -> grid.getOrNull(c * 7 + r) }.firstOrNull()
+        val firstOfMonth = (0..6).mapNotNull { r -> grid.getOrNull(c * 7 + r) }.firstOrNull { it.dayOfMonth == 1 }
         when {
-            first != null && first.dayOfMonth <= 7 && first.monthValue != lastMonth -> {
-                lastMonth = first.monthValue
-                monthFormatter.format(first)
+            firstOfMonth != null && firstOfMonth.monthValue != lastMonth -> {
+                lastMonth = firstOfMonth.monthValue
+                monthFormatter.format(firstOfMonth)
             }
             else -> ""
         }

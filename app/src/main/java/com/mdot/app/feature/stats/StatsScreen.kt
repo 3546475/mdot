@@ -26,6 +26,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -67,6 +68,7 @@ import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.WeekBarCard
 import com.mdot.app.core.designsystem.component.buildWeekBars
 import com.mdot.app.core.designsystem.component.WorkHeatmap
+import com.mdot.app.core.designsystem.component.modeValueText
 import com.mdot.app.core.designsystem.component.DatePick
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.TopBarHeight
@@ -94,6 +96,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.LocalDate
 import javax.inject.Inject
@@ -152,8 +155,10 @@ data class StatsUiState(
     val siteSummary: SitePayCalculator.Output? = null,
     /** 统一热点图（所有模式）：非工地=加班小时，工地=工数 */
     val heatValues: Map<LocalDate, Float> = emptyMap(),
-    /** 热点图铺格终止日（区间尾与今天取小，防未来空格子） */
+    /** 热点图铺格终止日（固定今天，与所选区间无关） */
     val heatEnd: LocalDate = LocalDate.now(),
+    /** 热点图铺格起始日（本月月初向前推五个月的月初，共六个月） */
+    val heatStart: LocalDate? = null,
     /** 区间起止日（月柱状图铺满整月用，不截断到今天） */
     val rangeFrom: LocalDate? = null,
     val rangeTo: LocalDate? = null,
@@ -230,9 +235,11 @@ class StatsViewModel @Inject constructor(
     }.flatMapLatest { (dim, range, salaryWorkdays) ->
         val (salary, workdays) = salaryWorkdays
         if (range == null) return@flatMapLatest flowOf(StatsUiState(dimension = dim))
-        val heatEnd = minOf(range.to, today)
-        if (salary.workSystem == WorkSystem.SITE) {
-            // 工地记工：汇总/明细/热点图走当前项目（SitePayCalculator 口径），饼图为跨项目「项目工数」
+        // 热点图固定窗口：本月月初向前推五个月的月初 → 今天（如本月九月 = 四~九月），与所选区间无关
+        val heatStart = today.withDayOfMonth(1).minusMonths(5)
+        val heatEnd = today
+        // 工地记工：汇总/明细走所选区间（SitePayCalculator 口径），热点图由下方 merge 提供固定六个月窗口
+        val base = if (salary.workSystem == WorkSystem.SITE) {
             val pid = siteRepo.currentProjectId()
             combine(
                 siteRepo.observeAttendance(pid, range.from, range.to),
@@ -370,6 +377,26 @@ class StatsViewModel @Inject constructor(
                 customTo = customTo.value,
             )
         }
+        // 热点图数据独立于所选区间：固定六个月窗口（工地=工数，非工地=加班分钟），覆盖完整窗口
+        val heatFlow = if (salary.workSystem == WorkSystem.SITE) {
+            val pid = siteRepo.currentProjectId()
+            siteRepo.observeAttendance(pid, heatStart, heatEnd).map { atts ->
+                atts.filter { it.workMinutes > 0 }
+                    .groupBy { LocalDate.parse(it.date) }
+                    .mapValues { (_, list) ->
+                        list.sumOf { it.workMinutes * 1000L / it.baseMinutes.coerceAtLeast(1) } / 1000f
+                    }
+            }
+        } else {
+            recordRepo.observeRange(heatStart, heatEnd).map { recs ->
+                recs.filter { it.type == RecordType.OT }
+                    .groupBy { it.date }
+                    .mapValues { (_, list) -> list.sumOf { it.durationMinutes }.toFloat() }
+            }
+        }
+        base.combine(heatFlow) { st, heat ->
+            st.copy(heatValues = heat, heatEnd = heatEnd, heatStart = heatStart)
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StatsUiState())
 
     fun onDimension(d: StatsDimension) {
@@ -462,11 +489,31 @@ fun StatsScreen(
                 }
             }
             Spacer(Modifier.height(Spacing.xs))
-            Text(
-                state.rangeLabel,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            // 区间胶囊（与首页数据区日期同款样式）
+            val rangeText = state.rangeFrom?.let { f ->
+                state.rangeTo?.let { t ->
+                    stringResource(R.string.home_cycle_period, "${TimeUtils.mdCn(f)} – ${TimeUtils.mdCn(t)}")
+                }
+            } ?: state.rangeLabel
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(Radius.pill))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_ms_calendar_month), null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    rangeText,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
             Spacer(Modifier.height(Spacing.m))
         }
@@ -513,7 +560,7 @@ fun StatsScreen(
             }
 
             // ---- 月柱状图（区间 ≤31 天时展示：整月每日柱 + 刻度 + 最多日文字） ----
-            val rangeDays = state.rangeFrom?.let { f -> (state.heatEnd.toEpochDay() - f.toEpochDay()).toInt() + 1 } ?: 0
+            val rangeDays = state.rangeFrom?.let { f -> state.rangeTo?.let { t -> (t.toEpochDay() - f.toEpochDay()).toInt() + 1 } } ?: 0
             if (rangeDays in 2..31) {
                 item {
                     MonthBarCard(state)
@@ -521,10 +568,10 @@ fun StatsScreen(
                 }
             }
 
-            // ---- 热点图卡（所有模式同款强度：加班小时 / 工数） ----
+            // ---- 热点图卡（固定六个月：本月向前推五个月，如九月 = 四~九月） ----
             item {
                 SectionCard {
-                    WorkHeatmap(values = state.heatValues, end = state.heatEnd)
+                    WorkHeatmap(values = state.heatValues, start = state.heatStart, end = state.heatEnd)
                 }
                 Spacer(Modifier.height(Spacing.m))
             }
@@ -573,16 +620,9 @@ fun StatsScreen(
 }
 
 /** 模式取值文本：非工地=时长（小时），工地=工数（"N 工"） */
-@Composable
-private fun modeValueText(workSystem: WorkSystem, value: Float): String =
-    if (workSystem == WorkSystem.SITE) {
-        val num = if (value % 1f == 0f) value.toInt().toString() else String.format(java.util.Locale.US, "%.1f", value)
-        stringResource(R.string.stats_works_value, num)
-    } else {
-        TimeUtils.prettyDuration(value.roundToInt())
-    }
 
-/** 月柱状图（参考竞品版式）：区间每日柱 + 右侧最大/半程/0 虚线刻度 + 最多日高亮胶囊 */
+
+/** 月柱状图：统计页薄包装（共享组件在 core/designsystem/component/MonthBarCard.kt） */
 @Composable
 private fun MonthBarCard(state: StatsUiState) {
     // 铺满完整区间（自然月即 1 号到月末，未来日期空柱），不截断到今天
@@ -591,136 +631,11 @@ private fun MonthBarCard(state: StatsUiState) {
     if (from.isAfter(to)) return
     val days = ((to.toEpochDay() - from.toEpochDay()).toInt() + 1).coerceIn(2, 31)
     val values = (0 until days).map { state.heatValues[from.plusDays(it.toLong())] ?: 0f }
-    val maxV = (values.maxOrNull() ?: 0f)
-    val bestIdx = values.indices.maxByOrNull { values[it] } ?: 0
-
-    // 自绘容器：底距比统一卡片更紧（最多日文字贴近下缘）
-    Surface(
-        shape = RoundedCornerShape(Radius.card),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-    ) {
-        Column(Modifier.padding(start = Spacing.l, end = Spacing.l, top = Spacing.l, bottom = Spacing.s)) {
-            Row(verticalAlignment = Alignment.Bottom) {
-                Column(Modifier.weight(1f)) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(113.dp)
-                    ) {
-                        // 虚线网格（最大/半程/0）
-                        val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
-                        val barTopColor = MaterialTheme.colorScheme.primary
-                        val barBottomColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
-                        Canvas(Modifier.fillMaxSize()) {
-                            listOf(1f, 0.5f, 0f).forEach { f ->
-                                val y = size.height * (1f - f)
-                                drawLine(
-                                    color = gridColor,
-                                    start = Offset(0f, y),
-                                    end = Offset(size.width, y),
-                                    strokeWidth = 1.dp.toPx(),
-                                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f)),
-                                )
-                            }
-                        }
-                        // 每日柱（底部对齐，渐变）
-                        Row(
-                            Modifier
-                                .align(Alignment.BottomCenter)
-                                .fillMaxSize(),
-                            verticalAlignment = Alignment.Bottom,
-                        ) {
-                            values.forEachIndexed { idx, v ->
-                                Box(
-                                    Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight(),
-                                    contentAlignment = Alignment.BottomCenter,
-                                ) {
-                                    if (v > 0f) {
-                                        Box(
-                                            Modifier
-                                                .fillMaxHeight(
-                                                    (v / maxV.coerceAtLeast(1f)).coerceIn(0.03f, 1f)
-                                                )
-                                                .width(5.dp)
-                                                .background(
-                                                    Brush.verticalGradient(listOf(barTopColor, barBottomColor)),
-                                                    RoundedCornerShape(3.dp),
-                                                ),
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    // X 轴固定标签（1 5 10 15 20 25 30，按当月日期定位，Canvas 直绘防换行）
-                    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    val labelStyle = MaterialTheme.typography.labelSmall
-                    val measurer = rememberTextMeasurer()
-                    val labelDates = (0 until days)
-                        .map { from.plusDays(it.toLong()) }
-                        .filter { it.dayOfMonth == 1 || it.dayOfMonth % 5 == 0 }
-                    Canvas(Modifier.fillMaxWidth().height(18.dp)) {
-                        labelDates.forEach { date ->
-                            val idx = (date.toEpochDay() - from.toEpochDay()).toInt()
-                            val measured = measurer.measure(
-                                AnnotatedString(date.dayOfMonth.toString()),
-                                labelStyle,
-                            )
-                            drawText(
-                                measured,
-                                topLeft = Offset(
-                                    size.width * ((idx + 0.5f) / days) - measured.size.width / 2f,
-                                    0f,
-                                ),
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.width(Spacing.s))
-                // 右侧刻度（与网格线对齐）
-                Box(Modifier.height(113.dp)) {
-                    Text(
-                        modeValueText(state.workSystem, maxV),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.align(Alignment.TopEnd),
-                    )
-                    Text(
-                        modeValueText(state.workSystem, maxV / 2f),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.align(Alignment.CenterEnd),
-                    )
-                    Text(
-                        "0",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.align(Alignment.BottomEnd),
-                    )
-                }
-            }
-            // 最多日（纯文字）
-            if (maxV > 0f) {
-                Spacer(Modifier.height(Spacing.m))
-                Text(
-                    stringResource(
-                        R.string.stats_month_best,
-                        from.plusDays(bestIdx.toLong()).dayOfMonth,
-                        modeValueText(state.workSystem, values[bestIdx]),
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
-    }
+    com.mdot.app.core.designsystem.component.MonthBarCard(
+        values = values,
+        from = from,
+        workSystem = state.workSystem,
+    )
 }
 
 /** 汇总卡（模式化 hero，与明细页同视觉体系）：
@@ -728,7 +643,8 @@ private fun MonthBarCard(state: StatsUiState) {
 @Composable
 private fun SummaryCard(state: StatsUiState) {
     SectionCard(containerColor = MaterialTheme.colorScheme.primaryContainer) {
-        Column(Modifier.padding(Spacing.l)) {
+        // SectionCard 内已含 Spacing.l padding（与明细页 hero 同一层），此处不再叠加
+        Column(Modifier.fillMaxWidth()) {
             if (state.workSystem == WorkSystem.SITE) {
                 val out = state.siteSummary ?: return@Column
                 Text(

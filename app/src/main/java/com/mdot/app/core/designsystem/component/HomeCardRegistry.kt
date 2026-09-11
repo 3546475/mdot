@@ -23,6 +23,7 @@ object HomeCardRegistry {
         "entries" to HomeCardSpec("entries", R.string.home_card_entries, R.drawable.ic_ms_dashboard),
         "heatmap" to HomeCardSpec("heatmap", R.string.home_card_heatmap, R.drawable.ic_ms_table_chart),
         "weekbar" to HomeCardSpec("weekbar", R.string.home_card_weekbar, R.drawable.ic_ms_bar_chart),
+        "monthbar" to HomeCardSpec("monthbar", R.string.home_card_monthbar, R.drawable.ic_ms_bar_chart),
     )
 
     /** 解析出有效显示序列：null/未配置 = POOL 默认；剔除未知 id；去重；不足 MIN_CARDS 回退默认 */

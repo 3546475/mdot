@@ -160,7 +160,12 @@ class HomeViewModel @Inject constructor(
             if (salary.workSystem != com.mdot.app.domain.model.WorkSystem.SITE) {
                 // 非工地制度：每日时长卡显示当前制度每日加班时长（daily_record）
                 val month = CycleCalculator.naturalMonth(today.toYearMonth())
-                recordRepo.observeRange(month.from, month.to).map { records ->
+                // 热点图固定六个月窗口（本月月初向前推五个月的月初 → 今天），与统计页同窗口
+                val heatFrom = today.withDayOfMonth(1).minusMonths(5)
+                combine(
+                    recordRepo.observeRange(month.from, month.to),
+                    recordRepo.observeRange(heatFrom, today),
+                ) { records, heatRecs ->
                     val daily = records.filter { it.type == com.mdot.app.domain.model.RecordType.OT }
                         .groupBy { it.date }
                         .map { (d, list) ->
@@ -171,11 +176,20 @@ class HomeViewModel @Inject constructor(
                                 payCents = 0L,
                             )
                         }.sortedBy { it.date }
-                    SiteHomeUi(otMinutes = daily.sumOf { it.otMinutes }, daily = daily)
+                    val heat = heatRecs.filter { it.type == com.mdot.app.domain.model.RecordType.OT }
+                        .groupBy { it.date }
+                        .mapValues { (_, list) -> list.sumOf { it.durationMinutes }.toFloat() }
+                    SiteHomeUi(
+                        otMinutes = daily.sumOf { it.otMinutes },
+                        daily = daily,
+                        heatValues = heat,
+                    )
                 }
             } else {
                 kotlinx.coroutines.flow.flow {
                     val pid = siteRepo.currentProjectId()
+                    // 热点图固定六个月窗口（本月月初向前推五个月的月初 → 今天），与统计页同窗口
+                    val heatFrom = today.withDayOfMonth(1).minusMonths(5)
                     val name = siteRepo.getProject(pid)?.name.orEmpty()
                     // 待结余额扣减未结清的部分结算（本次结算金额）
                     val partial = siteRepo.partialSettledTotal(pid)
@@ -184,7 +198,8 @@ class HomeViewModel @Inject constructor(
                         siteRepo.observeAttendance(pid, month.from, month.to),
                         siteRepo.observePieceWorks(pid, month.from, month.to),
                         siteRepo.observeAdvances(pid, month.from, month.to),
-                    ) { atts, pieces, advs ->
+                        siteRepo.observeAttendance(pid, heatFrom, today),
+                    ) { atts, pieces, advs, heatAtts ->
                         val out = SitePayCalculator.summarize(
                             SitePayCalculator.Input(
                                 attendance = atts,
@@ -212,6 +227,11 @@ class HomeViewModel @Inject constructor(
                                     payCents = a.workPayCents + a.otPayCents,
                                 )
                             }.sortedBy { it.date },
+                            heatValues = heatAtts.filter { it.workMinutes > 0 }
+                                .groupBy { LocalDate.parse(it.date) }
+                                .mapValues { (_, list) ->
+                                    list.sumOf { it.workMinutes * 1000L / it.baseMinutes.coerceAtLeast(1) } / 1000f
+                                },
                         )
                     }.collect { emit(it) }
                 }
@@ -230,8 +250,10 @@ data class SiteHomeUi(
     val pendingCents: Long = 0,
     /** 当前项目上班基准分钟（HOUR 显示折算用） */
     val siteBaseMinutes: Int = 480,
-    /** 每日工数（首页热点图/每日时长卡用） */
+    /** 每日工数（每日时长卡/周柱状/月柱状卡用，本月） */
     val daily: List<HomeDayPoint> = emptyList(),
+    /** 热点图强度（本月月初向前六个月 → 今天；工地=工数，其他=加班分钟），与统计页同窗口 */
+    val heatValues: Map<java.time.LocalDate, Float> = emptyMap(),
     /** 今日（数据区今日胶囊用） */
     val todayWorksMilli: Long = 0,
     val todayOtMinutes: Int = 0,

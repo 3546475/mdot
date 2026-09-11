@@ -38,6 +38,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -224,10 +225,19 @@ fun SystemScreen(
         JiabanTopBar(title = stringResource(R.string.settings_worktime_title), onBack = onBack)
         Spacer(Modifier.height(Spacing.m))
 
-        SectionCard {
+        // 当前制度卡：hero 样式（primaryContainer）；整卡可点，效果同「切换」按钮
+        SectionCard(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            onClick = { onOpen(Routes.SYSTEM_SWITCH) },
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(salary.workSystem.displayName, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        salary.workSystem.displayName,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
                     Text(
                         when (salary.workSystem) {
                             WorkSystem.HOURLY -> stringResource(R.string.settings_system_desc_hourly)
@@ -236,10 +246,14 @@ fun SystemScreen(
                             WorkSystem.SITE -> stringResource(R.string.site_system_desc)
                         },
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                     )
                 }
-                TextButton(onClick = { onOpen(Routes.SYSTEM_SWITCH) }) { Text(stringResource(R.string.settings_switch_action)) }
+                Text(
+                    stringResource(R.string.settings_switch_action),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
             }
         }
 

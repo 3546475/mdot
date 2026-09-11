@@ -7,6 +7,9 @@
     <string name="onboarding_ws_standard_desc">工资 = 底薪 + 加班工资\n平时 1.5 倍 · 周末 2 倍 · 法定 3 倍\n支持转调休</string>
     <string name="onboarding_ws_hourly">小时工</string>
     <string name="onboarding_ws_hourly_desc">工资 = 工时 × 时薪\n平时/周末/法定 三档时薪\n无底薪 · 无转调休</string>
+    <string name="onboarding_ws_site">工地记工</string>
+    <string name="onboarding_ws_site_desc">按项目记工天/工时
+借支结算独立成账 · 一本明白账</string>
     <string name="onboarding_ws_comprehensive">综合工时</string>
     <string name="onboarding_ws_comprehensive_desc">按周期总工时算加班，单日超 8h 不算\n法定节假日 3 倍即时结算\n底薪 + 请假扣款同标准工时</string>
     <string name="onboarding_hourly_rates_title">三档时薪</string>

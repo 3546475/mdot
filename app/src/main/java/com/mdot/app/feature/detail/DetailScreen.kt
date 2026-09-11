@@ -2,6 +2,7 @@ package com.mdot.app.feature.detail
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +40,7 @@ import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.SiteMoneyColors
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.JiabanTopBar
+import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.navigation.bottomBarContentPaddingValues
 import com.mdot.app.core.repository.DataRevision
@@ -233,19 +236,28 @@ fun DetailScreen(
             modifier = Modifier.fillMaxSize(),
         ) {
             item {
-                Column(Modifier.padding(bottom = Spacing.s)) {
-                    Text(
-                        stringResource(R.string.detail_cycle_label),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    if (state.rangeLabel.isNotEmpty()) {
+                if (state.rangeLabel.isNotEmpty()) {
+                    // 区间胶囊（与首页数据区日期同款样式）
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(Radius.pill))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.ic_ms_calendar_month), null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Spacer(Modifier.width(4.dp))
                         Text(
                             state.rangeLabel,
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    Spacer(Modifier.height(Spacing.s))
                 }
             }
             item {
@@ -254,26 +266,18 @@ fun DetailScreen(
             }
             when {
                 state.workSystem == WorkSystem.SITE -> {
-                    // 按日期分组：日期小节头 + 行
-                    val byDate = state.siteDetails.groupBy { it.date }
-                    if (byDate.isEmpty()) item { EmptyHint() }
-                    byDate.forEach { (date, rows) ->
-                        item(key = "h_${date}") { DateHeader(date) }
-                        items(rows) { row -> SiteDetailRowItem(row) }
-                    }
+                    // 平铺单行明细（日期星期并入行内）
+                    if (state.siteDetails.isEmpty()) item { EmptyHint() }
+                    items(state.siteDetails) { row -> SiteDetailRowItem(row) }
                 }
                 else -> {
-                    val byDate = state.breakdowns.groupBy { it.record.date }
-                    if (byDate.isEmpty() && state.output != null) item { EmptyHint() }
-                    byDate.forEach { (date, rows) ->
-                        item(key = "h_${date}") { DateHeader(date) }
-                        items(rows) { bd ->
-                            NormalDetailRow(
-                                state.workSystem,
-                                bd,
-                                onOpen = { vm.recordSheet.open(bd.record.date, bd.record.type) },
-                            )
-                        }
+                    if (state.breakdowns.isEmpty() && state.output != null) item { EmptyHint() }
+                    items(state.breakdowns) { bd ->
+                        NormalDetailRow(
+                            state.workSystem,
+                            bd,
+                            onOpen = { vm.recordSheet.open(bd.record.date, bd.record.type) },
+                        )
                     }
                 }
             }
@@ -408,9 +412,11 @@ internal fun TierChip(tier: RateTier, out: PayrollCalculator.Output, modifier: M
             )
             Spacer(Modifier.width(4.dp))
             Text(
-                tier.displayName + " " + Money.yuanText(cents),
+                tier.displayName + " " + Money.yuanWithSign(cents),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
+                maxLines = 1,
+                softWrap = false,
             )
         }
     }
@@ -424,16 +430,6 @@ internal fun tierTint(tier: RateTier): androidx.compose.ui.graphics.Color = when
 
 // ---- 日期小节头 ----
 
-@Composable
-private fun DateHeader(date: LocalDate) {
-    Text(
-        "${TimeUtils.mdCn(date)} · ${TimeUtils.weekdayCn(date)}",
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = Spacing.m, bottom = Spacing.xs),
-    )
-}
 
 @Composable
 private fun EmptyHint() {
@@ -447,7 +443,7 @@ private fun EmptyHint() {
 
 // ---- 明细行（原统计页共享组件移入，模式化美化） ----
 
-/** 明细行（普通制度）：加班/请假记录，点击打开记录弹层；档位/请假类型徽章着色 */
+/** 明细行（普通制度）：单行——「9/1 周二 · 班次 + 档位徽章」+ 右侧时长/金额上下布局 */
 @Composable
 private fun NormalDetailRow(
     workSystem: WorkSystem,
@@ -455,86 +451,79 @@ private fun NormalDetailRow(
     onOpen: () -> Unit,
 ) {
     val r = bd.record
+    val isOt = r.type == com.mdot.app.domain.model.RecordType.OT
+    val interaction = remember { MutableInteractionSource() }
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable(onClick = onOpen)
-            .padding(vertical = 10.dp),
+            .pressScale(interaction)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = onOpen,
+            )
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(
-                "${TimeUtils.md(r.date)} ${TimeUtils.weekdayCn(r.date)}" +
-                    (r.shiftName?.let { " · $it" } ?: ""),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Spacer(Modifier.height(2.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (r.type == com.mdot.app.domain.model.RecordType.OT) {
-                    Text(
-                        stringResource(
-                            R.string.stats_detail_ot_line,
-                            stringResource(R.string.stats_ot),
-                            TimeUtils.prettyDuration(r.durationMinutes),
-                            bd.tier?.displayName ?: "",
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                Text(
+                    "${TimeUtils.md(r.date)} ${TimeUtils.weekdayCn(r.date)}" +
+                        (r.shiftName?.let { " · $it" } ?: if (isOt) " · " + stringResource(R.string.stats_ot) else " · " + stringResource(R.string.stats_leave)),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                if (isOt) {
                     bd.tier?.let { TierBadge(it) }
                 } else {
-                    Text(
-                        stringResource(R.string.stats_detail_leave, TimeUtils.prettyDuration(r.durationMinutes), r.leaveType?.displayName ?: ""),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    r.leaveType?.let { type ->
+                        Box(
+                            Modifier
+                                .clip(RoundedCornerShape(Radius.pill))
+                                .background(MaterialTheme.colorScheme.error.copy(alpha = 0.12f))
+                                .padding(horizontal = 6.dp, vertical = 1.dp),
+                        ) {
+                            Text(
+                                type.displayName,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
                 }
             }
-            if (r.type == com.mdot.app.domain.model.RecordType.OT && r.toCompMinutes > 0) {
+            // 附加信息仅在有内容时出现（转调休/备注），多数记录保持单行
+            if (isOt && r.toCompMinutes > 0) {
                 Text(
                     stringResource(R.string.stats_detail_ot_comp, TimeUtils.prettyDuration(r.toCompMinutes)),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                if (r.type == com.mdot.app.domain.model.RecordType.OT) "+" + Money.yuanText(bd.amountCents)
-                else "−" + Money.yuanText(bd.amountCents),
-                style = MaterialTheme.typography.titleSmall,
-                color = if (r.type == com.mdot.app.domain.model.RecordType.OT) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.error,
-            )
-            r.note?.let {
-                Text(it, style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            r.note?.let { note ->
+                Text(note, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        Column(horizontalAlignment = Alignment.End) {
+            // 时长在上，金额在下
+            Text(
+                TimeUtils.hoursDecimal(r.durationMinutes) + stringResource(R.string.detail_worked_hours_unit),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                if (isOt) "+" + Money.yuanText(bd.amountCents) else "−" + Money.yuanText(bd.amountCents),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (isOt) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            )
+        }
     }
 }
 
-/** 档位徽章：平时/周末/法定着色小胶囊 */
-@Composable
-private fun TierBadge(tier: RateTier) {
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(Radius.pill))
-            .background(tierTint(tier).copy(alpha = 0.12f))
-            .padding(horizontal = 6.dp, vertical = 1.dp),
-    ) {
-        Text(
-            tier.displayName,
-            style = MaterialTheme.typography.labelSmall,
-            color = tierTint(tier),
-        )
-    }
-}
-
-/** 明细行（工地）：图标瓦片 + 出工/休息/包工/借支/部分结算 */
+/** 明细行（工地）：单行——「9/11 周五 · 类型/构成」+ 金额 */
 @Composable
 private fun SiteDetailRowItem(row: SiteDetailRow) {
-    val line = when (row.kind) {
+    val kindLine = when (row.kind) {
         SiteDetailKind.WORK -> {
             val num = if (row.worksMilli % 1000L == 0L) (row.worksMilli / 1000L).toString()
             else String.format(java.util.Locale.US, "%.1f", row.worksMilli / 1000f)
@@ -555,33 +544,14 @@ private fun SiteDetailRowItem(row: SiteDetailRow) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 10.dp),
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier
-                .size(32.dp)
-                .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(Radius.small)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                painterResource(kindIcon(row.kind)), null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-        Spacer(Modifier.width(Spacing.m))
-        Column(Modifier.weight(1f)) {
-            Text(
-                "${TimeUtils.md(row.date)} ${TimeUtils.weekdayCn(row.date)}",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                line,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Text(
+            "${TimeUtils.md(row.date)} ${TimeUtils.weekdayCn(row.date)} · $kindLine",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+        )
         val amountText = when {
             row.kind == SiteDetailKind.ADVANCE -> "−" + Money.yuanText(row.amountCents)
             row.kind == SiteDetailKind.PARTIAL -> "+" + Money.yuanText(row.amountCents)
@@ -591,9 +561,9 @@ private fun SiteDetailRowItem(row: SiteDetailRow) {
         if (amountText.isNotEmpty()) {
             Text(
                 amountText,
-                style = MaterialTheme.typography.titleSmall,
-                color = if (row.kind == SiteDetailKind.ADVANCE) SiteMoneyColors.ReceivedGreen
-                else if (row.kind == SiteDetailKind.PARTIAL) SiteMoneyColors.ReceivedGreen
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (row.kind == SiteDetailKind.ADVANCE || row.kind == SiteDetailKind.PARTIAL) SiteMoneyColors.ReceivedGreen
                 else MaterialTheme.colorScheme.primary,
             )
         }
@@ -606,6 +576,24 @@ private fun kindIcon(kind: SiteDetailKind): Int = when (kind) {
     SiteDetailKind.PIECE -> R.drawable.ic_ms_dashboard
     SiteDetailKind.ADVANCE -> R.drawable.ic_ms_paid
     SiteDetailKind.PARTIAL -> R.drawable.ic_ms_flip
+}
+
+
+/** 档位徽章：平时/周末/法定着色小胶囊 */
+@Composable
+private fun TierBadge(tier: RateTier) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(Radius.pill))
+            .background(tierTint(tier).copy(alpha = 0.12f))
+            .padding(horizontal = 6.dp, vertical = 1.dp),
+    ) {
+        Text(
+            tier.displayName,
+            style = MaterialTheme.typography.labelSmall,
+            color = tierTint(tier),
+        )
+    }
 }
 
 /** 借支用途 → 标签资源（展示点解析） */

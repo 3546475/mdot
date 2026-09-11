@@ -187,6 +187,32 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
                     }
                 }
                 Spacer(Modifier.height(12.dp))
+                // 工地记工（12 文档 F-S1：四卡全可选）
+                Surface(
+                    shape = RoundedCornerShape(Radius.card),
+                    color = if (selectedSystem == WorkSystem.SITE)
+                        MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceContainer,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { selectedSystem = WorkSystem.SITE }
+                        .then(
+                            if (selectedSystem == WorkSystem.SITE) Modifier.border(
+                                2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(Radius.card),
+                            ) else Modifier
+                        ),
+                ) {
+                    Column(Modifier.padding(20.dp)) {
+                        Text(stringResource(R.string.onboarding_ws_site), style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            stringResource(R.string.onboarding_ws_site_desc),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
                 // 综合工时（10 文档 F-Z1）
                 Surface(
                     shape = RoundedCornerShape(Radius.card),
@@ -222,7 +248,7 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
                             WorkSystem.HOURLY -> R.string.onboarding_ws_hourly
                             WorkSystem.COMPREHENSIVE -> R.string.onboarding_ws_comprehensive
                             WorkSystem.STANDARD -> R.string.onboarding_ws_standard
-                            WorkSystem.SITE -> R.string.site_system_desc
+                            WorkSystem.SITE -> R.string.onboarding_ws_site
                         }
                     ),
                     style = MaterialTheme.typography.labelMedium,

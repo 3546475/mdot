@@ -9,7 +9,7 @@
     <string name="home_overtime_standard_suffix">" · 标准 %1$sh（截至今天）"</string>
     <string name="home_today_empty">今日还没记，点此去记</string>
     <string name="home_today_ot">今日 %1$sh</string>
-    <string name="home_cycle_period">考勤周期：%1$s</string>
+    <string name="home_cycle_period">周期 %1$s</string>
     <string name="home_entry_calendar">日历</string>
     <string name="home_entry_stats">统计</string>
     <string name="home_record_hourly">记工作</string>
@@ -35,4 +35,5 @@
     <string name="home_card_record">记加班按钮</string>
     <string name="home_card_heatmap">热点图</string>
     <string name="home_card_weekbar">本周柱状</string>
+    <string name="home_card_monthbar">月柱状</string>
 </resources>
