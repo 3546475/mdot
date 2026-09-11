@@ -89,7 +89,7 @@ class OnboardingViewModel @Inject constructor(
     }
 }
 
-/** 首启引导（F8-4：3 步，可跳过）；第 3 步 = 底薪 + 三档倍率 */
+/** 首启引导（F8-4；v0.6 起只保留设置项两步：工时制度 → 工资设定，可跳过） */
 @Composable
 fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel()) {
     var step by remember { mutableStateOf(0) }
@@ -120,23 +120,13 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
     ) {
         Spacer(Modifier.height(64.dp))
         LinearProgressIndicator(
-            progress = { (step + 1) / 3f },
+            progress = { (step + 1) / 2f },
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(48.dp))
 
         when (step) {
             0 -> {
-                Text(stringResource(R.string.onboarding_app_title), style = MaterialTheme.typography.displaySmall)
-                Spacer(Modifier.height(24.dp))
-                Text(
-                    stringResource(R.string.onboarding_intro),
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                )
-            }
-
-            1 -> {
                 Text(stringResource(R.string.onboarding_step_work_system), style = MaterialTheme.typography.headlineMedium)
                 Spacer(Modifier.height(16.dp))
                 Text(
@@ -224,7 +214,21 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
                 }
             }
 
-            2 -> {
+            1 -> {
+                // 与第一屏所选制度对应：顶部回显制度名，可核对；「上一步」可回改
+                Text(
+                    stringResource(
+                        when (selectedSystem) {
+                            WorkSystem.HOURLY -> R.string.onboarding_ws_hourly
+                            WorkSystem.COMPREHENSIVE -> R.string.onboarding_ws_comprehensive
+                            WorkSystem.STANDARD -> R.string.onboarding_ws_standard
+                            WorkSystem.SITE -> R.string.site_system_desc
+                        }
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
                 when (selectedSystem) {
                     WorkSystem.HOURLY -> {
                         Text(stringResource(R.string.onboarding_hourly_rates_title), style = MaterialTheme.typography.headlineMedium)
@@ -268,6 +272,34 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
                         }
                     }
 
+                    WorkSystem.SITE -> {
+                        // 工地记工：引导仅提示项目制（点工标准在项目设置内，首切自动建项目）
+                        Text(stringResource(R.string.onboarding_pay_title), style = MaterialTheme.typography.headlineMedium)
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            stringResource(R.string.site_onboarding_desc),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        OutlinedTextField(
+                        shape = RoundedCornerShape(Radius.textField),
+                            value = baseText,
+                            onValueChange = { baseText = it.filter { c -> c.isDigit() || c == '.' } },
+                            label = { Text(stringResource(R.string.onboarding_base_salary_label)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Text(stringResource(R.string.onboarding_multiplier_title), style = MaterialTheme.typography.titleSmall)
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            MultField(stringResource(R.string.onboarding_tier_weekday), weekdayText) { weekdayText = it.filter { c -> c.isDigit() || c == '.' } }
+                            MultField(stringResource(R.string.onboarding_tier_weekend), weekendText) { weekendText = it.filter { c -> c.isDigit() || c == '.' } }
+                            MultField(stringResource(R.string.onboarding_tier_holiday), statutoryText) { statutoryText = it.filter { c -> c.isDigit() || c == '.' } }
+                        }
+                    }
+
                     WorkSystem.STANDARD -> {
                         Text(stringResource(R.string.onboarding_pay_title), style = MaterialTheme.typography.headlineMedium)
                         Spacer(Modifier.height(16.dp))
@@ -304,14 +336,26 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            OutlinedButton(
-                onClick = { finish() },
-                modifier = Modifier.weight(1f),
-            ) { Text(stringResource(R.string.onboarding_skip)) }
-            Button(
-                onClick = { if (step < 2) step += 1 else finish() },
-                modifier = Modifier.weight(1f),
-            ) { Text(if (step < 2) stringResource(R.string.onboarding_next) else stringResource(R.string.onboarding_start)) }
+            // 第二屏左侧变「上一步」回改制度；跳过收纳为最右侧文字入口
+            if (step > 0) {
+                OutlinedButton(
+                    onClick = { step -= 1 },
+                    modifier = Modifier.weight(1f),
+                ) { Text(stringResource(R.string.onboarding_back)) }
+                Button(
+                    onClick = { finish() },
+                    modifier = Modifier.weight(1f),
+                ) { Text(stringResource(R.string.onboarding_start)) }
+            } else {
+                OutlinedButton(
+                    onClick = { finish() },
+                    modifier = Modifier.weight(1f),
+                ) { Text(stringResource(R.string.onboarding_skip)) }
+                Button(
+                    onClick = { step += 1 },
+                    modifier = Modifier.weight(1f),
+                ) { Text(stringResource(R.string.onboarding_next)) }
+            }
         }
         Spacer(Modifier.height(32.dp))
     }

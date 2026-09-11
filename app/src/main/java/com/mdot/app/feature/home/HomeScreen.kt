@@ -24,8 +24,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.WindowInsets
@@ -40,7 +43,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -56,9 +61,12 @@ import com.mdot.app.R
 import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.LocalWindowSpec
 import com.mdot.app.core.designsystem.Radius
+import com.mdot.app.core.designsystem.SiteMoneyColors
+import com.mdot.app.feature.stats.pieColor
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.WindowSpec
 import com.mdot.app.core.designsystem.component.SectionCard
+import com.mdot.app.core.designsystem.component.WorkHeatmap
 import com.mdot.app.core.designsystem.component.TopBarHeight
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.navigation.contentBottomPadding
@@ -66,6 +74,7 @@ import com.mdot.app.domain.model.WorkSystem
 import com.mdot.app.domain.util.Money
 import com.mdot.app.domain.util.TimeUtils
 import java.time.LocalDate
+import kotlin.math.roundToInt
 
 /** 首页（03 文档 §5.1 线框）；顶栏由 AppRoot 的固定一级顶栏统一提供。
  *  响应式（docs 03 §3.2）：EXPANDED（≥840dp）双栏——左数据（大数字/收入）| 右操作（入口卡/记加班主按钮），
@@ -74,13 +83,16 @@ import java.time.LocalDate
 fun HomeScreen(
     onOpenCalendar: () -> Unit,
     onOpenStats: () -> Unit,
-    onOpenPayroll: () -> Unit,
-    onRecord: () -> Unit,
+    onOpenDetail: () -> Unit,
+    onOpenRecord: () -> Unit,
     homeVm: HomeViewModel = hiltViewModel(),
 ) {
     val state by homeVm.uiState.collectAsStateWithLifecycle()
     val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val twoPane = LocalWindowSpec.current == WindowSpec.EXPANDED
+    // 卡片渲染序列（v0.6.0 首页卡片可编辑；id -> 内容由 HomeCardContent 按 id 分发）
+    val cardIds = state.cards
+    val site by homeVm.siteState.collectAsStateWithLifecycle()
 
     if (twoPane) {
         // ---- 宽屏双栏：总宽 720dp 居中，左右各半 ----
@@ -99,14 +111,15 @@ fun HomeScreen(
                     HomeSkeleton()
                 } else {
                     Spacer(Modifier.height(Spacing.xl))
-                    DataSection(state, onOpenStats = onOpenStats)
-                    Spacer(Modifier.height(Spacing.l))
-                    IncomeCard(
-                        workSystem = state.salary.workSystem,
-                        cycleOtPay = state.cycleOtPayCents,
-                        monthIncome = state.monthIncomeCents,
-                        onOpenPayroll = onOpenPayroll,
-                    )
+                    var firstData = true
+                    cardIds.forEach { id ->
+                        val content = HomeCardContent(id, state, site, onOpenCalendar, onOpenStats, onOpenDetail, onOpenRecord, stackedEntries = true)
+                        if (content != null) {
+                            if (!firstData) Spacer(Modifier.height(Spacing.l))
+                            content()
+                            firstData = false
+                        }
+                    }
                 }
             }
             Spacer(Modifier.width(Spacing.xl))
@@ -118,13 +131,14 @@ fun HomeScreen(
             ) {
                 Spacer(Modifier.height(statusBar + TopBarHeight + Spacing.s))
                 if (!state.loading) {
-                    if (state.showEntryCards) {
-                        EntryCard(onOpenCalendar, R.drawable.ic_ms_calendar_month, R.string.home_entry_calendar)
-                        Spacer(Modifier.height(Spacing.m))
-                        EntryCard(onOpenStats, R.drawable.ic_ms_bar_chart, R.string.home_entry_stats)
-                        Spacer(Modifier.height(Spacing.m))
+                    cardIds.forEach { id ->
+                        if (id == "entries" || id == "record") {
+                            HomeCardContent(id, state, site, onOpenCalendar, onOpenStats, onOpenDetail, onOpenRecord, stackedEntries = true)?.let {
+                                it()
+                                Spacer(Modifier.height(Spacing.m))
+                            }
+                        }
                     }
-                    RecordHeroButton(workSystem = state.salary.workSystem, onClick = onRecord)
                 }
                 Spacer(Modifier.height(Spacing.xl))
             }
@@ -150,45 +164,98 @@ fun HomeScreen(
                 return@Column
             }
 
-            DataSection(state, onOpenStats = onOpenStats)
+            // 按配置序列渲染卡片；卡间距沿用原节奏：数据区之后 l，其余 m
+            var prev: String? = null
+            cardIds.forEach { id ->
+                val content = HomeCardContent(id, state, site, onOpenCalendar, onOpenStats, onOpenDetail, onOpenRecord, stackedEntries = false)
+                if (content != null) {
+                    if (prev != null) {
+                        Spacer(Modifier.height(if (prev == "data") Spacing.l else Spacing.m))
+                    }
+                    content()
+                    prev = id
+                }
+            }
 
-            Spacer(Modifier.height(Spacing.l))
+            Spacer(Modifier.height(Spacing.xl))
+        }
 
-            // 收入卡（右端「工资 ›」小字可点进工资设定）
+    }
+}
+
+/** 按卡片 id 渲染对应内容；返回 null = 该 id 未知（忽略）。entryOnRight 仅宽屏双栏布局差异用 */
+@Composable
+private fun HomeCardContent(
+    id: String,
+    state: HomeUiState,
+    site: SiteHomeUi,
+    onOpenCalendar: () -> Unit,
+    onOpenStats: () -> Unit,
+    onOpenDetail: () -> Unit,
+    onOpenRecord: () -> Unit,
+    stackedEntries: Boolean,
+): (@Composable () -> Unit)? = when (id) {
+    "data" -> ({
+        if (state.salary.workSystem == WorkSystem.SITE) {
+            SiteDataContent(state, site, onOpenRecord)
+        } else {
+            DataSection(state, onOpenStats = onOpenStats, onOpenRecord = onOpenRecord)
+        }
+    })
+    "income" -> ({
+        if (state.salary.workSystem == WorkSystem.SITE) {
+            SitePendingCard(site, onOpenDetail)
+        } else {
             IncomeCard(
                 workSystem = state.salary.workSystem,
                 cycleOtPay = state.cycleOtPayCents,
                 monthIncome = state.monthIncomeCents,
-                onOpenPayroll = onOpenPayroll,
+                onOpenDetail = onOpenDetail,
             )
-
-            if (state.showEntryCards) {
-                Spacer(Modifier.height(Spacing.m))
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
-                    EntryCard(
-                        onOpenCalendar, R.drawable.ic_ms_calendar_month, R.string.home_entry_calendar,
-                        modifier = Modifier.weight(1f),
-                    )
-                    EntryCard(
-                        onOpenStats, R.drawable.ic_ms_bar_chart, R.string.home_entry_stats,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(Spacing.m))
-
-            // 记加班大按钮：醒目主入口，点击直达记录弹层
-            RecordHeroButton(workSystem = state.salary.workSystem, onClick = onRecord)
-
-            Spacer(Modifier.height(Spacing.xl))
         }
-    }
+    })
+    "entries" -> ({
+        if (stackedEntries) {
+            EntryCard(onOpenCalendar, R.drawable.ic_ms_calendar_month, R.string.home_entry_calendar)
+            Spacer(Modifier.height(Spacing.m))
+            EntryCard(onOpenStats, R.drawable.ic_ms_bar_chart, R.string.home_entry_stats)
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
+                EntryCard(
+                    onOpenCalendar, R.drawable.ic_ms_calendar_month, R.string.home_entry_calendar,
+                    modifier = Modifier.weight(1f),
+                )
+                EntryCard(
+                    onOpenStats, R.drawable.ic_ms_bar_chart, R.string.home_entry_stats,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    })
+    "heatmap" -> ({
+        // 显隐与数据解耦：所有制度同序列（配置驱动），无数据渲染空格子热图，end 兜底今天
+        HomeHeatmapCard(site.daily, state.salary.workSystem == WorkSystem.SITE)
+    })
+    "weekbar" -> ({
+        // 本周柱状卡（与统计页同款共享组件）：从本月 daily 过滤本周；强度随制度（工地=工数，其他=加班分钟）
+        val isSite = state.salary.workSystem == WorkSystem.SITE
+        val today = java.time.LocalDate.now()
+        val monday = today.minusDays(((today.dayOfWeek.value + 6) % 7).toLong())
+        val weekValues = site.daily.mapNotNull { d ->
+            val date = d.date
+            if (date < monday || date.isAfter(today)) null else date to (if (isSite) d.worksMilli / 1000f else d.otMinutes.toFloat())
+        }.toMap()
+        HomeWeekBarCard(
+            bars = com.mdot.app.core.designsystem.component.buildWeekBars(weekValues),
+            isSite = isSite,
+        )
+    })
+    else -> null
 }
 
-/** 数据区：工时制度标签 + 本期大数字 + 综合工时副行 + 今日加班胶囊 + 考勤周期行 */
+/** 数据区：工时制度标签 + 本期大数字 + 综合工时副行 + 今日加班胶囊 + 考勤周期行（SITE 形态另见 SiteDataContent） */
 @Composable
-private fun DataSection(state: HomeUiState, onOpenStats: () -> Unit) {
+private fun DataSection(state: HomeUiState, onOpenStats: () -> Unit, onOpenRecord: () -> Unit) {
     Row(verticalAlignment = Alignment.Bottom) {
         Column(Modifier.weight(1f)) {
             Text(
@@ -196,6 +263,7 @@ private fun DataSection(state: HomeUiState, onOpenStats: () -> Unit) {
                     WorkSystem.HOURLY -> stringResource(R.string.home_cycle_label_hourly)
                     WorkSystem.COMPREHENSIVE -> stringResource(R.string.home_cycle_label_comprehensive)
                     WorkSystem.STANDARD -> stringResource(R.string.home_cycle_label_standard)
+                    WorkSystem.SITE -> stringResource(R.string.site_cycle_label)
                 },
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -209,11 +277,20 @@ private fun DataSection(state: HomeUiState, onOpenStats: () -> Unit) {
                 },
                 label = "otBigNumber",
             ) { minutes ->
-                Text(
-                    TimeUtils.hoursDecimal(minutes),
-                    style = MaterialTheme.typography.displayLarge,
-                    fontWeight = FontWeight.Bold,
-                )
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        TimeUtils.hoursDecimal(minutes),
+                        style = MaterialTheme.typography.displayLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                    )
+                    Text(
+                        stringResource(R.string.detail_worked_hours_unit),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp, start = 4.dp),
+                    )
+                }
             }
             // 综合工时副行：超时部分 primary 强调（10 文档 F-Z5；月中为预演值）
             if (state.salary.workSystem == WorkSystem.COMPREHENSIVE && state.cycleOtMinutes > 0) {
@@ -236,18 +313,15 @@ private fun DataSection(state: HomeUiState, onOpenStats: () -> Unit) {
                     )
                 }
             }
+            // 今日胶囊两态：已记 → 「今日 Xh」；没记 → 「今日还没记」可点直达记加班
             if (state.todayOtMinutes > 0) {
-                Text(
+                TodayPill(
                     text = stringResource(R.string.home_today_ot, TimeUtils.hoursDecimal(state.todayOtMinutes)),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier
-                        .padding(top = 6.dp)
-                        .clip(RoundedCornerShape(Radius.pill))
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .padding(horizontal = 10.dp, vertical = 3.dp),
+                    filled = true,
+                    onRecord = onOpenRecord,
                 )
+            } else {
+                TodayPill(text = stringResource(R.string.home_today_empty), filled = false, onRecord = onOpenRecord)
             }
             Text(
                 text = state.period?.let { stringResource(R.string.home_cycle_period, it) } ?: "",
@@ -256,6 +330,38 @@ private fun DataSection(state: HomeUiState, onOpenStats: () -> Unit) {
                 modifier = Modifier.clickable { onOpenStats() },
             )
         }
+    }
+}
+
+/** 今日胶囊两态：已记（primaryContainer 填充「今日 Xh/N 工」）/ 未记（描边「今日还没记」，点击直达记加班/记工） */
+@Composable
+private fun TodayPill(text: String, filled: Boolean, onRecord: () -> Unit) {
+    if (filled) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier
+                .padding(top = 6.dp)
+                .clip(RoundedCornerShape(Radius.pill))
+                .background(MaterialTheme.colorScheme.primaryContainer)
+                .padding(horizontal = 10.dp, vertical = 3.dp),
+        )
+    } else {
+        val interaction = remember { MutableInteractionSource() }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier
+                .padding(top = 6.dp)
+                .clip(RoundedCornerShape(Radius.pill))
+                .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(Radius.pill))
+                .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onRecord)
+                .padding(horizontal = 10.dp, vertical = 3.dp),
+        )
     }
 }
 
@@ -353,6 +459,7 @@ private fun RecordHeroButton(workSystem: WorkSystem, onClick: () -> Unit) {
                     WorkSystem.HOURLY -> stringResource(R.string.home_record_hourly)
                     WorkSystem.COMPREHENSIVE -> stringResource(R.string.home_record_comprehensive)
                     WorkSystem.STANDARD -> stringResource(R.string.home_record_standard)
+                    WorkSystem.SITE -> stringResource(R.string.site_record_hero)
                 },
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onPrimary,
@@ -367,33 +474,33 @@ private fun IncomeCard(
     workSystem: WorkSystem,
     cycleOtPay: Long?,
     monthIncome: Long?,
-    onOpenPayroll: () -> Unit,
+    onOpenDetail: () -> Unit,
 ) {
-    // 与首页其它入口卡同款容器；仅右端「工资 ›」小字可点进工资设定
-    SectionCard {
+    // hero 卡（primaryContainer，与统计/明细页同视觉体系）；整卡与右端「明细 ›」小字均进入明细页
+    SectionCard(onClick = onOpenDetail, containerColor = MaterialTheme.colorScheme.primaryContainer) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
                     if (workSystem == WorkSystem.HOURLY) stringResource(R.string.home_income_hourly) else stringResource(R.string.home_income_ot),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                 )
                 Text(
                     cycleOtPay?.let { Money.yuanWithSign(it) } ?: "-",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
             Column(Modifier.weight(1.2f)) {
                 Text(
                     stringResource(R.string.home_income_month),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                 )
                 Text(
                     monthIncome?.let { Money.yuanWithSign(it) } ?: "-",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
             // 「工资 ›」小字：只有这一小块进入工资设定
@@ -405,25 +512,187 @@ private fun IncomeCard(
                     .clickable(
                         interactionSource = interaction,
                         indication = LocalIndication.current,
-                        onClick = onOpenPayroll,
+                        onClick = onOpenDetail,
                     )
                     .padding(horizontal = 8.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    if (cycleOtPay == null) stringResource(R.string.home_income_go_settings) else stringResource(R.string.home_income_payroll_label),
+                    stringResource(R.string.home_income_detail),
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (cycleOtPay == null) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
                 Spacer(Modifier.width(2.dp))
                 Text(
                     "›",
                     style = MaterialTheme.typography.titleMedium,
-                    color = if (cycleOtPay == null) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
         }
     }
 }
+
+
+/** 首页 SITE 数据区（12 文档 F-S6）：本月工数大数字 + 加班副行 + 项目名 */
+@Composable
+private fun SiteDataContent(state: HomeUiState, site: SiteHomeUi, onOpenRecord: () -> Unit) {
+    Column {
+        Text(
+            if (state.salary.siteDisplayUnit == "HOUR") stringResource(R.string.site_cycle_label_hour)
+            else stringResource(R.string.site_cycle_label),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        val hourMode = state.salary.siteDisplayUnit == "HOUR"
+        // 数值变化时轻微缩放淡入（与 DataSection 同款）
+        AnimatedContent(
+            targetState = site.totalWorksMilli,
+            transitionSpec = {
+                (fadeIn(spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium)) + scaleIn(animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium), initialScale = 0.92f)) togetherWith
+                    fadeOut(spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium))
+            },
+            label = "siteBigNumber",
+        ) { milli ->
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    if (hourMode) String.format(java.util.Locale.US, "%.1f", milli / 1000.0 * (site.siteBaseMinutes / 60.0))
+                    else String.format(java.util.Locale.US, "%.1f", milli / 1000.0),
+                    style = MaterialTheme.typography.displayLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
+                Text(
+                    if (hourMode) stringResource(R.string.detail_worked_hours_unit)
+                    else stringResource(R.string.stats_works_unit),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp, start = 4.dp),
+                )
+            }
+        }
+        if (site.otMinutes > 0 || site.projectName.isNotEmpty()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    listOfNotNull(
+                        if (site.otMinutes > 0) stringResource(R.string.home_overtime_hours, TimeUtils.hoursDecimal(site.otMinutes)) else null,
+                    ).joinToString(" · "),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (site.projectName.isNotEmpty()) {
+                    // 项目色点：与统计饼图同一稳定色（projectId 索引）
+                    Box(
+                        Modifier
+                            .size(8.dp)
+                            .background(pieColor((site.projectId % 7).toInt()), androidx.compose.foundation.shape.CircleShape),
+                    )
+                    Text(
+                        site.projectName,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        // 今日胶囊两态（口径随显示单位偏好）
+        if (site.todayWorksMilli > 0 || site.todayOtMinutes > 0) {
+            TodayPill(
+                text = if (hourMode)
+                    stringResource(R.string.site_home_today_hours, TimeUtils.hoursDecimal(((site.todayWorksMilli * site.siteBaseMinutes / 1000L) + site.todayOtMinutes * 60L).toInt()))
+                else
+                    stringResource(R.string.site_home_today_works, site.todayWorksMilli / 1000L),
+                filled = true,
+                onRecord = onOpenRecord,
+            )
+        } else {
+            TodayPill(text = stringResource(R.string.home_today_empty), filled = false, onRecord = onOpenRecord)
+        }
+    }
+}
+
+/** 首页 SITE 待结卡：应得 / 已借支 / 待结 + 「明细 ›」入口（primaryContainer hero；整卡与小字均进明细页） */
+@Composable
+private fun SitePendingCard(site: SiteHomeUi, onOpenDetail: () -> Unit) {
+    SectionCard(onClick = onOpenDetail, containerColor = MaterialTheme.colorScheme.primaryContainer) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.site_settlement_receivable),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                )
+                Text(
+                    Money.yuanWithSign(site.workPayCents),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
+                    Text(
+                        stringResource(R.string.site_stat_advance) + " " + Money.yuanWithSign(site.advanceCents),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SiteMoneyColors.ReceivedGreen,
+                    )
+                    Text(
+                        stringResource(R.string.site_stat_pending) + " " + Money.yuanWithSign(site.pendingCents),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SiteMoneyColors.PendingOrange,
+                    )
+                }
+            }
+            val interaction = remember { MutableInteractionSource() }
+            Row(
+                modifier = Modifier
+                    .pressScale(interaction, pressedScale = 0.88f)
+                    .clip(RoundedCornerShape(Radius.button))
+                    .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onOpenDetail)
+                    .padding(horizontal = 8.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.home_income_detail), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+        }
+    }
+}
+
+
+/** 首页本周柱状卡：与统计页同款共享组件；柱顶数值单位随制度（时长 | N 工） */
+@Composable
+private fun HomeWeekBarCard(
+    bars: List<com.mdot.app.core.designsystem.component.WeekBar>,
+    isSite: Boolean,
+) {
+    var selected by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    com.mdot.app.core.designsystem.component.WeekBarCard(
+        bars = bars,
+        valueText = { v ->
+            if (isSite) {
+                val num = if (v % 1f == 0f) v.toInt().toString() else String.format(java.util.Locale.US, "%.1f", v)
+                stringResource(R.string.stats_works_value, num)
+            } else {
+                TimeUtils.prettyDuration(v.roundToInt())
+            }
+        },
+        selectedLabel = selected,
+        onSelect = { selected = if (selected == it) null else it },
+    )
+}
+
+/** 首页热点图卡：GitHub 贡献图风格，与统计页一致（无标题）；强度按制度取值（工地=工数，其他=加班小时） */
+@Composable
+private fun HomeHeatmapCard(daily: List<HomeDayPoint>, isSite: Boolean) {
+    SectionCard {
+        val values = daily.associate {
+            it.date to (if (isSite) it.worksMilli / 1000f else it.otMinutes / 60f)
+        }
+        WorkHeatmap(
+            values = values,
+            end = daily.maxOfOrNull { it.date } ?: LocalDate.now(),
+        )
+    }
+}
+

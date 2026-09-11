@@ -9,6 +9,8 @@ import com.mdot.app.core.holiday.HolidayRepository
 import com.mdot.app.core.repository.RecordRepository
 import com.mdot.app.domain.toCalcLite
 import com.mdot.app.core.util.CsvWriter
+import com.mdot.app.domain.util.Money
+import com.mdot.app.domain.util.TimeUtils
 import com.mdot.app.core.util.PayslipRenderer
 import com.mdot.app.domain.CycleCalculator
 import com.mdot.app.domain.PayrollCalculator
@@ -57,6 +59,7 @@ class ExportViewModel @Inject constructor(
     private val recordRepo: RecordRepository,
     private val settings: SettingsDataSource,
     private val holidayRepo: HolidayRepository,
+    private val siteRepo: com.mdot.app.core.repository.SiteRepository,
 ) : ViewModel() {
 
     private val today = LocalDate.now()
@@ -122,25 +125,43 @@ class ExportViewModel @Inject constructor(
             try {
                 val salary = settings.salaryFlow.first()
                 val workdays = settings.workdaysFlow.first()
-                val records = recordRepo.getRange(range.from, range.to)
-                if (records.isEmpty()) {
-                    extra.update { it.copy(busy = false, errorText = "该区间没有记录") }
-                    return@launch
-                }
-                val csv = CsvWriter.buildRangeCsv(
-                    range, records, salary,
-                    tierOf = { date -> holidayRepo.tierFor(date, workdays) },
-                    standardMinutes = autoStandardMinutes(salary, workdays, range),
-                )
                 val dir = File(context.cacheDir, "share").apply { mkdirs() }
-                val file = File(
-                    dir,
-                    "${when (salary.workSystem) {
+                val csv: String
+                val fileName: String
+                if (salary.workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
+                    // 工地记工：按项目 + 区间导出出勤/包工/借支明细
+                    val pid = siteRepo.currentProjectId()
+                    val project = siteRepo.getProject(pid)
+                    val atts = siteRepo.observeAttendance(pid, range.from, range.to).first()
+                    val pieces = siteRepo.observePieceWorks(pid, range.from, range.to).first()
+                    val advs = siteRepo.observeAdvances(pid, range.from, range.to).first()
+                    if (atts.isEmpty() && pieces.isEmpty() && advs.isEmpty()) {
+                        extra.update { it.copy(busy = false, errorText = "该区间没有记录") }
+                        return@launch
+                    }
+                    val siteOut = com.mdot.app.domain.SitePayCalculator.summarize(
+                        com.mdot.app.domain.SitePayCalculator.Input(atts, pieces, advs)
+                    )
+                    csv = CsvWriter.buildSiteCsv(range, project?.name.orEmpty(), atts, pieces, advs, siteOut)
+                    fileName = "工地明细_${range.from}_${range.to}.csv"
+                } else {
+                    val records = recordRepo.getRange(range.from, range.to)
+                    if (records.isEmpty()) {
+                        extra.update { it.copy(busy = false, errorText = "该区间没有记录") }
+                        return@launch
+                    }
+                    csv = CsvWriter.buildRangeCsv(
+                        range, records, salary,
+                        tierOf = { date -> holidayRepo.tierFor(date, workdays) },
+                        standardMinutes = autoStandardMinutes(salary, workdays, range),
+                    )
+                    fileName = "${when (salary.workSystem) {
                         com.mdot.app.domain.model.WorkSystem.HOURLY -> "工作明细"
                         com.mdot.app.domain.model.WorkSystem.COMPREHENSIVE -> "上班明细"
                         else -> "加班明细"
-                    }}_${range.from}_${range.to}.csv",
-                )
+                    }}_${range.from}_${range.to}.csv"
+                }
+                val file = File(dir, fileName)
                 file.writeText(csv, Charsets.UTF_8)
                 extra.update { it.copy(busy = false, preview = PreviewArtifact.Csv(file)) }
             } catch (e: Exception) {
@@ -158,34 +179,69 @@ class ExportViewModel @Inject constructor(
             try {
                 val salary = settings.salaryFlow.first()
                 val workdays = settings.workdaysFlow.first()
-                val records = recordRepo.getRange(range.from, range.to)
-                if (records.isEmpty()) {
-                    extra.update { it.copy(busy = false, errorText = "该区间没有记录") }
-                    return@launch
-                }
-                val out = PayrollCalculator.summarize(
-                    PayrollCalculator.Input(
-                        salary,
-                        records.map { it.toCalcLite() },
-                        tierOf = { date -> holidayRepo.tierFor(date, workdays) },
-                        standardMinutes = autoStandardMinutes(salary, workdays, range),
+                val bitmap: android.graphics.Bitmap
+                val fileName: String
+                if (salary.workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
+                    // 工地结算单长图（项目名 + 工数/点工/包工/借支/应结 + 签字栏）
+                    val pid = siteRepo.currentProjectId()
+                    val project = siteRepo.getProject(pid)
+                    val atts = siteRepo.observeAttendance(pid, range.from, range.to).first()
+                    val pieces = siteRepo.observePieceWorks(pid, range.from, range.to).first()
+                    val advs = siteRepo.observeAdvances(pid, range.from, range.to).first()
+                    if (atts.isEmpty() && pieces.isEmpty() && advs.isEmpty()) {
+                        extra.update { it.copy(busy = false, errorText = "该区间没有记录") }
+                        return@launch
+                    }
+                    val siteOut = com.mdot.app.domain.SitePayCalculator.summarize(
+                        com.mdot.app.domain.SitePayCalculator.Input(atts, pieces, advs)
                     )
-                )
-                val showMoney = when (salary.mode) {
-                    com.mdot.app.domain.model.SalaryMode.BASE -> salary.hasBaseSalary
-                    com.mdot.app.domain.model.SalaryMode.MANUAL ->
-                        salary.hasBaseSalary || salary.manualRatesCents.values.any { it > 0 }
+                    val rows = listOf(
+                        "工数合计" to String.format(java.util.Locale.US, "%.1f", siteOut.totalWorksMilli / 1000.0) + " 工",
+                        "加班" to TimeUtils.prettyDuration(siteOut.otMinutes),
+                        "点工工资" to Money.yuanText(siteOut.workPayCents) + " 元",
+                        "包工工资" to Money.yuanText(siteOut.piecePayCents) + " 元",
+                        "已借支" to Money.yuanText(siteOut.advanceTotalCents) + " 元",
+                        "应结金额" to Money.yuanText(siteOut.pendingCents) + " 元",
+                    )
+                    bitmap = PayslipRenderer.renderSettlement(
+                        context,
+                        projectName = project?.name.orEmpty(),
+                        range = range,
+                        rows = rows,
+                        palette = palette,
+                    )
+                    fileName = "结算单_${range.from}_${range.to}.png"
+                } else {
+                    val records = recordRepo.getRange(range.from, range.to)
+                    if (records.isEmpty()) {
+                        extra.update { it.copy(busy = false, errorText = "该区间没有记录") }
+                        return@launch
+                    }
+                    val out = PayrollCalculator.summarize(
+                        PayrollCalculator.Input(
+                            salary,
+                            records.map { it.toCalcLite() },
+                            tierOf = { date -> holidayRepo.tierFor(date, workdays) },
+                            standardMinutes = autoStandardMinutes(salary, workdays, range),
+                        )
+                    )
+                    val showMoney = when (salary.mode) {
+                        com.mdot.app.domain.model.SalaryMode.BASE -> salary.hasBaseSalary
+                        com.mdot.app.domain.model.SalaryMode.MANUAL ->
+                            salary.hasBaseSalary || salary.manualRatesCents.values.any { it > 0 }
+                    }
+                    bitmap = PayslipRenderer.render(
+                        context,
+                        title = "工资单",
+                        range = range,
+                        output = out,
+                        showMoney = showMoney,
+                        workSystem = salary.workSystem,
+                        palette = palette,
+                    )
+                    fileName = "工资单_${range.from}_${range.to}.png"
                 }
-                val bitmap = PayslipRenderer.render(
-                    context,
-                    title = "工资单",
-                    range = range,
-                    output = out,
-                    showMoney = showMoney,
-                    workSystem = salary.workSystem,
-                    palette = palette,
-                )
-                val file = PayslipRenderer.savePng(bitmap, context, "工资单_${range.from}_${range.to}.png")
+                val file = PayslipRenderer.savePng(bitmap, context, fileName)
                 extra.update { it.copy(busy = false, preview = PreviewArtifact.Payslip(file)) }
             } catch (e: Exception) {
                 extra.update { it.copy(busy = false, errorText = e.message ?: "生成失败") }

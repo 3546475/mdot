@@ -50,7 +50,6 @@ data class SyncUiState(
     val isError: Boolean = false,
     val confirmRestore: RemoteSummary? = null,
     val autoBackup: Boolean = true,
-    val historyCopy: Boolean = true,
     /** 本地文件备份忙碌中 */
     val localBusy: Boolean = false,
     /** 待确认的本地文件恢复摘要 */
@@ -108,7 +107,6 @@ class SyncViewModel @Inject constructor(
             settings.autoBackupEnabledFlow.collect { v -> _state.update { it.copy(autoBackup = v) } }
         }
         viewModelScope.launch {
-            settings.historyCopyEnabledFlow.collect { v -> _state.update { it.copy(historyCopy = v) } }
         }
     }
 
@@ -309,9 +307,6 @@ class SyncViewModel @Inject constructor(
         settings.setAutoBackupEnabled(enabled)
     }
 
-    fun onHistoryCopy(enabled: Boolean) = viewModelScope.launch {
-        settings.setHistoryCopyEnabled(enabled)
-    }
 
     /** 备份/恢复（同步备份页） */
 

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -68,8 +69,8 @@ fun SyncStorageScreen(
             return@Column
         }
 
-        // 类型切换 + 右上角新增。S3 入口暂藏（未充分测试）：类型区仅 WebDAV；
-        // 历史 S3 配置兜底可见（kind 初始化=选中源类型），可编辑/删除/断开但不可新增（+ 仅 WebDAV 下可用）
+        // 类型切换 + 右上角新增。v0.6.3 起 S3 放开（真实 MinIO E2E 通过后移除暂藏）；
+        // 新增/编辑/删除/断开与 WebDAV 同一套交互，弹窗表单按类型切换
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth(),
@@ -79,10 +80,16 @@ fun SyncStorageScreen(
                 onClick = { vm.onKind(ProviderKind.WEBDAV) },
                 label = { Text("WebDAV") },
             )
+            Spacer(Modifier.width(Spacing.s))
+            FilterChip(
+                selected = state.kind == ProviderKind.S3,
+                onClick = { vm.onKind(ProviderKind.S3) },
+                label = { Text("S3") },
+            )
             Spacer(Modifier.weight(1f))
             IconButton(
                 onClick = vm::openAddDialog,
-                enabled = state.kind == ProviderKind.WEBDAV && !state.adding,
+                enabled = state.kind != ProviderKind.NONE && !state.adding,
             ) {
                 Icon(painterResource(R.drawable.ic_ms_add), contentDescription = stringResource(R.string.sync_storage_add))
             }

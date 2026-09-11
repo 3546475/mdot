@@ -213,6 +213,8 @@ fun SystemScreen(
     val compBalance by hub.compBalance.collectAsStateWithLifecycle()
     val isHourly = salary.workSystem == WorkSystem.HOURLY
     val isStandard = salary.workSystem == WorkSystem.STANDARD
+    val isSite = salary.workSystem == WorkSystem.SITE
+    val siteProject by hub.siteCurrentProject.collectAsStateWithLifecycle()
     Column(
         Modifier
             .fillMaxSize()
@@ -231,6 +233,7 @@ fun SystemScreen(
                             WorkSystem.HOURLY -> stringResource(R.string.settings_system_desc_hourly)
                             WorkSystem.COMPREHENSIVE -> stringResource(R.string.settings_system_desc_comprehensive)
                             WorkSystem.STANDARD -> stringResource(R.string.settings_system_desc_standard)
+                            WorkSystem.SITE -> stringResource(R.string.site_system_desc)
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -244,13 +247,18 @@ fun SystemScreen(
         SectionCard {
             Column {
                 SettingRow(
-                    stringResource(R.string.settings_row_salary),
-                    if (isHourly) {
-                        val hourlyCents = salary.hourlyRatesCents[RateTier.WEEKDAY] ?: 0
-                        if (hourlyCents > 0) stringResource(R.string.settings_salary_per_hour, Money.yuanText(hourlyCents)) else stringResource(R.string.settings_not_set)
-                    } else if (salary.hasBaseSalary) stringResource(R.string.settings_salary_per_month, Money.yuanText(salary.baseSalaryCents))
-                    else if (salary.mode == SalaryMode.MANUAL) stringResource(R.string.settings_manual_rate)
-                    else stringResource(R.string.settings_not_set),
+                    if (isSite) stringResource(R.string.site_projects_settle_title)
+                    else stringResource(R.string.settings_row_salary),
+                    when {
+                        isSite -> siteProject?.name ?: stringResource(R.string.settings_not_set)
+                        isHourly -> {
+                            val hourlyCents = salary.hourlyRatesCents[RateTier.WEEKDAY] ?: 0
+                            if (hourlyCents > 0) stringResource(R.string.settings_salary_per_hour, Money.yuanText(hourlyCents)) else stringResource(R.string.settings_not_set)
+                        }
+                        salary.hasBaseSalary -> stringResource(R.string.settings_salary_per_month, Money.yuanText(salary.baseSalaryCents))
+                        salary.mode == SalaryMode.MANUAL -> stringResource(R.string.settings_manual_rate)
+                        else -> stringResource(R.string.settings_not_set)
+                    },
                     onClick = onOpenPayroll,
                 )
                 if (isStandard) {
@@ -261,16 +269,19 @@ fun SystemScreen(
                         onClick = { onOpen(Routes.COMP) },
                     )
                 }
-                SettingRow(stringResource(R.string.settings_row_cycle), stringResource(R.string.settings_cycle_anchor_summary, anchorDay), onClick = { onOpen(Routes.CYCLE) })
-                if (!isHourly) {
-                    SettingRow(
-                        stringResource(R.string.settings_row_workdays),
-                        if (workdays == SettingsHubDefaults.STANDARD_WORKDAYS) stringResource(R.string.settings_workdays_standard)
-                        else stringResource(R.string.settings_workdays_custom_count, workdays.size),
-                        onClick = { onOpen(Routes.WORKDAYS) },
-                    )
+                if (!isSite) {
+                    SettingRow(stringResource(R.string.settings_row_cycle), stringResource(R.string.settings_cycle_anchor_summary, anchorDay), onClick = { onOpen(Routes.CYCLE) })
+                    if (!isHourly) {
+                        // 小时工纯时薪无档位，不看周末/节假日 → 无需工作日设定
+                        SettingRow(
+                            stringResource(R.string.settings_row_workdays),
+                            if (workdays == SettingsHubDefaults.STANDARD_WORKDAYS) stringResource(R.string.settings_workdays_standard)
+                            else stringResource(R.string.settings_workdays_custom_count, workdays.size),
+                            onClick = { onOpen(Routes.WORKDAYS) },
+                        )
+                    }
+                    SettingRow(stringResource(R.string.settings_row_shifts), stringResource(R.string.settings_shift_count_summary, shiftCount), onClick = { onOpen(Routes.SHIFTS) })
                 }
-                SettingRow(stringResource(R.string.settings_row_shifts), stringResource(R.string.settings_shift_count_summary, shiftCount), onClick = { onOpen(Routes.SHIFTS) })
             }
         }
         Spacer(Modifier.height(Spacing.xl))
@@ -329,10 +340,12 @@ fun SystemSwitchScreen(onBack: () -> Unit) {
 
         SystemCard(
             title = stringResource(R.string.settings_system_construction),
-            desc = stringResource(R.string.settings_system_construction_desc),
-            enabled = false,
-            isSelected = false,
-            onClick = {},
+            desc = stringResource(R.string.site_system_desc),
+            enabled = true,
+            isSelected = currentSystem == WorkSystem.SITE,
+            onClick = {
+                if (currentSystem != WorkSystem.SITE) pendingSystem = WorkSystem.SITE
+            },
         )
         Spacer(Modifier.height(Spacing.xl))
 
@@ -354,6 +367,7 @@ fun SystemSwitchScreen(onBack: () -> Unit) {
                         WorkSystem.HOURLY -> stringResource(R.string.settings_switch_confirm_hourly)
                         WorkSystem.COMPREHENSIVE -> stringResource(R.string.settings_switch_confirm_comprehensive)
                         WorkSystem.STANDARD -> stringResource(R.string.settings_switch_confirm_standard)
+                        WorkSystem.SITE -> stringResource(R.string.site_switch_confirm)
                     },
                 )
             },
@@ -460,19 +474,6 @@ fun AboutScreen(
                 )
                 // 点击拉取 update.json → 比对版本 → 提示更新（UpdateFlow 承载弹窗）
                 SettingRow(stringResource(R.string.settings_row_check_update), null, onClick = updateVm::check)
-
-                // 项目开源地址（公开仓 3546475/mdot），点击跳转 GitHub
-                SettingRow(
-                    stringResource(R.string.settings_row_github),
-                    "github.com/3546475/mdot",
-                    onClick = {
-                        runCatching {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/3546475/mdot"))
-                            )
-                        }
-                    },
-                )
                 updateMsg?.let { msg ->
                     LaunchedEffect(msg) {
                         kotlinx.coroutines.delay(3000)
@@ -510,6 +511,21 @@ fun AboutScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+        Spacer(Modifier.height(Spacing.m))
+        // 项目开源地址（公开仓 3546475/mdot），点击跳转 GitHub（置于开源许可之后）
+        SectionCard {
+            SettingRow(
+                stringResource(R.string.settings_row_github),
+                "github.com/3546475/mdot",
+                onClick = {
+                    runCatching {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/3546475/mdot"))
+                        )
+                    }
+                },
+            )
         }
         Spacer(Modifier.height(Spacing.xl))
     }

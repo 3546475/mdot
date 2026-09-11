@@ -56,8 +56,8 @@ import kotlinx.coroutines.flow.first
 
 private const val COLUMNS = 6
 
-/** 预设 0.5–24h，0.5 步进；显示格式与旧网格一致（整点不带 .0，半点带 .5） */
-private val PRESET_HOURS: List<String> = (1..48).map { i ->
+/** 预设档数（半小时步进）：默认 48 档 = 0.5–24h；工地记工「选工天」用 6 档 = 0.5–3 */
+private fun presetLabels(steps: Int): List<String> = (1..steps).map { i ->
     if (i % 2 == 0) "${i / 2}" else "${i / 2}.5"
 }
 
@@ -77,8 +77,10 @@ fun DurationGrid(
     onPreset: (Double) -> Unit,
     onCustomCommit: (String) -> Unit,
     modifier: Modifier = Modifier,
+    presetSteps: Int = 48,
 ) {
     val haptic = LocalHapticFeedback.current
+    val presets = remember(presetSteps) { presetLabels(presetSteps) }
     var editing by remember { mutableStateOf(false) }
     var text by remember { mutableStateOf("") }
     // onFocusChanged 首次组合会以"未聚焦"回调一次，需等真正获得过焦点后才允许失焦提交
@@ -104,7 +106,7 @@ fun DurationGrid(
     // 进入时已有选中值（补改/编辑历史记录）→ 滚到对应行让高亮可见
     LaunchedEffect(Unit) {
         val sel = selectedHours ?: return@LaunchedEffect
-        val idx = PRESET_HOURS.indexOfFirst { it.toDoubleOrNull() == sel }
+        val idx = presets.indexOfFirst { it.toDoubleOrNull() == sel }
         if (idx >= COLUMNS) {
             // 等首次布局算出可滚动范围后再定位
             snapshotFlow { scroll.maxValue }.filter { it > 0 }.first()
@@ -120,7 +122,7 @@ fun DurationGrid(
             .verticalScroll(scroll),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        (PRESET_HOURS + CUSTOM_LABEL).chunked(COLUMNS).forEach { row ->
+        (presets + CUSTOM_LABEL).chunked(COLUMNS).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 row.forEach { label ->
                     if (label == CUSTOM_LABEL) {

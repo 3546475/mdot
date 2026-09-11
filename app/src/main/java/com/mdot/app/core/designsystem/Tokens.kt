@@ -4,6 +4,7 @@ import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /** 设计令牌（04 文档 §4.1：feature 层禁用魔法值）；M3 Expressive：形状整体加圆、动效弹簧化 */
@@ -14,6 +15,12 @@ object Spacing {
     val l = 16.dp
     val xl = 24.dp
     val page = 16.dp
+}
+
+/** 工地记工语义金额色（跨深浅主题取中饱和度保证可读）：已到手（借支/结算单）= 绿；待结余额 = 橙 */
+object SiteMoneyColors {
+    val ReceivedGreen = Color(0xFF1E8E3E)
+    val PendingOrange = Color(0xFFE8930C)
 }
 
 object Radius {

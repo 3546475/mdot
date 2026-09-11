@@ -30,6 +30,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Android 10+ 默认会在浅色内容上给系统导航条/状态栏叠一层对比底色（表现为一条偏白的带状底色）；
+        // 应用已 edge-to-edge 自绘背景，关掉该自动对比色，让导航条区域与页面背景一致。
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+            window.isStatusBarContrastEnforced = false
+        }
         setContent { MdJiabanApp() }
     }
 }

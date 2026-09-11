@@ -56,6 +56,7 @@ import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.FloatingLabelTextField
 import com.mdot.app.core.designsystem.component.SectionCard
+import com.mdot.app.core.designsystem.component.SettingRow
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.domain.CycleCalculator
 import com.mdot.app.domain.HourlyPayrollStrategy
@@ -84,6 +85,8 @@ data class PayrollUiState(
     val coefPercents: Map<LeaveType, Int> = LeaveType.entries.associateWith { 0 },
     val includeBase: Boolean = true,
     val workSystem: WorkSystem = WorkSystem.STANDARD,
+    /** 工地记工显示单位偏好 DAY|HOUR（F-S11，仅展示） */
+    val siteDisplayUnit: String = "DAY",
     // ---- 综合工时（10 文档 F-Z2）----
     /** 周期标准工时（小时文本）；空 = 自动（应出勤天数 × 8h） */
     val stdHoursText: String = "",
@@ -124,6 +127,7 @@ class PayrollViewModel @Inject constructor(
                 },
                 includeBase = salary.includeBase,
                 workSystem = salary.workSystem,
+                siteDisplayUnit = salary.siteDisplayUnit,
                 stdHoursText = salary.comprehensiveStandardMinutes.takeIf { it > 0 }
                     ?.let { stdHoursText(it) } ?: "",
             )
@@ -158,6 +162,14 @@ class PayrollViewModel @Inject constructor(
     fun onHourlyRate(text: String) = _state.update {
         it.copy(hourlyRateText = text.filter { c -> c.isDigit() || c == '.' }, saved = false)
     }
+    /** 切换工地记工显示单位（工天/小时），写回 SalaryConfig */
+    fun toggleSiteDisplayUnit() = viewModelScope.launch {
+        val current = settings.salaryFlow.first()
+        val next = if (current.siteDisplayUnit == "DAY") "HOUR" else "DAY"
+        settings.setSalary(current.copy(siteDisplayUnit = next))
+        _state.update { it.copy(siteDisplayUnit = next) }
+    }
+
     fun onStdHours(text: String) = _state.update {
         it.copy(stdHoursText = text.filter { c -> c.isDigit() || c == '.' }, saved = false)
     }
@@ -204,7 +216,13 @@ class PayrollViewModel @Inject constructor(
 
 /** 工资设定页 —— 参考布局：悬浮保存按钮、预览上移、倍率三栏、请假系数折叠 */
 @Composable
-fun PayrollScreen(canBack: Boolean = false, onBack: () -> Unit = {}, vm: PayrollViewModel = hiltViewModel()) {
+fun PayrollScreen(
+    canBack: Boolean = false,
+    onBack: () -> Unit = {},
+    onOpenSiteProjects: () -> Unit = {},
+    onOpenSiteSettlement: () -> Unit = {},
+    vm: PayrollViewModel = hiltViewModel(),
+) {
     val state by vm.state.collectAsStateWithLifecycle()
 
     Box(Modifier.fillMaxSize()) {
@@ -217,7 +235,11 @@ fun PayrollScreen(canBack: Boolean = false, onBack: () -> Unit = {}, vm: Payroll
                 .padding(bottom = 96.dp), // 留出悬浮按钮空间
         ) {
             JiabanTopBar(
-                title = if (canBack) stringResource(R.string.payroll_title) else null,
+                title = if (canBack) {
+                    // 工地记工：本页承载项目管理与结算入口，更名「项目与结算」（12 文档 F-S2）
+                    if (state.workSystem == WorkSystem.SITE) stringResource(R.string.site_projects_settle_title)
+                    else stringResource(R.string.payroll_title)
+                } else null,
                 showBack = canBack,
                 onBack = onBack,
             )
@@ -227,6 +249,8 @@ fun PayrollScreen(canBack: Boolean = false, onBack: () -> Unit = {}, vm: Payroll
                 WorkSystem.STANDARD -> StandardPayrollContent(state, vm)
                 WorkSystem.HOURLY -> HourlyPayrollContent(state, vm)
                 WorkSystem.COMPREHENSIVE -> ComprehensivePayrollContent(state, vm)
+                // 工地记工（12 文档 F-S2）：点工标准在项目设置内，此处仅入口与说明（项目管理页见 site/projects）
+                WorkSystem.SITE -> SitePayrollContent(state, vm, onOpenSiteProjects, onOpenSiteSettlement)
             }
         }
 
@@ -245,6 +269,47 @@ fun PayrollScreen(canBack: Boolean = false, onBack: () -> Unit = {}, vm: Payroll
                     .fillMaxWidth()
                     .height(52.dp),
             ) { Text(stringResource(R.string.payroll_save), style = MaterialTheme.typography.titleMedium) }
+        }
+    }
+}
+
+@Composable
+private fun SitePayrollContent(
+    state: PayrollUiState,
+    vm: PayrollViewModel,
+    onOpenProjects: () -> Unit,
+    onOpenSettlement: () -> Unit,
+) {
+    // 工地记工（F-S2）：点工标准在项目设置内维护；借支与结算独立页
+    SectionCard {
+        Column {
+            Text(stringResource(R.string.payroll_site_hint_title), style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(Spacing.s))
+            SettingRow(
+                stringResource(R.string.site_projects_title),
+                stringResource(R.string.payroll_site_projects_summary),
+                painterResource(R.drawable.ic_ms_dashboard),
+                onClick = onOpenProjects,
+            )
+            SettingRow(
+                stringResource(R.string.site_settlement_title),
+                stringResource(R.string.payroll_site_settlement_summary),
+                painterResource(R.drawable.ic_ms_paid),
+                onClick = onOpenSettlement,
+            )
+            SettingRow(
+                stringResource(R.string.site_display_unit),
+                if (state.siteDisplayUnit == "DAY") stringResource(R.string.site_display_unit_day)
+                else stringResource(R.string.site_display_unit_hour),
+                painterResource(R.drawable.ic_ms_swap_horiz),
+                onClick = { vm.toggleSiteDisplayUnit() },
+            )
+            Text(
+                stringResource(R.string.payroll_site_hint_body),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = Spacing.s),
+            )
         }
     }
 }
@@ -440,7 +505,7 @@ private fun TierField(
         suffix = {
             Text(
                 suffix,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         },

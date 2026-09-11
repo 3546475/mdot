@@ -23,6 +23,9 @@ object CsvWriter {
             "日期,星期,班次,上班工时(小时),档位,即时计酬(元),请假类型,请假时长(小时),请假扣款(元),备注"
         WorkSystem.STANDARD ->
             "日期,星期,班次,加班时长(小时),档位,倍率,加班费(元),转调休(小时),请假类型,请假时长(小时),请假扣款(元),备注"
+        WorkSystem.SITE ->
+            // 工地记工不写 daily_record（12 文档 §3.1），此 header 仅兜底防御
+            "日期,星期,班次,加班时长(小时),档位,倍率,加班费(元),转调休(小时),请假类型,请假时长(小时),请假扣款(元),备注"
     }
 
     /**
@@ -127,6 +130,65 @@ object CsvWriter {
 
     /** 日期写为 ="yyyy-MM-dd" 防 Excel 自动转换（04 文档 §6.5） */
     private fun excelSafeDate(date: LocalDate): String = "\"=\"\"$date\"\"\""
+
+    /**
+     * 工地记工明细 CSV（Phase 2）：按日期合并出勤/包工/借支，尾部汇总行。
+     * 金额直接取记录快照（分→元），与首页/结算口径一致。
+     */
+    fun buildSiteCsv(
+        range: CycleCalculator.Period,
+        projectName: String,
+        attendance: List<com.mdot.app.domain.model.SiteAttendance>,
+        pieceWorks: List<com.mdot.app.domain.model.SitePieceWork>,
+        advances: List<com.mdot.app.domain.model.SiteAdvance>,
+        summary: com.mdot.app.domain.SitePayCalculator.Output,
+    ): String {
+        val nl = "\r\n"
+        val sb = StringBuilder()
+        sb.append("\uFEFF")
+        sb.append("结算周期,${escape(range.toString())}").append(nl)
+        sb.append("项目,${escape(projectName)}").append(nl)
+        sb.append("导出时间,${escape(java.time.LocalDateTime.now().toString())}").append(nl)
+        sb.append("日期,星期,上班(小时),加班(小时),日价(元),点工工钱(元),工作项,数量,单位,包工工钱(元),借支(元),借支用途,备注").append(nl)
+        val dates = (attendance.map { java.time.LocalDate.parse(it.date) } +
+            pieceWorks.map { java.time.LocalDate.parse(it.date) } +
+            advances.map { java.time.LocalDate.parse(it.date) }).distinct().sorted()
+        val attBy = attendance.groupBy { it.date }
+        val pieceBy = pieceWorks.groupBy { it.date }
+        val advBy = advances.groupBy { it.date }
+        dates.forEach { d ->
+            val key = d.toString()
+            val weekday = d.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.CHINA)
+            val a = attBy[key]?.firstOrNull()
+            val pc = pieceBy[key]?.firstOrNull()
+            val v = advBy[key]?.firstOrNull()
+            val qty = pc?.let {
+                if (it.quantityMilli > 0) {
+                    val q = it.quantityMilli / 1000.0
+                    if (q % 1.0 == 0.0) q.toInt().toString() else q.toString()
+                } else ""
+            } ?: ""
+            val cells = listOf(
+                excelSafeDate(d), weekday,
+                a?.let { TimeUtils.hoursDecimal(it.workMinutes) } ?: "",
+                a?.let { TimeUtils.hoursDecimal(it.otMinutes) } ?: "",
+                a?.let { Money.yuanText(it.rateCents) } ?: "",
+                a?.let { Money.yuanText(it.workPayCents + it.otPayCents) } ?: "",
+                pc?.itemName ?: "",
+                qty,
+                pc?.unit ?: "",
+                pc?.let { Money.yuanText(it.amountCents) } ?: "",
+                v?.let { Money.yuanText(it.amountCents) } ?: "",
+                v?.purpose ?: "",
+                listOfNotNull(a?.note, pc?.note, v?.note).filter { it.isNotBlank() }.joinToString(" / "),
+            )
+            sb.append(cells.joinToString(",") { escape(it) }).append(nl)
+        }
+        sb.append("合计," + (summary.totalWorksMilli / 1000.0) + "工,加班" + TimeUtils.hoursDecimal(summary.otMinutes) +
+            ",," + Money.yuanText(summary.workPayCents) + ",点工,,,," + Money.yuanText(summary.piecePayCents) +
+            "," + Money.yuanText(summary.advanceTotalCents) + ",,待结" + Money.yuanText(summary.pendingCents)).append(nl)
+        return sb.toString()
+    }
 
     private fun escape(cell: String): String =
         if (cell.contains(',') || cell.contains('"') || cell.contains('\n')) {

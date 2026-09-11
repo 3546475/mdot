@@ -22,6 +22,9 @@ sealed interface AppError {
     /** 名称非法（空/超长） */
     data object InvalidName : AppError
 
+    /** 带用户可读文案的校验失败（工地记工 12 文档：项目上限/已结算锁定等） */
+    data class InvalidMessage(val message: String) : AppError
+
     /** 存储/网络等可重试错误 */
     data class Storage(val reason: String) : AppError
 

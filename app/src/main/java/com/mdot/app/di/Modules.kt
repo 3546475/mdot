@@ -99,7 +99,7 @@ object DatabaseModule {
         }
         return Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.NAME)
             .openHelperFactory(SqlcipherFastKdf.factory(passphrase, rawKey))
-            .addMigrations(AppDatabase.MIGRATION_1_2)
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
             .addCallback(AppDatabase.SEED_CALLBACK)
             .build()
     }
@@ -115,6 +115,21 @@ object DatabaseModule {
 
     @Provides
     fun provideHolidayDao(db: AppDatabase): HolidayDao = db.holidayDao()
+
+    @Provides
+    fun provideSiteProjectDao(db: AppDatabase): com.mdot.app.core.database.SiteProjectDao = db.siteProjectDao()
+
+    @Provides
+    fun provideSiteAttendanceDao(db: AppDatabase): com.mdot.app.core.database.SiteAttendanceDao = db.siteAttendanceDao()
+
+    @Provides
+    fun provideSiteAdvanceDao(db: AppDatabase): com.mdot.app.core.database.SiteAdvanceDao = db.siteAdvanceDao()
+
+    @Provides
+    fun provideSitePieceWorkDao(db: AppDatabase): com.mdot.app.core.database.SitePieceWorkDao = db.sitePieceWorkDao()
+
+    @Provides
+    fun provideSiteSettlementDao(db: AppDatabase): com.mdot.app.core.database.SiteSettlementDao = db.siteSettlementDao()
 }
 
 @Module

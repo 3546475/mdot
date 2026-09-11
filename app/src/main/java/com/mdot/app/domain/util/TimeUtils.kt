@@ -28,6 +28,9 @@ object TimeUtils {
 
     fun weekdayCn(date: LocalDate): String = WEEKDAY_NAMES[date.dayOfWeek.value - 1]
 
+    /** 周几单字（统计周柱状卡表头用）：一、二……日 */
+    fun weekdayCnShort(date: LocalDate): String = WEEKDAY_NAMES[date.dayOfWeek.value - 1].removePrefix("周")
+
     /** "今天 周三 08/29" 风格 */
     fun dateLabel(date: LocalDate, today: LocalDate): String {
         val prefix = when (date) {

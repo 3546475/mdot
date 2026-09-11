@@ -284,5 +284,6 @@ fun AppError.toText(): String = when (this) {
     AppError.DuplicateName -> "名称已存在"
     AppError.InvalidName -> "名称为空或过长（≤10 字）"
     is AppError.Storage -> reason
+    is AppError.InvalidMessage -> message
     AppError.Unexpected -> "操作失败，请重试"
 }

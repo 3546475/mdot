@@ -3,6 +3,7 @@ package com.mdot.app
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mdot.app.core.datastore.SettingsDataSource
+import com.mdot.app.core.holiday.HolidayRepository
 import com.mdot.app.domain.model.AppearanceConfig
 import com.mdot.app.domain.model.BottomBarConfig
 import com.mdot.app.domain.model.WorkSystem
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
 
@@ -22,7 +24,13 @@ import javax.inject.Inject
 class AppViewModel @Inject constructor(
     settings: SettingsDataSource,
     val recordSheetController: RecordSheetController,
+    private val holidayRepo: HolidayRepository,
 ) : ViewModel() {
+
+    init {
+        // 启动即触发节假日库远程刷新（内置资产/现缓存兜底，失败静默；7 天节流）
+        viewModelScope.launch { holidayRepo.refreshIfStale() }
+    }
 
     val appearance: StateFlow<AppearanceConfig> = settings.appearanceFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppearanceConfig())

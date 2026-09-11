@@ -60,15 +60,17 @@ import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.core.designsystem.paletteOptions
 import com.mdot.app.domain.model.ThemeMode
 
-/** 外观（F7-6 + F7-7：深浅三档、4 套配色、动态取色开关、底栏槽位配置） */
+/** 外观（F7-6 + F7-7：深浅三档、4 套配色、动态取色开关、底栏槽位配置、首页卡片配置） */
 @Composable
 fun AppearanceScreen(
     onBack: () -> Unit,
     onOpenBottomBar: () -> Unit = {},
+    onOpenHomeCards: () -> Unit = {},
     vm: AppearanceViewModel = hiltViewModel(),
 ) {
     val appearance by vm.appearance.collectAsStateWithLifecycle()
     val bottomBarCount by vm.bottomBarCount.collectAsStateWithLifecycle()
+    val homeCardsCount by vm.homeCardsCount.collectAsStateWithLifecycle()
 
     Column(
         Modifier
@@ -156,9 +158,13 @@ fun AppearanceScreen(
         }
         Spacer(Modifier.height(Spacing.l))
 
-        // ---- 底栏配置入口 ----
+        // ---- 首页卡片 + 底栏配置入口（首页卡片在上） ----
         SectionCard {
             Column {
+                SettingRow(
+                    stringResource(R.string.appearance_home_cards_config), stringResource(R.string.appearance_home_cards_summary, homeCardsCount),
+                    painterResource(R.drawable.ic_ms_palette), onClick = onOpenHomeCards,
+                )
                 SettingRow(
                     stringResource(R.string.appearance_bottom_bar_config), stringResource(R.string.appearance_bottom_bar_summary, bottomBarCount),
                     painterResource(R.drawable.ic_ms_dashboard), onClick = onOpenBottomBar,

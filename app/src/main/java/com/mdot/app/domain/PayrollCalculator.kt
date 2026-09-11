@@ -94,6 +94,8 @@ object PayrollCalculator {
         WorkSystem.STANDARD -> StandardPayrollStrategy
         WorkSystem.HOURLY -> HourlyPayrollStrategy
         WorkSystem.COMPREHENSIVE -> ComprehensivePayrollStrategy
+        // 工地记工不走 PayrollStrategy 体系（12 文档 §4），防御回退标准策略；调用方按制度分流到 SitePayCalculator
+        WorkSystem.SITE -> StandardPayrollStrategy
     }
 
     /** 兼容门面：根据 input.salary.workSystem 自动选择策略 */

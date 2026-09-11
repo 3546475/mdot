@@ -127,7 +127,23 @@ class HolidayRepository @Inject constructor(
 
     val dataVersionFlow: Flow<String?> = holidayDao.observeDataVersion()
 
-    /** 从远程 JSON 刷新整库（失败保留现库） */
+    /**
+     * 启动时自动刷新（节流）：距上次成功 ≥7 天才真正拉取；失败按 1 天短节流回退
+     * （成功→记 now；失败→记 now−6 天，使下次 1 天后到期）。全程静默，内置库/现缓存兜底。
+     */
+    suspend fun refreshIfStale(now: Long = System.currentTimeMillis()) {
+        val last = settings.holidayLastFetchAtFlow.first()
+        if (!holidayRefreshDue(last, now)) return
+        val result = refresh()
+        val persisted = when (result) {
+            is Success -> now
+            // 失败：回退 6 天 → 1 天后可重试，避免每次冷启动都打失败请求
+            is Failure -> now - (HOLIDAY_REFRESH_INTERVAL_MS - HOLIDAY_RETRY_INTERVAL_MS)
+        }
+        settings.setHolidayLastFetchAt(persisted)
+    }
+
+    /** 从远程 JSON 刷新整库（失败保留现库；远端 dataVersion 与现库相同则跳过写入） */
     suspend fun refresh(): AppResult<String> {
         return try {
             val url = settings.holidayUrlFlow.first()
@@ -136,8 +152,14 @@ class HolidayRepository @Inject constructor(
             if (file.years.isEmpty()) {
                 Failure(AppError.Storage("远程节假日数据为空"))
             } else {
-                upsertFile(file, SOURCE_REMOTE)
-                Success(file.dataVersion)
+                val current = holidayDao.observeDataVersion().first()
+                if (file.dataVersion.isNotBlank() && file.dataVersion == current) {
+                    // 远端未更新：跳过 upsert（零写入、零 UI 抖动）
+                    Success(file.dataVersion)
+                } else {
+                    upsertFile(file, SOURCE_REMOTE)
+                    Success(file.dataVersion)
+                }
             }
         } catch (e: Exception) {
             Failure(AppError.Storage(e.message ?: "刷新失败"))
@@ -148,8 +170,17 @@ class HolidayRepository @Inject constructor(
         const val BUILTIN_ASSET = "holidays.json"
         const val SOURCE_BUILTIN = "BUILTIN"
         const val SOURCE_REMOTE = "REMOTE"
+
+        /** 自动刷新成功间隔：7 天（节假日为年度数据，7 天极保守） */
+        const val HOLIDAY_REFRESH_INTERVAL_MS = 7L * 24 * 60 * 60 * 1000
+        /** 失败后重试间隔：1 天 */
+        const val HOLIDAY_RETRY_INTERVAL_MS = 1L * 24 * 60 * 60 * 1000
     }
 }
+
+/** 节假日库是否到刷新时机（纯函数，可单测）：距上次成功 ≥7 天；last=0 表示从未拉过（立即） */
+fun holidayRefreshDue(lastFetchAt: Long, now: Long): Boolean =
+    now - lastFetchAt >= HolidayRepository.HOLIDAY_REFRESH_INTERVAL_MS
 
 @Serializable
 data class HolidaysFile(

@@ -14,12 +14,18 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.gestures.draggable
@@ -33,8 +39,12 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -45,6 +55,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import com.mdot.app.core.designsystem.component.pressScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -91,6 +104,11 @@ import com.mdot.app.feature.stats.StatsScreen
 import com.mdot.app.feature.sync.SyncScreen
 import com.mdot.app.feature.sync.SyncStorageScreen
 import com.mdot.app.feature.settings.BottomBarScreen
+import com.mdot.app.feature.settings.HomeCardsScreen
+import com.mdot.app.feature.site.SiteProjectsScreen
+import com.mdot.app.feature.site.SiteProjectEditScreen
+import com.mdot.app.feature.site.SiteSettlementScreen
+import com.mdot.app.feature.site.SiteRecordScreen
 
 /** 内容底部避让底栏（03 文档 §4.1：滚动内容从底栏下方穿过）；
  *  无底栏形态（showBottomBar=false）只避让系统导航栏，避免底部大片空隙 */
@@ -316,8 +334,14 @@ private fun AppRootContent(
                     HomeScreen(
                         onOpenCalendar = { navTo(navController, Routes.CALENDAR_PATTERN, slots) },
                         onOpenStats = { navTo(navController, Routes.STATS, slots) },
-                        onOpenPayroll = { navTo(navController, Routes.PAYROLL, slots) },
-                        onRecord = { appVm.recordSheetController.open(java.time.LocalDate.now()) },
+                        onOpenDetail = { navTo(navController, Routes.DETAIL, slots) },
+                        onOpenRecord = {
+                            if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
+                                navTo(navController, Routes.SITE_RECORD, slots)
+                            } else {
+                                appVm.recordSheetController.open(java.time.LocalDate.now())
+                            }
+                        },
                     )
                 }
             }
@@ -341,6 +365,7 @@ private fun AppRootContent(
                     StatsScreen(
                         canBack = !inBar("stats"),
                         onBack = { navController.popBackStack() },
+                        onOpenDetail = { navTo(navController, Routes.DETAIL, slots) },
                     )
                 }
             }
@@ -352,7 +377,12 @@ private fun AppRootContent(
             composable(Routes.PAYROLL) {
                 SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.PAYROLL, onNavigate = { navTo(navController, it, slots) }) {
                     AdaptiveContainer {
-                        PayrollScreen(canBack = !inBar("payroll"), onBack = { navController.popBackStack() })
+                        PayrollScreen(
+                            canBack = !inBar("payroll"),
+                            onBack = { navController.popBackStack() },
+                            onOpenSiteProjects = { navTo(navController, Routes.SITE_PROJECTS, slots) },
+                            onOpenSiteSettlement = { navTo(navController, Routes.SITE_SETTLEMENT, slots) },
+                        )
                     }
                 }
             }
@@ -425,11 +455,61 @@ private fun AppRootContent(
                     AppearanceScreen(
                         onBack = { navController.popBackStack() },
                         onOpenBottomBar = { navTo(navController, Routes.BOTTOM_BAR, slots) },
+                        onOpenHomeCards = { navTo(navController, Routes.HOME_CARDS, slots) },
                     )
                 }
             }
             composable(Routes.BOTTOM_BAR) {
                 AdaptiveContainer { BottomBarScreen(onBack = { navController.popBackStack() }) }
+            }
+            composable(Routes.HOME_CARDS) {
+                AdaptiveContainer { HomeCardsScreen(onBack = { navController.popBackStack() }) }
+            }
+            // ---- 工地记工（12 文档 F-S2/F-S6） ----
+            composable(
+                Routes.SITE_PROJECTS_PATTERN,
+                arguments = listOf(navArgument("pick") {
+                    type = NavType.StringType
+                    defaultValue = "0"
+                }),
+            ) { entry ->
+                AdaptiveContainer {
+                    SiteProjectsScreen(
+                        pickMode = entry.arguments?.getString("pick") == "1",
+                        onBack = { navController.popBackStack() },
+                        onOpenProject = { id -> navTo(navController, Routes.siteProjectEdit(id), slots) },
+                        onPicked = { navController.popBackStack() },
+                    )
+                }
+            }
+            composable(Routes.SITE_PROJECT_EDIT_PATTERN) { entry ->
+                AdaptiveContainer {
+                    SiteProjectEditScreen(onBack = { navController.popBackStack() })
+                }
+            }
+            composable(Routes.SITE_SETTLEMENT) {
+                AdaptiveContainer {
+                    SiteSettlementScreen(onBack = { navController.popBackStack() })
+                }
+            }
+            composable(Routes.DETAIL) {
+                AdaptiveContainer {
+                    com.mdot.app.feature.detail.DetailScreen(onBack = { navController.popBackStack() })
+                }
+            }
+            composable(Routes.SITE_RECORD) {
+                AdaptiveContainer {
+                    SiteRecordScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenProjectSettings = { id ->
+                            navTo(navController, Routes.siteProjectEdit(id), slots)
+                        },
+                        onOpenProjectPick = {
+                            navTo(navController, Routes.siteProjects(pick = true), slots)
+                        },
+                        onOpenSettlement = { navTo(navController, Routes.SITE_SETTLEMENT, slots) },
+                    )
+                }
             }
             composable(Routes.DATASOURCE) {
                 AdaptiveContainer { DataSourceScreen(onBack = { navController.popBackStack() }) }
@@ -441,10 +521,12 @@ private fun AppRootContent(
 
         // 一级页面统一固定顶栏（无标题：左=标准工时切换，右=齿轮设置）。
         // 挂在 NavHost 之外、底栏与弹层之下，页面切换时不参与转场、保持不动。
+        // MD3E：顶栏显隐走 motionScheme effects spec（与底栏动效语言一致，禁硬编码时长）
+        val topBarFadeSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
         AnimatedVisibility(
             visible = showBar,
-            enter = fadeIn(tween(120)),
-            exit = fadeOut(tween(120)),
+            enter = fadeIn(topBarFadeSpec),
+            exit = fadeOut(topBarFadeSpec),
         ) {
             Box(
                 Modifier
@@ -459,11 +541,32 @@ private fun AppRootContent(
             }
         }
 
+        val calSelDate by appVm.recordSheetController.calendarSelectedDate.collectAsStateWithLifecycle()
+        // 中央按钮入场动画只播一次：底栏隐藏→再现会销毁/重建该按钮，
+        // flag 提升到 AppRootContent（跨导航存活）避免每次重播弹簧弹入
+        var recordPillEntered by remember { mutableStateOf(false) }
         JiabanBottomBar(
             slots = bottomBar.slots.mapNotNull { SlotRegistry.resolve(it) },
             selectedRoute = currentBase,
             visible = showBar,
             iconOnly = bottomBarIconOnly,
+            centerAction = {
+                RecordPillButton(
+                    onRecord = {
+                        when {
+                            // 日历一级页：承担原悬浮 FAB 功能——工地模式直达记工页，其余打开选中日期的记录
+                            currentBase == "calendar" && workSystem == com.mdot.app.domain.model.WorkSystem.SITE ->
+                                navTo(navController, Routes.SITE_RECORD, slots)
+                            currentBase == "calendar" -> appVm.recordSheetController.open(calSelDate)
+                            workSystem == com.mdot.app.domain.model.WorkSystem.SITE ->
+                                navTo(navController, Routes.SITE_RECORD, slots)
+                            else -> appVm.recordSheetController.open(java.time.LocalDate.now())
+                        }
+                    },
+                    playEntrance = !recordPillEntered,
+                    onEntranceDone = { recordPillEntered = true },
+                )
+            },
             onSlotClick = { spec ->
                 // 点击底栏：按目标相对当前位置设置左右平移方向
                 val fromIdx = orderedSlots.indexOf(currentBase)
@@ -475,20 +578,30 @@ private fun AppRootContent(
         )
 
         // 日历页面右下角 FAB：补记/编辑
-        val calSelDate by appVm.recordSheetController.calendarSelectedDate.collectAsStateWithLifecycle()
         val isCalendarPage = currentBase == "calendar"
+        // 日历为一级页（在底栏）时由底栏中央记加班按钮承担记录入口，悬浮 FAB 仅二级页形态保留
+        val showCalendarFab = isCalendarPage && !inBar("calendar")
         val fabBottomPadding = Spacing.page + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        val calFabFadeSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+        val calFabScaleSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
         androidx.compose.animation.AnimatedVisibility(
-            visible = isCalendarPage,
-            enter = androidx.compose.animation.fadeIn(tween(120)) + androidx.compose.animation.scaleIn(tween(120)),
-            exit = androidx.compose.animation.fadeOut(tween(120)) + androidx.compose.animation.scaleOut(tween(120)),
+            visible = showCalendarFab,
+            enter = androidx.compose.animation.fadeIn(calFabFadeSpec) +
+                androidx.compose.animation.scaleIn(calFabScaleSpec, initialScale = 0.8f),
+            exit = androidx.compose.animation.fadeOut(calFabFadeSpec) +
+                androidx.compose.animation.scaleOut(calFabScaleSpec, targetScale = 0.8f),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = Spacing.page + fabSideInset, bottom = fabBottomPadding),
         ) {
             FloatingActionButton(
                 onClick = {
-                    appVm.recordSheetController.open(calSelDate)
+                    // 工地模式：直接打开记工页（不走加班/请假弹窗）
+                    if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
+                        navTo(navController, Routes.SITE_RECORD, slots)
+                    } else {
+                        appVm.recordSheetController.open(calSelDate)
+                    }
                 },
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -543,4 +656,64 @@ private fun navTo(
         }
     }
     return true
+}
+
+/**
+ * 底栏中央主操作按钮（记加班/记工）：主色圆形（M3 FAB 形态），M3E 动效——
+ * 入场弹簧弹入（slowSpatialSpec）+ 按压 shape morph（圆形→超圆角方，fastSpatialSpec）+ 阴影贴合（fastEffectsSpec）。
+ * spec 须先在 composable 上下文取出再传入动画 API（03 文档规则 7）。
+ */
+@Composable
+private fun RecordPillButton(
+    onRecord: () -> Unit,
+    /** 仅首次出现播放弹簧弹入；底栏隐藏→再现（组合销毁重建）时不重播 */
+    playEntrance: Boolean,
+    onEntranceDone: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val entrance = remember { Animatable(if (playEntrance) 0f else 1f) }
+    val entranceSpec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
+    LaunchedEffect(Unit) {
+        if (playEntrance) {
+            entrance.animateTo(1f, entranceSpec)
+            onEntranceDone()
+        }
+    }
+    val elevSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val elevation by animateFloatAsState(
+        targetValue = if (pressed) 1f else 3f,
+        animationSpec = elevSpec,
+        label = "recordPillElevation",
+    )
+    // 方圆形 20dp，与底栏配置页预览完全一致（按压反馈由 pressScale 缩放 + 阴影贴合承担，无形状 morph）
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)
+    Surface(
+        shape = shape,
+        color = MaterialTheme.colorScheme.primary,
+        shadowElevation = elevation.dp,
+        modifier = Modifier
+            .graphicsLayer {
+                val e = entrance.value
+                alpha = e
+                val scale = 0.8f + 0.2f * e
+                scaleX = scale
+                scaleY = scale
+                translationY = (1f - e) * 24.dp.toPx()
+            }
+            .pressScale(interaction, pressedScale = 0.9f)
+            .clip(shape)
+            .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onRecord),
+    ) {
+        Box(
+            Modifier.size(52.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painterResource(R.drawable.ic_ms_more_time), null,
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+    }
 }

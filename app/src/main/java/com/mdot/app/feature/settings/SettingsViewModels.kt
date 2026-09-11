@@ -13,12 +13,16 @@ import com.mdot.app.domain.model.AppearanceConfig
 import com.mdot.app.domain.model.SalaryConfig
 import com.mdot.app.domain.model.WorkSystem
 import com.mdot.app.domain.model.BottomBarConfig
+import com.mdot.app.domain.model.HomeCardsConfig
 import com.mdot.app.domain.model.Shift
 import com.mdot.app.domain.model.ThemeMode
 import com.mdot.app.feature.record.toText
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
@@ -137,6 +141,15 @@ class AppearanceViewModel @Inject constructor(
     val bottomBarCount: StateFlow<Int> = settings.bottomBarFlow
         .map { it.slots.size }
         .stateIn(viewModelScope, SharingStarted.Eagerly, 2)
+
+    /** 首页卡片数（清洗未知 id 后的实际张数；未配置时显示出厂默认张数，与首页一致） */
+    val homeCardsCount: StateFlow<Int> = settings.homeCardsFlow
+        .map {
+            val pool = com.mdot.app.domain.model.HomeCardsConfig.POOL
+            it.cards?.filter { c -> c in pool }?.distinct()?.size
+                ?: com.mdot.app.domain.model.HomeCardsConfig.DEFAULT_CARDS.size
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, com.mdot.app.domain.model.HomeCardsConfig.DEFAULT_CARDS.size)
 
     fun setMode(mode: ThemeMode) = viewModelScope.launch {
         settings.setAppearance(appearance.value.copy(themeMode = mode))
@@ -290,12 +303,14 @@ class DataSourceViewModel @Inject constructor(
 
 
 /** 设置中心/工时设置的行右值摘要 */
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class SettingsHubViewModel @Inject constructor(
     private val settings: SettingsDataSource,
     syncEngine: SyncEngine,
     shiftRepo: ShiftRepository,
     private val recordRepo: RecordRepository,
+    private val siteRepo: com.mdot.app.core.repository.SiteRepository,
 ) : ViewModel() {
 
     val syncStatus: StateFlow<SyncStatus> = syncEngine.status
@@ -323,6 +338,16 @@ class SettingsHubViewModel @Inject constructor(
     val compBalance: StateFlow<Int> = recordRepo.observeCompBalance()
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
+    /** 工地记工当前项目（工时设置 SITE 形态「项目与结算」行摘要用；指针变化自动刷新） */
+    val siteCurrentProject: StateFlow<com.mdot.app.domain.model.SiteProject?> =
+        settings.salaryFlow
+            .map { it.siteCurrentProjectId }
+            .flatMapLatest { pid ->
+                if (pid == 0L) kotlinx.coroutines.flow.flowOf(null)
+                else siteRepo.observeProject(pid)
+            }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     /**
      * 切换工时制度（08 文档 §2.3 F-H1、10 文档 F-Z1）。
      * 切到非标准工时（小时工/综合工时均无调休基础，10 文档 D4）时清理调休数据：
@@ -337,7 +362,40 @@ class SettingsHubViewModel @Inject constructor(
             if (system != WorkSystem.STANDARD) {
                 recordRepo.clearCompData()
             }
+            // 工地记工：确保「当前项目」存在（首切自动建「首个记工项目」，D1-rev）
+            if (system == WorkSystem.SITE) {
+                siteRepo.currentProjectId()
+            }
         }
+    }
+}
+
+/** 首页卡片配置（v0.6.0 首页卡片可编辑）：开关显隐 + 拖拽排序；至少保留一张 */
+@HiltViewModel
+class HomeCardsViewModel @Inject constructor(
+    private val settings: SettingsDataSource,
+) : ViewModel() {
+    val config: StateFlow<HomeCardsConfig> = settings.homeCardsFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, HomeCardsConfig())
+
+    /** 点选开关：显示中→隐藏（至少保留一张，否则忽略）；隐藏→追加到显示序列末尾 */
+    fun toggle(id: String) = viewModelScope.launch {
+        // 未配置基线 = DEFAULT_CARDS（与配置页草稿/首页实际显示一致，避免 POOL 下点开变关闭）
+        val current = config.value.cards ?: HomeCardsConfig.DEFAULT_CARDS
+        val next = if (id in current) {
+            if (current.size <= HomeCardsConfig.MIN_CARDS) return@launch
+            current - id
+        } else {
+            current + id
+        }
+        settings.setHomeCards(HomeCardsConfig(next))
+    }
+
+    /** 拖拽排序后的顺序提交（持久化为显式配置，此后不再走底栏联动的默认推导） */
+    fun applyOrder(cards: List<String>) = viewModelScope.launch {
+        val cleaned = cards.filter { it in HomeCardsConfig.POOL }.distinct()
+        if (cleaned.size < HomeCardsConfig.MIN_CARDS) return@launch
+        settings.setHomeCards(HomeCardsConfig(cleaned))
     }
 }
 

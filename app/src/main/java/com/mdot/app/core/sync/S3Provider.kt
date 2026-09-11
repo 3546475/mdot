@@ -60,6 +60,17 @@ class S3Provider @Inject constructor(
         return "$scheme://$host/${cfg.bucket}/${key.trimStart('/')}".toHttpUrl()
     }
 
+    /** 桶级 URL（ListObjectsV2 必须请求桶路径：GET /<bucket>?list-type=2——
+     *  挂在 bucket/key 上会被服务端当作 GetObject(key) 而非列举） */
+    private fun bucketUrl(): okhttp3.HttpUrl {
+        val cfg = requireConfig()
+        val host = cfg.endpoint
+            .removePrefix("https://").removePrefix("http://")
+            .trimEnd('/')
+        val scheme = if (cfg.endpoint.startsWith("http://")) "http" else "https"
+        return "$scheme://$host/${cfg.bucket}".toHttpUrl()
+    }
+
     private fun amzDate(): Pair<String, String> {
         val now = ZonedDateTime.now(ZoneOffset.UTC)
         val dateStamp = now.format(DateTimeFormatter.ofPattern("yyyyMMdd"))
@@ -79,11 +90,19 @@ class S3Provider @Inject constructor(
             val payloadHash = SigV4.sha256HexBytes(payload)
             val (dateStamp, amzDate) = amzDate()
 
-            val headers = mapOf(
-                "host" to url.host,
-                "x-amz-content-sha256" to payloadHash,
-                "x-amz-date" to amzDate,
-            )
+            val headers = run {
+                // SigV4 规范：host 头必须含非默认端口（http≠80 / https≠443），
+                // 否则 MinIO/OSS 等自建端口场景 SignatureDoesNotMatch
+                val hostHeader =
+                    if ((url.scheme == "http" && url.port == 80) ||
+                        (url.scheme == "https" && url.port == 443)
+                    ) url.host else "${url.host}:${url.port}"
+                mapOf(
+                    "host" to hostHeader,
+                    "x-amz-content-sha256" to payloadHash,
+                    "x-amz-date" to amzDate,
+                )
+            }
             val query = url.queryParameterNames.associateWith { url.queryParameter(it).orEmpty() }
             val auth = SigV4.authorizationHeader(
                 method = request.method,
@@ -116,10 +135,12 @@ class S3Provider @Inject constructor(
         return IOException(hint + if (body.isNullOrBlank()) "" else "（$code）")
     }
 
-    /** 连接检测 = 对存储桶发 ListObjectsV2（max-keys=1）：凭据/桶/区域任一无效即失败 */
+    /** 连接检测 = 对桶发 ListObjectsV2（max-keys=1）：凭据/桶/区域任一无效即失败 */
     override suspend fun ensureBaseDir(): Result<Unit> = runCatching {
-        val probeUrl = objectUrl("probe").newBuilder()
-            .query("list-type=2&max-keys=1&prefix=${SigV4.awsUriEncode(prefix)}")
+        val probeUrl = bucketUrl().newBuilder()
+            .addQueryParameter("list-type", "2")
+            .addQueryParameter("max-keys", "1")
+            .addQueryParameter("prefix", prefix)
             .build()
         val req = Request.Builder().url(probeUrl).get().build()
         exec(req).use { resp ->
@@ -173,15 +194,27 @@ class S3Provider @Inject constructor(
 
     override suspend fun list(path: String): Result<List<RemoteFileMeta>> = runCatching {
         val dirPrefix = (prefix + path.trimStart('/')).trimEnd('/')
-        val key = "list" // 仅用于 URL 组装；实际以查询参数请求
-        val listUrl = objectUrl(key).newBuilder()
-            .query("list-type=2&max-keys=100&prefix=${SigV4.awsUriEncode("$dirPrefix/")}")
-            .build()
-        val req = Request.Builder().url(listUrl).get().build()
-        exec(req).use { resp ->
-            if (!resp.isSuccessful) throw mapError(resp.code, resp.body?.string())
-            parseListBucket(resp.body?.string().orEmpty())
-        }
+        val result = mutableListOf<RemoteFileMeta>()
+        var token: String? = null
+        var pages = 0
+        do {
+            val builder = bucketUrl().newBuilder()
+                .addQueryParameter("list-type", "2")
+                .addQueryParameter("max-keys", "1000")
+                .addQueryParameter("prefix", "$dirPrefix/")
+            token?.let { builder.addQueryParameter("continuation-token", it) }
+            val req = Request.Builder().url(builder.build()).get().build()
+            var truncated = false
+            exec(req).use { resp ->
+                if (!resp.isSuccessful) throw mapError(resp.code, resp.body?.string())
+                val (page, more, next) = parseListBucket(resp.body?.string().orEmpty())
+                result += page
+                truncated = more
+                token = next
+            }
+            pages++
+        } while (truncated && pages < 50) // 50 页×1000 对象的保险上限，防异常服务端死循环
+        result
     }
 
     override suspend fun delete(path: String): Result<Unit> = runCatching {
@@ -196,8 +229,9 @@ class S3Provider @Inject constructor(
         Unit
     }
 
-    /** 极简 ListBucketResult 解析（IsTruncated 场景本地仅 5 份历史，单页必够） */
-    private fun parseListBucket(xml: String): List<RemoteFileMeta> {
+    /** ListBucketResult 解析：返回 (对象列表, IsTruncated, NextContinuationToken)。
+     *  key 中的 XML 实体（&amp; 等）不反转义——备份 key 为 ASCII 日期/uuid 路径，不含特殊字符 */
+    private fun parseListBucket(xml: String): Triple<List<RemoteFileMeta>, Boolean, String?> {
         val result = mutableListOf<RemoteFileMeta>()
         val contentRegex = Regex("<Contents>(.*?)</Contents>", RegexOption.DOT_MATCHES_ALL)
         val keyRegex = Regex("<Key>(.*?)</Key>")
@@ -214,7 +248,10 @@ class S3Provider @Inject constructor(
                     ?: Instant.now(),
             )
         }
-        return result
+        val truncated = Regex("<IsTruncated>\\s*true\\s*</IsTruncated>").containsMatchIn(xml)
+        val nextToken = Regex("<NextContinuationToken>(.*?)</NextContinuationToken>", RegexOption.DOT_MATCHES_ALL)
+            .find(xml)?.groupValues?.get(1)
+        return Triple(result, truncated, nextToken)
     }
 
     companion object {

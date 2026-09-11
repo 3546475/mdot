@@ -46,11 +46,12 @@ import com.mdot.app.core.designsystem.Duration
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 
-/** 统一卡片容器：16dp 圆角、surfaceContainer 色阶（03 文档 §3.3）；可点卡片带按压缩放 */
+/** 统一卡片容器：16dp 圆角、surfaceContainer 色阶（03 文档 §3.3）；可点卡片带按压缩放；containerColor 可覆盖底色（如工钱 hero 卡） */
 @Composable
 fun SectionCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
     content: @Composable () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -59,7 +60,7 @@ fun SectionCard(
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.pressScale(interaction) else Modifier),
         shape = RoundedCornerShape(Radius.card),
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = containerColor,
         onClick = onClick ?: {},
         enabled = onClick != null,
         interactionSource = interaction,
@@ -244,7 +245,8 @@ fun FloatingLabelTextField(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text(label) },
+        // 标签锁单行：三栏窄容器下避免「平时」被后缀挤成两行撑高卡片
+        label = { Text(label, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Clip) },
         modifier = modifier,
         shape = RoundedCornerShape(Radius.textField),
         keyboardOptions = keyboardOptions,

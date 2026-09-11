@@ -523,6 +523,7 @@ private fun otLabel(workSystem: com.mdot.app.domain.model.WorkSystem): Int = whe
     com.mdot.app.domain.model.WorkSystem.HOURLY -> R.string.record_tab_ot_hourly
     com.mdot.app.domain.model.WorkSystem.COMPREHENSIVE -> R.string.record_tab_ot_comprehensive
     com.mdot.app.domain.model.WorkSystem.STANDARD -> R.string.record_tab_ot_standard
+    com.mdot.app.domain.model.WorkSystem.SITE -> R.string.site_tab_ot
 }
 
 private fun rateText(salary: com.mdot.app.domain.model.SalaryConfig, tier: RateTier): String =

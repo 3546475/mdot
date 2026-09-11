@@ -111,6 +111,63 @@ object PayslipRenderer {
         return bitmap
     }
 
+    /**
+     * 工地结算单长图（Phase 2）：项目名 + 周期 + 明细行 + 应结大字 + 工人/老板/日期签字栏。
+     * rows = (标签 to 值) 列表，末行以 highlight 绘制。
+     */
+    fun renderSettlement(
+        context: Context,
+        projectName: String,
+        range: CycleCalculator.Period,
+        rows: List<Pair<String, String>>,
+        palette: Palette,
+    ): Bitmap {
+        val width = 1080
+        val pad = 64f
+        val rowH = 72f
+        val height = (pad * 2 + 200 + rows.size * rowH + 80 + 160 + 120).toInt()
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(palette.surface)
+        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.onSurface; textSize = 64f; isFakeBoldText = true; textAlign = Paint.Align.CENTER
+        }
+        val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.muted; textSize = 36f; textAlign = Paint.Align.CENTER
+        }
+        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = palette.onSurface; textSize = 40f }
+        val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.onSurface; textSize = 40f; textAlign = Paint.Align.RIGHT
+        }
+        val highlightPaint = Paint(valuePaint).apply { color = palette.primary; isFakeBoldText = true; textSize = 52f }
+        val linePaint = Paint().apply { color = palette.line; strokeWidth = 2f }
+        val signPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = palette.muted; textSize = 36f }
+
+        var y = pad + 64f
+        canvas.drawText("工地结算单", width / 2f, y, titlePaint)
+        y += 56f
+        canvas.drawText("$projectName · $range", width / 2f, y, subPaint)
+        y += 48f
+        canvas.drawLine(pad, y, width - pad, y, linePaint)
+        y += rowH
+        rows.forEachIndexed { i, (label, value) ->
+            val isLast = i == rows.lastIndex
+            canvas.drawText(label, pad, y, labelPaint)
+            canvas.drawText(value, width - pad, y, if (isLast) highlightPaint else valuePaint)
+            if (!isLast) canvas.drawLine(pad, y + 24f, width - pad, y + 24f, linePaint)
+            y += rowH
+        }
+        y += 40f
+        canvas.drawLine(pad, y, width - pad, y, linePaint)
+        y += 80f
+        canvas.drawText("工人签字：______________    老板签字：______________", pad, y, signPaint)
+        y += 64f
+        canvas.drawText("日期：____ 年 __ 月 __ 日", pad, y, signPaint)
+        val footerPaint = Paint(subPaint).apply { textSize = 30f }
+        canvas.drawText("马的加班 · 本地记账导出", width / 2f, height - pad / 2, footerPaint)
+        return bitmap
+    }
+
     fun savePng(bitmap: Bitmap, context: Context, fileName: String): File {
         val dir = File(context.cacheDir, "share").apply { mkdirs() }
         val file = File(dir, fileName)

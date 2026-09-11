@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 首启引导（feature/onboarding/OnboardingScreen.kt） -->
-    <string name="onboarding_app_title">马的加班</string>
-    <string name="onboarding_intro">你的加班与工资，只存在你的手机和你自己的网盘。\n无账号 · 无广告 · 不收集任何数据。</string>
+    <!-- 首启引导（feature/onboarding/OnboardingScreen.kt；v0.6 起只保留设置项两步，介绍页已删） -->
     <string name="onboarding_step_work_system">工时制度</string>
     <string name="onboarding_step_work_system_desc">选择适合你的计薪方式，之后可在设置中切换。</string>
     <string name="onboarding_ws_standard">标准工时</string>
@@ -24,6 +22,7 @@
     <string name="onboarding_base_salary_label">月薪底薪（元，可留空）</string>
     <string name="onboarding_multiplier_title">加班倍率（倍）</string>
     <string name="onboarding_skip">跳过</string>
+    <string name="onboarding_back">上一步</string>
     <string name="onboarding_next">下一步</string>
     <string name="onboarding_start">开始使用</string>
 </resources>

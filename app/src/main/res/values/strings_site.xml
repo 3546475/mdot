@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 工地记工（feature/settings 切换页与制度卡 / v0.6.1 Phase 1，12 文档） -->
+    <string name="site_system_desc">记工天、工时、借支、结算，工地对账一本明白账</string>
+    <string name="site_switch_confirm">工天按 天/半天 记，加班按小时另算；工地数据独立保存，切换制度不丢记录。</string>
+    <string name="site_onboarding_desc">记工天（全天/半天）、加班按小时；项目制台账，借支结算分开记。</string>
+
+    <!-- 记录/首页制度化文案（when 补齐） -->
+    <string name="site_record_hero">记 工</string>
+    <string name="site_cycle_label">本月工数</string>
+    <string name="site_tab_ot">出工</string>
+    <!-- 项目管理/项目设置（F-S2） -->
+    <string name="site_projects_title">项目管理</string>
+    <string name="site_projects_settle_title">项目与结算</string>
+    <string name="site_projects_archived">已归档</string>
+    <string name="site_projects_restore">恢复</string>
+    <string name="site_project_purge_title">彻底删除项目？</string>
+    <string name="site_project_purge_body">将永久删除「%1$s」及其全部出勤、包工、借支与结算数据，不可恢复。</string>
+    <string name="site_project_purge_confirm">彻底删除</string>
+    <string name="site_projects_empty">还没有项目，点右上角「创建新项目」开始记工</string>
+    <string name="site_project_drag_hint">按住六点手柄拖动排序</string>
+    <string name="site_project_edit">修改</string>
+    <string name="site_project_delete">删除</string>
+    <string name="site_project_delete_title">删除这个项目？</string>
+    <string name="site_project_delete_body">有记录的项目将转为「归档」（数据保留，可在项目管理页恢复）；空项目直接删除。</string>
+    <string name="site_project_current_badge">当前</string>
+    <string name="site_project_summary_format">上班 %1$d 小时 = 1 个工 = %2$s 元 · 加班 %3$d 小时 = 1 工</string>
+    <string name="site_settlement_title">结算与借支</string>
+    <string name="site_settlement_loading">加载中…</string>
+    <string name="site_settlement_empty">切换到工地记工后，这里显示当前项目的借支与结算</string>
+    <string name="site_settlement_pending_title">本期待结 · %1$s</string>
+    <string name="site_settlement_works">出勤与加班</string>
+    <string name="site_settlement_works_value">%1$s 工 · 加班 %2$s</string>
+    <string name="site_settlement_receivable">应得工资</string>
+    <string name="site_settlement_advanced">已借支</string>
+    <string name="site_settlement_advanced_count">已借支（%1$d 笔）</string>
+    <string name="site_settlement_net">待结余额</string>
+    <string name="site_settlement_go">发起结算</string>
+    <string name="site_settlement_partial_title">本次结算金额</string>
+    <string name="site_settlement_partial_amount_label">金额（元）</string>
+    <string name="site_settlement_partial_action">确认结算</string>
+    <string name="site_settlement_partial_row">部分结算</string>
+    <string name="site_settlement_partial_deduct">已部分结算</string>
+    <string name="site_settlement_partial_paid">本次实付</string>
+    <string name="site_settlement_settle_all">结清</string>
+    <string name="site_settlement_settle_all_hint">把当前全部未结算记录锁定归档，一次性结清剩余待结余额。</string>
+    <string name="site_settlement_settle_all_action">结清全部</string>
+    <string name="site_settlement_advances">借支流水（未结算）</string>
+    <string name="site_settlement_pieces">包工流水（未结算）</string>
+    <string name="site_piece_unnamed">无名工量</string>
+    <string name="site_settlement_history">历史结算单</string>
+    <string name="site_settlement_row_detail">工资 %1$s · 借支 %2$s · 应结 %3$s</string>
+    <string name="site_settlement_revert">撤销</string>
+    <string name="site_settlement_revert_title">撤销这张结算单？</string>
+    <string name="site_settlement_revert_body">撤销后该区间记录解锁，可继续修改；历史金额口径不再保留。</string>
+    <string name="site_settlement_preview_title">结算单预览</string>
+    <string name="site_settlement_preview_period">结算周期：%1$d月%2$d日 – %3$d月%4$d日</string>
+    <string name="site_settlement_lock_hint">确认后区间内记录锁定，如需修改请先撤销结算单。</string>
+    <string name="site_settlement_confirm">确认结算</string>
+    <string name="site_delete">删除</string>
+    <!-- 借支用途 12 类（12 文档 D5-rev） -->
+    <string name="site_purpose_wage">工资</string>
+    <string name="site_purpose_living">生活费</string>
+    <string name="site_purpose_lodging">住宿费</string>
+    <string name="site_purpose_lodging_allow">住宿补贴</string>
+    <string name="site_purpose_meals">伙食费</string>
+    <string name="site_purpose_meals_allow">伙食补贴</string>
+    <string name="site_purpose_reward">奖励</string>
+    <string name="site_purpose_materials">买材料</string>
+    <string name="site_purpose_transport">车费</string>
+    <string name="site_purpose_project">工程款</string>
+    <string name="site_purpose_pocket">零花钱</string>
+    <string name="site_purpose_other">其他</string>
+    <string name="site_project_current">当前</string>
+    <string name="site_project_settings">项目设置</string>
+    <string name="site_project_create">创建新项目</string>
+    <string name="site_project_name_label">项目名称</string>
+    <string name="site_project_standard_summary">上班 %1$d 小时 = 1 个工 = %2$s 元 · 加班 %3$d 小时 = 1 工</string>
+    <string name="site_project_archive">删除项目</string>
+    <string name="site_project_archive_title">删除这个项目？</string>
+    <string name="site_project_archive_body">有记录的项目将转为「归档」（数据保留，不再出现在列表）；空项目直接删除。</string>
+    <string name="site_standard_heading">点工标准</string>
+    <string name="site_standard_work">上班</string>
+    <string name="site_standard_hours_per_day">小时 = 1 个工 =</string>
+    <string name="site_standard_rate">日价</string>
+    <string name="site_standard_yuan_per_day">元</string>
+    <string name="site_standard_overtime">加班</string>
+    <string name="site_standard_hours_per_ot">小时 = 1 个加班工</string>
+    <string name="site_standard_overtime_rate">加班时薪</string>
+    <string name="site_standard_yuan_per_hour">元/小时</string>
+    <string name="site_ot_heading">加班计钱方式</string>
+    <string name="site_ot_by_day">按加班工</string>
+    <string name="site_ot_by_hour">按小时算</string>
+    <string name="site_ot_hint">「按加班工」：加班满 Z 小时算 1 个加班工（按日价）；「按小时算」：加班按固定时薪逐小时计。单价变更只影响新记录，历史不动。</string>
+    <string name="site_save">保存</string>
+    <string name="site_dialog_ok">确定</string>
+    <string name="site_dialog_cancel">取消</string>
+    <!-- 记录弹层 SITE 形态（F-S3/F-S5） -->
+    <string name="site_tab_attendance">出工</string>
+    <string name="site_tab_advance">借支</string>
+    <string name="site_record_work">上班</string>
+    <string name="site_record_full_day">全天</string>
+    <string name="site_record_rest">休息</string>
+    <string name="site_record_half">半天</string>
+    <string name="site_record_work_hours">工时</string>
+    <string name="site_record_hours_unit">小时（%1$d 小时=1 工）</string>
+    <string name="site_record_overtime">加班</string>
+    <string name="stats_works_unit">工</string>
+    <string name="site_home_today_works">今日 %1$s 工</string>
+    <string name="site_home_today_hours">今日 %1$s h</string>
+    <string name="site_record_pay_today">今日工钱</string>
+    <string name="site_record_standard_summary">上班 %1$d 小时=1 工=%2$s 元 · 加班 %3$d 小时=1 工</string>
+    <string name="site_record_advance_amount">本次借支金额</string>
+    <string name="site_record_purpose">借支用途（选填）</string>
+    <string name="site_record_note">备注</string>
+    <string name="site_record_save">保存</string>
+    <string name="site_record_title">记工</string>
+    <!-- 首页 SITE 形态（F-S6） -->
+    <string name="site_home_pending_line">已借支 %1$s · 待结 %2$s</string>
+    <string name="site_settlement_short">结算</string>
+    <!-- 记工页截图版式（v0.6.1） -->
+    <string name="site_back">返回</string>
+    <string name="site_tab_book">记账</string>
+    <string name="site_tab_advance_settle">记借支/结算</string>
+    <string name="site_row_project">项目</string>
+    <string name="site_project_rate_hint">%1$s元/工</string>
+    <string name="site_yuan_symbol">¥</string>
+    <string name="site_row_date">日期</string>
+    <string name="site_today">今天</string>
+    <string name="site_multi_select">可多选</string>
+    <string name="site_multi_select_hint">勾选其他日期，保存时逐日批量记工</string>
+    <string name="site_sub_day">点工</string>
+    <string name="site_sub_contract">包工</string>
+    <string name="site_sub_quantity">工量</string>
+    <string name="site_planned">规划中</string>
+    <string name="site_work">上班</string>
+    <string name="site_one_work">1个工</string>
+    <string name="site_pick_days">选工天</string>
+    <string name="site_picked_days_fmt">%1$s 工</string>
+    <string name="site_picked_hours_fmt">%1$s 小时</string>
+    <string name="site_pick_hours">选小时</string>
+    <string name="site_rest">休息</string>
+    <string name="site_half_am_pm">上下午</string>
+    <string name="site_ot">加班</string>
+    <string name="site_no_ot">无加班</string>
+    <string name="site_pay">工钱</string>
+    <string name="site_pay_summary_work">上班 %1$s元/个工</string>
+    <string name="site_pay_summary_ot">加班 %1$d小时/个工</string>
+    <string name="site_note">备注</string>
+    <string name="site_note_hint">请输入，100字以内</string>
+    <string name="site_photos">照片</string>
+    <string name="site_photo_hint">律师提醒：记工时最好能拍摄工作照片</string>
+    <string name="site_add_photo">添加图片</string>
+    <string name="site_photo_evidence">留证</string>
+    <string name="site_save_again">保存 并再记一笔</string>
+    <string name="site_advance_amount_label">本次借支金额</string>
+    <string name="site_settle_amount_label">本次结算金额</string>
+    <string name="site_sub_advance">借支</string>
+    <string name="site_sub_settle">结算</string>
+    <string name="site_settle_entry_action">发起结算（按周期）</string>
+    <string name="site_settlement_entry_hint">流水与结算单</string>
+    <!-- 包工/工量表单（Phase 2，D4-rev） -->
+    <string name="site_sub_piece">包工</string>
+    <string name="site_piece_name">工作项</string>
+    <string name="site_piece_name_hint">如：砌墙 / 贴砖 / 钢筋绑定</string>
+    <string name="site_piece_quantity">工程量</string>
+    <string name="site_piece_price">单价</string>
+    <string name="site_piece_price_unit">元/单位</string>
+    <string name="site_piece_yuan_per_unit">元</string>
+    <string name="site_advance_yuan_unit">元</string>
+    <string name="site_piece_auto_hint">量×价自动</string>
+    <!-- 工量单位（v0.6.2：数字输入框 + 单位按钮 → 自实现底部弹层选单位） -->
+    <string name="site_unit_picker_title">选择单位</string>
+    <string name="site_unit_sq_meter">平方米</string>
+    <string name="site_unit_cubic">立方</string>
+    <string name="site_unit_ton">吨</string>
+    <string name="site_unit_meter">米</string>
+    <string name="site_unit_inch">寸</string>
+    <string name="site_unit_piece">个</string>
+    <string name="site_unit_time">次</string>
+    <string name="site_unit_day">天</string>
+    <string name="site_unit_block">块</string>
+    <string name="site_unit_group">组</string>
+    <string name="site_unit_machine">台</string>
+    <string name="site_unit_bundle">捆</string>
+    <string name="site_unit_case">宗</string>
+    <string name="site_unit_item">项</string>
+    <string name="site_unit_plant">株</string>
+    <string name="site_unit_household">户</string>
+    <string name="site_unit_car">车</string>
+    <string name="site_unit_sheet">片</string>
+    <string name="site_unit_other">其他</string>
+    <!-- 项目选择模式 / 项目设置改版（v0.6.2） -->
+    <string name="site_projects_pick_title">选择项目</string>
+    <string name="site_project_standard_settings">点工标准设置</string>
+    <string name="site_std_eq_work">1 个工 =</string>
+    <string name="site_std_eq_hours">小时 =</string>
+    <string name="site_std_eq_yuan">元</string>
+    <string name="site_std_eq_ot_day">1 个加班工 =</string>
+    <string name="site_std_eq_ot_hours">小时</string>
+    <string name="site_std_eq_ot_hour">1 小时 =</string>
+    <string name="site_project_ot_switch_to_hour">按小时算</string>
+    <string name="site_project_ot_switch_to_day">按工天算</string>
+    <string name="site_project_standard_hint">改动只影响新记录，历史记录金额不重算。</string>
+    <string name="site_project_summary_hour_format">上班 %1$s 小时 = 1 个工 = %2$s 元 · 加班 %3$s 元/小时</string>
+    <string name="site_project_summary_day_format">上班 %1$s 小时 = 1 个工 = %2$s 元 · 加班 %3$s 小时 = 1 个工</string>
+    <string name="site_project_standard_unset">未设置</string>
+    <!-- 显示单位偏好（F-S11） -->
+    <string name="site_display_unit">切换显示单位</string>
+    <string name="site_display_unit_day">上班按工天</string>
+    <string name="site_display_unit_hour">上班按小时</string>
+    <string name="site_cycle_label_hour">本月工时</string>
+</resources>

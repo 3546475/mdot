@@ -179,14 +179,6 @@ fun SyncScreen(
                     }
                     Switch(checked = state.autoBackup, onCheckedChange = vm::onAutoBackup)
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.sync_history_copy_title), style = MaterialTheme.typography.bodyMedium)
-                        Text(stringResource(R.string.sync_history_copy_desc), style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Switch(checked = state.historyCopy, onCheckedChange = vm::onHistoryCopy)
-                }
             }
         }
 

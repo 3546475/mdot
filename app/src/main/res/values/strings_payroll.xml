@@ -4,6 +4,11 @@
     <string name="payroll_title">工资设定</string>
     <string name="payroll_save">保存</string>
     <string name="payroll_mode_title">计薪模式</string>
+    <!-- 工地记工 SITE 形态（v0.6.1） -->
+    <string name="payroll_site_hint_title">工地记工</string>
+    <string name="payroll_site_projects_summary">点工标准按项目维护</string>
+    <string name="payroll_site_settlement_summary">借支流水与结算单</string>
+    <string name="payroll_site_hint_body">点工标准（上班几小时算 1 个工、单价多少、加班怎么折算）在「项目管理 → 项目设置」里按项目维护；借支与结算在「结算与借支」页操作。</string>
     <string name="payroll_mode_base">底薪折算</string>
     <string name="payroll_mode_manual">手动单价</string>
     <string name="payroll_include_base">加班费计入底薪</string>

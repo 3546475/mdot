@@ -11,6 +11,8 @@
     <string name="appearance_dynamic_color_desc">跟随壁纸配色（Android 12+），关闭则使用所选配色</string>
     <string name="appearance_bottom_bar_config">底栏配置</string>
     <string name="appearance_bottom_bar_summary">%1$d 个功能</string>
+    <string name="appearance_home_cards_config">首页卡片</string>
+    <string name="appearance_home_cards_summary">%1$d 张卡片</string>
 
     <!-- 底栏配置页 -->
     <string name="appearance_bottom_bar_title">底栏配置</string>
@@ -19,4 +21,10 @@
     <string name="appearance_preview">预览</string>
     <string name="appearance_functions">功能</string>
     <string name="appearance_drag_reorder">拖动排序</string>
+
+    <!-- 首页卡片配置页（v0.6.0） -->
+    <string name="home_cards_title">首页卡片</string>
+    <string name="home_cards_desc">控制首页各卡片的显示与排列顺序，至少保留一张</string>
+    <string name="home_cards_visible_heading">显示中</string>
+    <string name="home_cards_hidden_heading">已隐藏</string>
 </resources>

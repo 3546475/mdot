@@ -7,6 +7,7 @@
     <string name="home_overtime_prefix">"超时 "</string>
     <string name="home_overtime_hours">%1$sh</string>
     <string name="home_overtime_standard_suffix">" · 标准 %1$sh（截至今天）"</string>
+    <string name="home_today_empty">今日还没记，点此去记</string>
     <string name="home_today_ot">今日 %1$sh</string>
     <string name="home_cycle_period">考勤周期：%1$s</string>
     <string name="home_entry_calendar">日历</string>
@@ -17,6 +18,21 @@
     <string name="home_income_hourly">工作收入</string>
     <string name="home_income_ot">加班收入</string>
     <string name="home_income_month">本月收入</string>
-    <string name="home_income_go_settings">去设置</string>
-    <string name="home_income_payroll_label">工资</string>
+    <string name="home_income_detail">明细</string>
+    <string name="detail_worked_hours_unit">小时</string>
+    <string name="detail_income_cycle">本周期收入</string>
+    <string name="detail_income_work">工时收入</string>
+    <string name="detail_worked_hours">工时 %1$s 小时</string>
+    <string name="detail_ot_leave_line">加班 %1$s 小时</string>
+    <string name="detail_leave_deduct">请假扣款 %1$s</string>
+    <string name="detail_title">明细</string>
+    <string name="detail_cycle_label">本周期明细</string>
+    <string name="detail_empty">本周期暂无收入明细</string>
+    <!-- 首页卡片名（HomeCardRegistry，配置页与预览用） -->
+    <string name="home_card_data">数据区</string>
+    <string name="home_card_income">收入卡</string>
+    <string name="home_card_entries">日历/统计入口</string>
+    <string name="home_card_record">记加班按钮</string>
+    <string name="home_card_heatmap">热点图</string>
+    <string name="home_card_weekbar">本周柱状</string>
 </resources>

@@ -1,10 +1,8 @@
 package com.mdot.app.core.designsystem.component
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,7 +28,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -88,8 +88,22 @@ fun JiabanBottomBar(
     iconOnly: Boolean = false,
     /** 是否显示选中胶囊指示（预览场景可关闭） */
     showIndicator: Boolean = true,
+    /** 底栏中央固定操作（如「记加班」主按钮）；null = 无（配置页预览）。槽位左右分组让出中央位 */
+    centerAction: (@Composable () -> Unit)? = null,
 ) {
-    if (!visible) return
+    // MD3E 出入场（双向对称）：一级→二级弹簧下沉退出、二级→一级弹簧浮入（defaultSpatialSpec）；
+    // 进度归零且动画结束后跳过绘制。motionScheme 仅 composable 可调用——先取 spec 再传入（03 文档规则 7）
+    val progress = remember { Animatable(if (visible) 1f else 0f) }
+    val progressSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    LaunchedEffect(visible) {
+        progress.animateTo(if (visible) 1f else 0f, progressSpec)
+    }
+    // 组合期不得逐帧读 progress.value（否则动画期间整个底栏每帧重组=转场高峰掉帧）；
+    // derivedStateOf 收敛为布尔翻转：仅「完全隐藏」瞬间重组一次
+    val fullyHidden by remember {
+        androidx.compose.runtime.derivedStateOf { progress.value <= 0f }
+    }
+    if (!visible && fullyHidden) return
     val shape = RoundedCornerShape(Radius.bar)
     val barColor = MaterialTheme.colorScheme.surfaceContainer
     val pillColor = MaterialTheme.colorScheme.secondaryContainer
@@ -100,6 +114,10 @@ fun JiabanBottomBar(
 
     Box(
         modifier = modifier
+            .graphicsLayer {
+                alpha = progress.value.coerceIn(0f, 1f)
+                translationY = (1f - progress.value) * 24.dp.toPx()
+            }
             .fillMaxWidth()
             .onSizeChanged { screenW = it.width }
             .padding(horizontal = BottomBarSpec.horizontalMargin)
@@ -109,7 +127,8 @@ fun JiabanBottomBar(
         val cellDp = if (iconOnly) BottomBarSpec.slotWidthIconOnly else BottomBarSpec.slotWidth
         val marginPx = with(density) { BottomBarSpec.horizontalMargin.toPx() }
         val maxWpx = (screenW - 2 * marginPx).roundToInt().coerceAtLeast(0)
-        val idealWpx = (slots.size * with(density) { cellDp.toPx() }).roundToInt()
+        val cells = slots.size + if (centerAction != null) 1 else 0
+        val idealWpx = (cells * with(density) { cellDp.toPx() }).roundToInt()
         // 首帧 screenW 尚未测量：先按理想宽渲染，随后收进可用宽度
         val barWpx = if (screenW > 0) idealWpx.coerceAtMost(maxWpx) else idealWpx
         Box(
@@ -123,16 +142,18 @@ fun JiabanBottomBar(
         ) {
             // 滑动胶囊：M3 Expressive 活动指示，弹簧滑动到目标槽位
             if (showIndicator && barWidth > 0 && selectedIndex >= 0 && slots.isNotEmpty()) {
-                val cellPx = barWidth.toFloat() / slots.size
+                val centerW = if (centerAction != null) barWidth.toFloat() / cells else 0f
+                val cellPx = (barWidth.toFloat() - centerW) / slots.size
                 val pillW = cellPx - with(density) { 12.dp.toPx() }
                 val pillH = with(density) { (if (iconOnly) 44.dp else 54.dp).toPx() }
-                val targetLeft = (selectedIndex + 0.5f) * cellPx - pillW / 2
+                val leftCount = if (centerAction != null) slots.size / 2 else 0
+                val flowIdx = selectedIndex + if (selectedIndex >= leftCount && centerAction != null) 1 else 0
+                val targetLeft = (flowIdx + 0.5f) * cellPx - pillW / 2
+                // MD3E：胶囊滑动走 motionScheme 空间 spec（expressive 弹簧过冲），禁硬编码 spring（03 文档规则 7）
+                val pillSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
                 val left by animateFloatAsState(
                     targetValue = targetLeft,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMediumLow,
-                    ),
+                    animationSpec = pillSpec,
                     label = "navPillSlide",
                 )
                 Box(
@@ -145,23 +166,44 @@ fun JiabanBottomBar(
             }
 
             Row(Modifier.fillMaxSize()) {
-                slots.forEachIndexed { idx, slot ->
-                    val interaction = remember { MutableInteractionSource() }
+                val leftCount = if (centerAction != null) slots.size / 2 else 0
+                slots.take(leftCount).forEachIndexed { idx, slot ->
+                    SlotCell(slot, idx == selectedIndex, iconOnly) { onSlotClick(slot) }
+                }
+                if (centerAction != null) {
                     Box(
                         Modifier
                             .weight(1f)
-                            .fillMaxHeight()
-                            .pressScale(interaction, pressedScale = 0.9f)
-                            .clickable(indication = null, interactionSource = interaction) {
-                                onSlotClick(slot)
-                            },
+                            .fillMaxHeight(),
                         contentAlignment = Alignment.Center,
-                    ) {
-                        SlotBody(slot, selected = idx == selectedIndex, iconOnly = iconOnly)
-                    }
+                    ) { centerAction() }
+                }
+                slots.drop(leftCount).forEachIndexed { idx, slot ->
+                    SlotCell(slot, leftCount + idx == selectedIndex, iconOnly) { onSlotClick(slot) }
                 }
             }
         }
+    }
+}
+
+/** 底栏槽位单元：等分宽 + 按压缩放 + 点击 */
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.SlotCell(
+    slot: SlotSpec,
+    selected: Boolean,
+    iconOnly: Boolean,
+    onClick: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    Box(
+        Modifier
+            .weight(1f)
+            .fillMaxHeight()
+            .pressScale(interaction, pressedScale = 0.9f)
+            .clickable(indication = null, interactionSource = interaction, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        SlotBody(slot, selected = selected, iconOnly = iconOnly)
     }
 }
 
@@ -178,12 +220,11 @@ private fun SlotBody(
         animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
         label = "slotTint",
     )
+    // MD3E：图标放大走 motionScheme 空间 spec
+    val scaleSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
     val iconScale by animateFloatAsState(
         targetValue = if (selected) 1.1f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium,
-        ),
+        animationSpec = scaleSpec,
         label = "slotIconScale",
     )
 

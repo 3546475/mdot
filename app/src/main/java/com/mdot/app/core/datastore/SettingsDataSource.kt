@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.mdot.app.domain.model.AppearanceConfig
 import com.mdot.app.domain.model.BottomBarConfig
+import com.mdot.app.domain.model.HomeCardsConfig
 import com.mdot.app.domain.model.SalaryConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -70,6 +71,13 @@ class SettingsDataSource @Inject constructor(
     suspend fun setBottomBar(config: BottomBarConfig) =
         dataStore.edit { it[BOTTOM_BAR] = json.encodeToString(config) }
 
+    // ---- 首页卡片（v0.6.0 首页卡片可编辑；cards=null=未配置走默认） ----
+    val homeCardsFlow: Flow<HomeCardsConfig> =
+        dataStore.data.map { decode(it[HOME_CARDS], HomeCardsConfig()) }
+
+    suspend fun setHomeCards(config: HomeCardsConfig) =
+        dataStore.edit { it[HOME_CARDS] = json.encodeToString(config) }
+
     // ---- 引导 ----
     val firstLaunchDoneFlow: Flow<Boolean> = dataStore.data.map { it[FIRST_LAUNCH_DONE] ?: false }
 
@@ -81,6 +89,11 @@ class SettingsDataSource @Inject constructor(
 
     suspend fun setUpdateUrl(url: String) = dataStore.edit { it[UPDATE_URL] = url }
     suspend fun setHolidayUrl(url: String) = dataStore.edit { it[HOLIDAY_URL] = url }
+
+    /** 节假日库最近一次成功拉取时间（毫秒；自动刷新节流用，失败按 1 天短节流回退） */
+    val holidayLastFetchAtFlow: Flow<Long> = dataStore.data.map { it[HOLIDAY_LAST_FETCH_AT] ?: 0L }
+
+    suspend fun setHolidayLastFetchAt(ts: Long) = dataStore.edit { it[HOLIDAY_LAST_FETCH_AT] = ts }
 
     val lastUpdateCheckAtFlow: Flow<Long> = dataStore.data.map { it[LAST_UPDATE_CHECK_AT] ?: 0 }
     suspend fun setLastUpdateCheckAt(at: Long) = dataStore.edit { it[LAST_UPDATE_CHECK_AT] = at }
@@ -156,17 +169,21 @@ class SettingsDataSource @Inject constructor(
         val DEFAULT_WORKDAYS = listOf("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY")
         const val DEFAULT_UPDATE_URL =
             "https://3546475.github.io/mdot/update.json"
+        /** 节假日库与 update.json 同源托管于 GitHub Pages（公开仓 main 根，随 main 推送自动部署）；
+         *  0.6.4 由 GitHub Raw 占位迁移（github.io 国内可达性优于 raw.githubusercontent.com） */
         const val DEFAULT_HOLIDAY_URL =
-            "https://raw.githubusercontent.com/mdjiaban/update/main/holidays.json"
+            "https://3546475.github.io/mdot/holidays.json"
 
         private val SALARY = stringPreferencesKey("salary_config")
         private val CYCLE_ANCHOR_DAY = intPreferencesKey("cycle_anchor_day")
         private val WORKDAYS = stringPreferencesKey("workdays")
         private val APPEARANCE = stringPreferencesKey("appearance")
         private val BOTTOM_BAR = stringPreferencesKey("bottom_bar_slots")
+        private val HOME_CARDS = stringPreferencesKey("home_cards")
         private val FIRST_LAUNCH_DONE = booleanPreferencesKey("first_launch_done")
         private val UPDATE_URL = stringPreferencesKey("update_url")
         private val HOLIDAY_URL = stringPreferencesKey("holiday_url")
+        private val HOLIDAY_LAST_FETCH_AT = longPreferencesKey("holiday_last_fetch_at")
         private val LAST_UPDATE_CHECK_AT = longPreferencesKey("last_update_check_at")
         private val AUTO_BACKUP_ENABLED = booleanPreferencesKey("auto_backup_enabled")
         private val HISTORY_COPY_ENABLED = booleanPreferencesKey("history_copy_enabled")

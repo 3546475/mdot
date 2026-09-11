@@ -48,7 +48,7 @@ data class SyncStatus(
 
 /**
  * 同步引擎（06 文档）：备份/恢复式同步，单设备语义，不自动合并。
- * 备份 = 导出 ZIP → 上传 current.zip + current.json → 滚动 history → 更新锚点。
+ * 备份 = 导出 ZIP（内含 manifest.json）→ 上传 current.zip（云端/本地各只有一个压缩包）→ 更新锚点。
  * 自动备份 = 数据变更后 30s 防抖；远端有新包时阻断并提示冲突。
  */
 @Singleton
@@ -304,7 +304,7 @@ class SyncEngine @Inject constructor(
         SyncPolicy.remotePath(provider?.kind ?: ProviderKind.NONE, path)
 
     private fun currentZip() = rel("backup/current.zip")
-    private fun currentJson() = rel("backup/current.json")
+    private fun legacyCurrentJson() = rel("backup/current.json")
     private fun historyDir() = "backup/history"
 
     // ---- 备份 ----
@@ -327,21 +327,12 @@ class SyncEngine @Inject constructor(
                 val put = p.put(currentZip(), pkg.zipBytes, ifMatch = lastEtag).getOrThrow()
                 settings.setLastEtag(put.etag)
             }
-            runStep("上传 current.json") {
-                val manifestText = codec.json.encodeToString(ManifestDto.serializer(), pkg.manifest)
-                p.put(currentJson(), manifestText.toByteArray(Charsets.UTF_8)).getOrThrow()
-            }
 
-            // history 副本与滚动清理（流量敏感可关，06 文档 §3）
-            if (settings.historyCopyEnabledFlow.first()) {
-                val stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
-                val histDir = rel(historyDir())
-                runCatching {
-                    p.put("$histDir/backup-$stamp.zip", pkg.zipBytes).getOrThrow()
-                    cleanupHistory(p)
-                }.onFailure { e ->
-                    android.util.Log.w("SyncEngine", "history 副本上传失败", e)
-                }
+            // 清理旧版本残留：current.json 与 history/ 副本（云端目录只保留 current.zip，best-effort）
+            runCatching {
+                cleanupLegacy(p)
+            }.onFailure { e ->
+                android.util.Log.w("SyncEngine", "旧备份文件清理失败", e)
             }
 
             settings.setLastSyncedRemoteCreatedAt(pkg.manifest.createdAt)
@@ -361,27 +352,29 @@ class SyncEngine @Inject constructor(
         }
     }
 
-    private suspend fun cleanupHistory(p: StorageProvider) {
-        // list 必须与 put/delete 同路径（含 rel 前缀），否则 PROPFIND 404 → 清理永不执行
+    private suspend fun cleanupLegacy(p: StorageProvider) {
+        // 删除 current.json（manifest 已在 zip 内）
+        p.delete(legacyCurrentJson())
+        // 删除 history/ 全部旧副本
         val files = p.list(rel(historyDir())).getOrDefault(emptyList())
-        SyncPolicy.selectHistoryToDelete(files, MAX_HISTORY).forEach { name ->
-            // list 返回的 path 可能是服务端完整 href，删除按文件名相对路径
+        files.forEach { meta ->
+            val name = meta.path.substringAfterLast('/')
             p.delete("${rel(historyDir())}/$name")
         }
     }
 
     // ---- 恢复 ----
 
-    /** 拉取远端摘要（恢复前确认卡用；仅下载轻量 current.json） */
+    /** 拉取远端摘要（恢复前确认卡用；下载整包解出 manifest） */
     suspend fun fetchRemoteSummary(): AppResult<RemoteSummary?> {
         val p = provider ?: return Failure(AppError.Storage("请先配置存储源"))
         return try {
-            val bytes = p.get(currentJson()).getOrThrow()
-            if (bytes == null) {
+            val zipBytes = p.get(currentZip()).getOrThrow()
+            if (zipBytes == null) {
                 _status.update { it.copy(remoteSummary = null) }
                 Success(null)
             } else {
-                val manifest = codec.parseManifest(bytes.decodeToString())
+                val manifest = codec.unzip(zipBytes).manifest
                 val summary = RemoteSummary(
                     createdAt = manifest.createdAt,
                     recordCount = manifest.recordCount,
@@ -416,16 +409,13 @@ class SyncEngine @Inject constructor(
                 p.get(currentZip()).getOrThrow()
                     ?: throw IllegalArgumentException("云端没有备份包")
             }
-            // 3. 校验结构 + 4. 事务导入
+            // 3. 校验结构（manifest 在包内）+ 4. 事务导入
+            val parsed = runStep("校验结构") { codec.unzip(zipBytes) }
             runStep("导入数据") {
-                val parsed = codec.unzip(zipBytes)
                 codec.import(parsed.data)
             }
             // 5. 锚点同步
-            val manifestText = p.get(currentJson()).getOrThrow()?.decodeToString()
-            manifestText?.let {
-                settings.setLastSyncedRemoteCreatedAt(codec.parseManifest(it).createdAt)
-            }
+            settings.setLastSyncedRemoteCreatedAt(parsed.manifest.createdAt)
             // 6. 显式全量重算：首页/统计等订阅 DataRevision 的界面立即重算（import 内的
             //    touch() 只负责"本地已脏"标记，不驱动 UI 重算）
             dataRevision.bump()
