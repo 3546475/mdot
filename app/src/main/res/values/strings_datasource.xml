@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="datasource_title">更新与数据源</string>
-    <string name="datasource_section_update">更新</string>
     <string name="datasource_current_version">当前版本</string>
     <string name="datasource_check_update">检查更新</string>
     <string name="datasource_section_holiday">节假日库</string>
@@ -22,6 +21,10 @@
     <string name="update_action_later">稍后</string>
     <string name="datasource_add_url">添加地址</string>
     <string name="datasource_add_url_hint">需以 http(s):// 开头</string>
+    <string name="datasource_add_url_dup">该地址已在列表中</string>
     <string name="datasource_ok">确定</string>
     <string name="datasource_cancel">取消</string>
+    <!-- hero 数据源胶囊与选择弹窗 -->
+    <string name="datasource_update_from">from</string>
+    <string name="datasource_source_picker_title">选择更新数据源</string>
 </resources>

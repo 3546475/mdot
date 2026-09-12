@@ -127,10 +127,12 @@ fun SettingsScreen(
                         else stringResource(R.string.settings_sync_not_configured),
                         painterResource(R.drawable.ic_ms_cloud_sync), onClick = { onOpen(Routes.SYNC) },
                     )
+                    /* 更新与数据源入口已隐藏：hero 卡迁至关于页（Routes.DATASOURCE 页面保留）
                     SettingRow(
                         stringResource(R.string.settings_row_update_datasource), null,
                         painterResource(R.drawable.ic_ms_settings), onClick = { onOpen(Routes.DATASOURCE) },
                     )
+                    */
                 }
                 Spacer(Modifier.height(Spacing.m))
                 // ---- 其他 ----
@@ -168,10 +170,12 @@ fun SettingsScreen(
                     else stringResource(R.string.settings_sync_not_configured),
                     painterResource(R.drawable.ic_ms_cloud_sync), onClick = { onOpen(Routes.SYNC) },
                 )
+                /* 更新与数据源入口已隐藏：hero 卡迁至关于页（Routes.DATASOURCE 页面保留）
                 SettingRow(
                     stringResource(R.string.settings_row_update_datasource), null,
                     painterResource(R.drawable.ic_ms_settings), onClick = { onOpen(Routes.DATASOURCE) },
                 )
+                */
             }
             Spacer(Modifier.height(Spacing.m))
             // ---- 个性化 ----
@@ -466,12 +470,13 @@ private fun SystemCard(
     }
 }
 
-/** 关于页（03 文档 §5.5：隐私说明、版本、检查更新） */
+/** 关于页（03 文档 §5.5：隐私说明、版本、检查更新；版本卡已升级为更新与数据源页同款 hero） */
 @Composable
 fun AboutScreen(
     onBack: () -> Unit,
     context: android.content.Context = androidx.compose.ui.platform.LocalContext.current,
     updateVm: UpdateViewModel = hiltViewModel(),
+    dsVm: DataSourceViewModel = hiltViewModel(),
 ) {
     val updateMsg by updateVm.notice.collectAsStateWithLifecycle()
     Column(
@@ -483,6 +488,9 @@ fun AboutScreen(
         JiabanTopBar(title = stringResource(R.string.settings_about_title), onBack = onBack)
         Spacer(Modifier.height(Spacing.m))
 
+        // hero 版本卡（自更新与数据源页迁入）：当前版本大字 + 检查更新 + from 源选择胶囊（弹窗内选/增/删，UpdateFlow 承载更新弹窗）
+        UpdateHeroCard(updateVm = updateVm, dsVm = dsVm)
+        /* ---- 原版本/检查更新卡：已被上方 UpdateHeroCard 替代（代码保留备查） ----
         SectionCard {
             Column {
                 SettingRow(stringResource(R.string.settings_row_app), stringResource(R.string.app_name))
@@ -510,6 +518,7 @@ fun AboutScreen(
                 }
             }
         }
+        ---- 原卡片结束 ---- */
         Spacer(Modifier.height(Spacing.m))
         SectionCard {
             Column {
