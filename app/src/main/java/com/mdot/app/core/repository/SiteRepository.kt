@@ -19,6 +19,7 @@ import com.mdot.app.domain.SitePayCalculator
 import com.mdot.app.domain.model.AdvancePurpose
 import com.mdot.app.domain.model.SiteAdvance
 import com.mdot.app.domain.model.SiteAttendance
+import com.mdot.app.domain.model.SitePieceWork
 import com.mdot.app.domain.model.SiteProject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
@@ -215,6 +216,10 @@ class SiteRepository @Inject constructor(
     /** 全项目区间出勤（统计页「项目工时」饼图聚合用） */
     fun observeAttendanceAllProjects(from: LocalDate, to: LocalDate): Flow<List<SiteAttendance>> =
         attDao.observeAllRange(from, to).map { list -> list.map { it.toDomain() } }
+
+    /** 全项目区间包工/工量（我的页 SITE 模式年工钱聚合用） */
+    fun observePieceAllProjects(from: LocalDate, to: LocalDate): Flow<List<SitePieceWork>> =
+        pieceDao.observeAllRange(from, to).map { list -> list.map { it.toDomain() } }
 
     /** 全部项目（含归档；饼图项目取名用） */
     fun observeAllProjects(): Flow<List<SiteProject>> =

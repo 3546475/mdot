@@ -15,11 +15,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
@@ -33,6 +38,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -98,6 +104,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
 import kotlin.math.roundToInt
@@ -431,24 +438,54 @@ fun StatsScreen(
     val state by vm.uiState.collectAsStateWithLifecycle()
     val pieMode by vm.pieMode.collectAsStateWithLifecycle()
     val selectedBar by vm.selectedBar.collectAsStateWithLifecycle()
-    var picking by remember { mutableStateOf<String?>(null) } // "from" | "to"
-
-    val topGap = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + TopBarHeight + Spacing.xs
+    val pagerState = rememberPagerState(pageCount = { 2 })
 
     Column(Modifier.fillMaxSize()) {
-        if (canBack) {
-            JiabanTopBar(title = stringResource(R.string.stats_title), onBack = onBack)
-        } else {
-            Spacer(Modifier.height(topGap))
+        JiabanTopBar(
+            title = null,
+            titleContent = { StatsTabBar(pagerState) },
+            showBack = canBack,
+            onBack = onBack,
+        )
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+            beyondViewportPageCount = 1,
+        ) { page ->
+            when (page) {
+                0 -> StatsContent(
+                    vm = vm,
+                    state = state,
+                    pieMode = pieMode,
+                    selectedBar = selectedBar,
+                    onOpenDetail = onOpenDetail,
+                    showBottomBar = !canBack,
+                )
+                else -> PayMonthContent()
+            }
         }
-        LazyColumn(
-            Modifier
-                .fillMaxSize()
-                .wrapContentWidth(Alignment.CenterHorizontally)
-                .widthIn(max = AdaptiveSpecs.contentMaxWidth)
-                .padding(horizontal = Spacing.page),
-            contentPadding = com.mdot.app.core.navigation.contentPaddingValues(showBottomBar = !canBack),
-        ) {
+    }
+}
+
+/** 统计页第 0 页：原统计内容（维度行→汇总→热点图→柱状→饼图→明细入口） */
+@Composable
+private fun StatsContent(
+    vm: StatsViewModel,
+    state: StatsUiState,
+    pieMode: PieMode,
+    selectedBar: String?,
+    onOpenDetail: () -> Unit,
+    showBottomBar: Boolean,
+) {
+    var picking by remember { mutableStateOf<String?>(null) } // "from" | "to"
+    LazyColumn(
+        Modifier
+            .fillMaxSize()
+            .wrapContentWidth(Alignment.CenterHorizontally)
+            .widthIn(max = AdaptiveSpecs.contentMaxWidth)
+            .padding(horizontal = Spacing.page),
+        contentPadding = com.mdot.app.core.navigation.contentPaddingValues(showBottomBar = showBottomBar),
+    ) {
         item {
             Spacer(Modifier.height(Spacing.m))
 
@@ -603,7 +640,6 @@ fun StatsScreen(
                 Spacer(Modifier.height(Spacing.xl))
             }
         }
-        }
     }
 
     picking?.let { which ->
@@ -616,6 +652,53 @@ fun StatsScreen(
             },
             onDismiss = { picking = null },
         )
+    }
+}
+
+/** 顶栏分段控件：两个标签（统计/记月），选中块连续跟随 pager 位移，内容区同步横滑 */
+@Composable
+private fun StatsTabBar(pagerState: PagerState) {
+    val scope = rememberCoroutineScope()
+    val segWidth = 86.dp
+    Box(
+        Modifier
+            .width(segWidth * 2)
+            .height(34.dp)
+            .clip(RoundedCornerShape(Radius.pill))
+            .background(MaterialTheme.colorScheme.secondaryContainer),
+    ) {
+        // 滑块：offset 连续取 currentPage + 滑动分数，点标签的 animateScrollToPage 与手势拖动都跟随
+        Box(
+            Modifier
+                .width(segWidth)
+                .fillMaxHeight()
+                .offset(x = segWidth * (pagerState.currentPage + pagerState.currentPageOffsetFraction))
+                .clip(RoundedCornerShape(Radius.pill))
+                .background(MaterialTheme.colorScheme.primary),
+        )
+        Row(Modifier.fillMaxSize()) {
+            listOf(R.string.stats_title, R.string.stats_tab_month).forEachIndexed { index, labelRes ->
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        // 按压反馈即滑块位移本身，不叠涟漪（避免涟漪盖住移动中的选中块）
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { scope.launch { pagerState.animateScrollToPage(index) } },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val selected = index == pagerState.currentPage
+                    Text(
+                        stringResource(labelRes),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = if (selected) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+            }
+        }
     }
 }
 

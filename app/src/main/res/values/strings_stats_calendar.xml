@@ -1,6 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="stats_title">统计</string>
+    <string name="stats_tab_month">记月</string>
+    <!-- 记月（月度工资单） -->
+    <string name="paymonth_month">%1$d年%2$d月</string>
+    <string name="paymonth_prev_cd">上个月</string>
+    <string name="paymonth_next_cd">下个月</string>
+    <string name="paymonth_group_basic">基本项目</string>
+    <string name="paymonth_group_subsidy">补贴项目</string>
+    <string name="paymonth_group_deduction">扣款项目</string>
+    <string name="paymonth_group_other">其他项目</string>
+    <string name="paymonth_add_subsidy">添加补贴</string>
+    <string name="paymonth_add_deduction">添加扣款</string>
+    <string name="paymonth_add_title">添加条目</string>
+    <string name="paymonth_edit_title">编辑条目</string>
+    <string name="paymonth_name_label">名称</string>
+    <string name="paymonth_amount_label">金额（元）</string>
+    <string name="paymonth_save">保存</string>
+    <string name="paymonth_delete">删除</string>
+    <string name="paymonth_cancel">取消</string>
+    <string name="paymonth_ok">确定</string>
+    <string name="paymonth_import_prev">导入上月</string>
+    <string name="paymonth_import_title">导入上月</string>
+    <string name="paymonth_import_confirm">将用上月数据覆盖本月记录，确定？</string>
+    <string name="paymonth_sync">同步本月考勤</string>
+    <string name="paymonth_sync_title">同步本月考勤</string>
+    <string name="paymonth_sync_confirm">将按本月加班/请假记录覆盖：加班工资、事假、病假（已设底薪时含基本工资），继续？</string>
     <string name="stats_dim_cycle">考勤周期</string>
     <string name="stats_dim_month">自然月</string>
     <string name="stats_dim_year">年</string>

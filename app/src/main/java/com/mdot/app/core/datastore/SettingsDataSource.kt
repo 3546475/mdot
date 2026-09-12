@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.mdot.app.domain.model.AppearanceConfig
 import com.mdot.app.domain.model.BottomBarConfig
 import com.mdot.app.domain.model.HomeCardsConfig
+import com.mdot.app.domain.model.PayMonthSheet
 import com.mdot.app.domain.model.SalaryConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -38,6 +39,18 @@ class SettingsDataSource @Inject constructor(
     val salaryFlow: Flow<SalaryConfig> = dataStore.data.map { decode(it[SALARY], SalaryConfig()) }
 
     suspend fun setSalary(config: SalaryConfig) = dataStore.edit { it[SALARY] = json.encodeToString(config) }
+
+    // ---- 记月（月度工资单，按月键存 JSON；键形如 paymonth_2026-09）。
+    //      解码显式用非空 T——此处若走 decode(text, null) 的可空推断，设备端会解出非 Sheet 对象回落默认 ----
+    fun payMonthFlow(monthKey: String): Flow<PayMonthSheet?> =
+        dataStore.data.map { prefs ->
+            prefs[stringPreferencesKey("paymonth_$monthKey")]?.let { text ->
+                runCatching { json.decodeFromString<PayMonthSheet>(text) }.getOrNull()
+            }
+        }
+
+    suspend fun setPayMonth(monthKey: String, sheet: PayMonthSheet) =
+        dataStore.edit { it[stringPreferencesKey("paymonth_$monthKey")] = json.encodeToString(sheet) }
 
     // ---- 考勤周期 ----
     val cycleAnchorDayFlow: Flow<Int> = dataStore.data.map { it[CYCLE_ANCHOR_DAY] ?: 1 }

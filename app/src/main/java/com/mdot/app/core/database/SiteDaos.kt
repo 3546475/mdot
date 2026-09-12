@@ -169,6 +169,10 @@ interface SitePieceWorkDao {
     @Query("SELECT * FROM site_piece_work WHERE project_id = :projectId AND date BETWEEN :from AND :to ORDER BY date, id")
     fun observeRange(projectId: Long, from: LocalDate, to: LocalDate): Flow<List<SitePieceWorkEntity>>
 
+    /** 全项目区间包工/工量（我的页 SITE 模式年工钱聚合用） */
+    @Query("SELECT * FROM site_piece_work WHERE date BETWEEN :from AND :to ORDER BY date, project_id, id")
+    fun observeAllRange(from: LocalDate, to: LocalDate): Flow<List<SitePieceWorkEntity>>
+
     @Query("SELECT * FROM site_piece_work WHERE project_id = :projectId AND date BETWEEN :from AND :to AND settlement_id IS NULL ORDER BY date, id")
     suspend fun getUnsettledRange(projectId: Long, from: LocalDate, to: LocalDate): List<SitePieceWorkEntity>
 

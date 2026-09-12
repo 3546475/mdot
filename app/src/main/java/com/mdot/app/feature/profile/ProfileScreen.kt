@@ -77,6 +77,8 @@ import com.mdot.app.core.designsystem.component.SettingRow
 import com.mdot.app.core.designsystem.component.TopBarHeight
 import com.mdot.app.core.navigation.Routes
 import com.mdot.app.core.navigation.contentBottomPadding
+import com.mdot.app.domain.model.WorkSystem
+import com.mdot.app.domain.util.Money
 import com.mdot.app.domain.util.TimeUtils
 import com.mdot.app.feature.settings.SettingsHubViewModel
 import com.mdot.app.feature.settings.appearanceSummary
@@ -97,6 +99,8 @@ fun ProfileScreen(
     val summary by vm.summary.collectAsStateWithLifecycle()
     val nickname by vm.nickname.collectAsStateWithLifecycle()
     val avatarPath by vm.avatarPath.collectAsStateWithLifecycle()
+    val workSystem by vm.workSystem.collectAsStateWithLifecycle()
+    val siteSummary by vm.siteSummary.collectAsStateWithLifecycle()
     val appearance by hub.appearance.collectAsStateWithLifecycle()
     val syncStatus by hub.syncStatus.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -239,29 +243,55 @@ fun ProfileScreen(
 
         Spacer(Modifier.height(Spacing.m))
 
-        // ---- 本年数据 ----
+        // ---- 本年数据（按工时制度切换：工地记工=工天/完工项目/工钱，其余=加班/天数/调休） ----
         SectionCard {
-            Row {
-                KeyValue(
-                    stringResource(R.string.profile_year_ot_label), stringResource(R.string.profile_hours_value, TimeUtils.hoursDecimal(summary.yearOtMinutes)),
-                    valueColor = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f),
-                    alignment = Alignment.CenterHorizontally,
-                )
-                KeyValue(
-                    stringResource(R.string.profile_year_days_label), stringResource(R.string.profile_days_value, summary.yearDays),
-                    valueColor = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f),
-                    alignment = Alignment.CenterHorizontally,
-                )
-                KeyValue(
-                    stringResource(R.string.profile_comp_balance_label),
-                    if (summary.compBalanceMinutes < 0) "-" + TimeUtils.prettyDuration(-summary.compBalanceMinutes)
-                    else TimeUtils.prettyDuration(summary.compBalanceMinutes),
-                    valueColor = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.weight(1f),
-                    alignment = Alignment.CenterHorizontally,
-                )
+            if (workSystem == WorkSystem.SITE) {
+                Row {
+                    KeyValue(
+                        stringResource(R.string.profile_site_days_label),
+                        stringResource(R.string.profile_days_value, siteSummary.yearWorkDays),
+                        valueColor = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f),
+                        alignment = Alignment.CenterHorizontally,
+                    )
+                    KeyValue(
+                        stringResource(R.string.profile_site_projects_label),
+                        stringResource(R.string.profile_count_value, siteSummary.completedProjects),
+                        valueColor = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f),
+                        alignment = Alignment.CenterHorizontally,
+                    )
+                    KeyValue(
+                        stringResource(R.string.profile_site_pay_label),
+                        stringResource(R.string.profile_yuan_value, Money.yuanText(siteSummary.yearPayCents)),
+                        valueColor = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.weight(1f),
+                        alignment = Alignment.CenterHorizontally,
+                    )
+                }
+            } else {
+                Row {
+                    KeyValue(
+                        stringResource(R.string.profile_year_ot_label), stringResource(R.string.profile_hours_value, TimeUtils.hoursDecimal(summary.yearOtMinutes)),
+                        valueColor = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f),
+                        alignment = Alignment.CenterHorizontally,
+                    )
+                    KeyValue(
+                        stringResource(R.string.profile_year_days_label), stringResource(R.string.profile_days_value, summary.yearDays),
+                        valueColor = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f),
+                        alignment = Alignment.CenterHorizontally,
+                    )
+                    KeyValue(
+                        stringResource(R.string.profile_comp_balance_label),
+                        if (summary.compBalanceMinutes < 0) "-" + TimeUtils.prettyDuration(-summary.compBalanceMinutes)
+                        else TimeUtils.prettyDuration(summary.compBalanceMinutes),
+                        valueColor = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.weight(1f),
+                        alignment = Alignment.CenterHorizontally,
+                    )
+                }
             }
         }
 

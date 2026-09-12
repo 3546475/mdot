@@ -43,15 +43,20 @@ fun JiabanTopBar(
     onBack: () -> Unit = {},
     actions: (@Composable () -> Unit)? = null,
     leading: (@Composable () -> Unit)? = null,
+    /** 自定义标题区内容（如统计页的分段控件）；非空时覆盖 title 文本 */
+    titleContent: (@Composable () -> Unit)? = null,
 ) {
     CenterAlignedTopAppBar(
         title = {
-            if (title != null) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleLarge,
-                    maxLines = 1,
-                )
+            when {
+                titleContent != null -> titleContent()
+                title != null -> {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 1,
+                    )
+                }
             }
         },
         modifier = modifier.fillMaxWidth(),

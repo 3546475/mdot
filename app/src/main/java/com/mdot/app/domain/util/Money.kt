@@ -13,6 +13,17 @@ object Money {
     /** 分 → "¥5,586.20" */
     fun yuanWithSign(cents: Long): String = "¥${yuanText(cents)}"
 
+    /** 分 → 去尾零元文本（记月条目用）：0→"0"，230000→"2300"，951730→"951.73"，-10→"-0.1" */
+    fun yuanTrimText(cents: Long): String {
+        val abs = kotlin.math.abs(cents)
+        val text = when {
+            abs % 100L == 0L -> String.format(Locale.US, "%d", abs / 100)
+            abs % 10L == 0L -> String.format(Locale.US, "%.1f", abs / 100.0)
+            else -> String.format(Locale.US, "%.2f", abs / 100.0)
+        }
+        return if (cents < 0) "-$text" else text
+    }
+
     /** 元字符串 → 分；非法输入返回 null。支持 "5000" / "5000.5" / "5,000.50" */
     fun parseYuanToCents(text: String): Long? {
         val cleaned = text.trim().replace(",", "")
