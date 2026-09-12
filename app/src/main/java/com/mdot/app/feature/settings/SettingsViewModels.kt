@@ -276,8 +276,9 @@ class DataSourceViewModel @Inject constructor(
         viewModelScope.launch {
             holidayUrl.value = settings.holidayUrlFlow.first()
             updateUrl.value = settings.updateUrlFlow.first()
-            updateUrls.value = settings.updateUrlsFlow.first().ifEmpty { SettingsDataSource.DEFAULT_UPDATE_URLS }
-            holidayUrls.value = settings.holidayUrlsFlow.first().ifEmpty { SettingsDataSource.DEFAULT_HOLIDAY_URLS }
+            // 历史版本可能往 DataStore 存过重复条目（重复会双行同亮），加载时去重
+            updateUrls.value = settings.updateUrlsFlow.first().ifEmpty { SettingsDataSource.DEFAULT_UPDATE_URLS }.distinct()
+            holidayUrls.value = settings.holidayUrlsFlow.first().ifEmpty { SettingsDataSource.DEFAULT_HOLIDAY_URLS }.distinct()
         }
     }
 

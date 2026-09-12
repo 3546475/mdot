@@ -175,14 +175,15 @@ class SettingsDataSource @Inject constructor(
     // ---- 内部 ----
     companion object {
         val DEFAULT_WORKDAYS = listOf("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY")
+        /** App 默认更新源 = CNB raw（国内可达性优先；GitHub Pages 作备用候选） */
         const val DEFAULT_UPDATE_URL =
-            "https://3546475.github.io/mdot/update.json"
-        /** 节假日库与 update.json 同源托管于 GitHub Pages（公开仓 main 根，随 main 推送自动部署）；
-         *  0.6.4 由 GitHub Raw 占位迁移（github.io 国内可达性优于 raw.githubusercontent.com） */
+            "https://cnb.cool/nulxiel/mdot/-/git/raw/main/update.json"
+        /** 节假日库默认同走 CNB raw，GitHub Pages 作备用候选 */
         const val DEFAULT_HOLIDAY_URL =
-            "https://3546475.github.io/mdot/holidays.json"
+            "https://cnb.cool/nulxiel/mdot/-/git/raw/main/holidays.json"
 
-        /** 出厂内置候选源（更新 JSON / 节假日 JSON 各两条：CNB raw 默认 + GitHub Pages 备用，多选一切换用） */
+        /** 出厂内置候选源（更新 JSON / 节假日 JSON 各两条：CNB raw 默认 + GitHub Pages 备用，多选一切换用；
+         *  两条必须不同——UrlPicker 按 url==selected 点亮，重复条目会同时高亮） */
         val DEFAULT_UPDATE_URLS = listOf(
             DEFAULT_UPDATE_URL,
             "https://3546475.github.io/mdot/update.json",
