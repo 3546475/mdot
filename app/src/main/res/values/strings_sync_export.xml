@@ -2,8 +2,10 @@
 <resources>
     <!-- feature/sync/SyncScreen.kt -->
     <string name="sync_screen_title">同步备份</string>
+    <string name="sync_tab_backup">备份</string>
+    <string name="sync_tab_storage">存储源</string>
     <string name="sync_status_title">备份状态</string>
-    <string name="sync_status_not_configured">未配置存储源 · 点按设置</string>
+    <string name="sync_status_not_configured">未配置存储源 · 到「存储源」页签添加</string>
     <string name="sync_status_source">存储源：%1$s</string>
     <string name="sync_status_uploading">正在备份…</string>
     <string name="sync_status_restoring">正在恢复…</string>
@@ -12,7 +14,7 @@
     <string name="sync_status_last_backup_at">上次备份：%1$s</string>
     <string name="sync_status_never">尚未备份</string>
     <string name="sync_section_backup_restore">备份与恢复</string>
-    <string name="sync_backup_restore_hint">先点上方「备份状态」配置存储源，再进行备份/恢复</string>
+    <string name="sync_backup_restore_hint">先切到「存储源」页签配置存储源，再进行备份/恢复</string>
     <string name="sync_backup_now_cloud">立即备份到云端</string>
     <string name="sync_restore_from_cloud">从云端恢复…</string>
     <string name="sync_auto_backup_title">自动备份</string>

@@ -102,7 +102,6 @@ import com.mdot.app.feature.settings.WorkdaysScreen
 import com.mdot.app.feature.comp.CompBalanceScreen
 import com.mdot.app.feature.stats.StatsScreen
 import com.mdot.app.feature.sync.SyncScreen
-import com.mdot.app.feature.sync.SyncStorageScreen
 import com.mdot.app.feature.settings.HomeBottomConfigScreen
 import com.mdot.app.feature.site.SiteProjectsScreen
 import com.mdot.app.feature.site.SiteProjectEditScreen
@@ -398,14 +397,13 @@ private fun AppRootContent(
                         SyncScreen(
                             canBack = !inBar("sync"),
                             onBack = { navController.popBackStack() },
-                            onOpenStorage = { navTo(navController, Routes.SYNC_STORAGE, slots) },
                         )
                     }
                 }
             }
             composable(Routes.SYNC_STORAGE) {
                 AdaptiveContainer {
-                    SyncStorageScreen(onBack = { navController.popBackStack() })
+                    SyncScreen(canBack = true, initialTab = 1, onBack = { navController.popBackStack() })
                 }
             }
             composable(Routes.SETTINGS) {
@@ -451,18 +449,15 @@ private fun AppRootContent(
             }
             composable(Routes.APPEARANCE) {
                 AdaptiveContainer {
-                    AppearanceScreen(
-                        onBack = { navController.popBackStack() },
-                        onOpenBottomBar = { navTo(navController, Routes.BOTTOM_BAR, slots) },
-                        onOpenHomeCards = { navTo(navController, Routes.HOME_CARDS, slots) },
-                    )
+                    // 「外观」入口进入「外观 / 首页 / 底栏」合并页，默认落「外观」页签
+                    HomeBottomConfigScreen(initialTab = 0, onBack = { navController.popBackStack() })
                 }
             }
             composable(Routes.BOTTOM_BAR) {
-                AdaptiveContainer { HomeBottomConfigScreen(initialTab = 1, onBack = { navController.popBackStack() }) }
+                AdaptiveContainer { HomeBottomConfigScreen(initialTab = 2, onBack = { navController.popBackStack() }) }
             }
             composable(Routes.HOME_CARDS) {
-                AdaptiveContainer { HomeBottomConfigScreen(initialTab = 0, onBack = { navController.popBackStack() }) }
+                AdaptiveContainer { HomeBottomConfigScreen(initialTab = 1, onBack = { navController.popBackStack() }) }
             }
             // ---- 工地记工（12 文档 F-S2/F-S6） ----
             composable(

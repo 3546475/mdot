@@ -9,10 +9,6 @@
     <string name="appearance_palette_heading">配色方案</string>
     <string name="appearance_dynamic_color">动态取色</string>
     <string name="appearance_dynamic_color_desc">跟随壁纸配色（Android 12+），关闭则使用所选配色</string>
-    <string name="appearance_bottom_bar_config">底栏配置</string>
-    <string name="appearance_bottom_bar_summary">%1$d 个功能</string>
-    <string name="appearance_home_cards_config">首页卡片</string>
-    <string name="appearance_home_cards_summary">%1$d 张卡片</string>
 
     <!-- 首页卡片 + 底栏配置合并页（v0.6.7 双页签） -->
     <string name="home_bottom_tab_home">首页</string>
@@ -22,7 +18,6 @@
     <string name="appearance_icon_only">仅图标</string>
     <string name="appearance_icon_only_desc">开启后底栏只显示图标，不显示文字</string>
     <string name="appearance_preview">预览</string>
-    <string name="appearance_functions">功能</string>
     <string name="appearance_drag_reorder">拖动排序</string>
 
     <!-- 首页卡片配置页（v0.6.0） -->

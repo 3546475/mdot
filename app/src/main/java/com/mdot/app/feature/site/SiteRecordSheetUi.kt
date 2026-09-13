@@ -258,6 +258,8 @@ fun SiteRecordScreen(
                         2 -> AdvanceForm(state, vm)
                         else -> SettleForm(state, vm, onOpenSettlement)
                     }
+                    // 表单与备注/照片卡之间留间距（此前缺失导致卡片贴边重叠观感）
+                    Spacer(Modifier.height(Spacing.s))
                     val onCashPage = page >= 2
                     NotePhotoSection(
                         note = if (onCashPage) state.advanceNote else state.note,

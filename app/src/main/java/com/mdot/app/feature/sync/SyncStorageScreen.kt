@@ -1,5 +1,6 @@
 package com.mdot.app.feature.sync
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,7 +18,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -40,7 +40,7 @@ import com.mdot.app.R
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.ConfirmDialog
 import com.mdot.app.core.designsystem.component.FloatingLabelTextField
-import com.mdot.app.core.designsystem.component.JiabanTopBar
+import com.mdot.app.core.designsystem.component.SegmentBar
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.sync.ProviderKind
 import com.mdot.app.core.sync.S3Creds
@@ -48,43 +48,36 @@ import com.mdot.app.core.sync.S3Source
 import com.mdot.app.core.sync.WebDavCreds
 import com.mdot.app.core.sync.WebDavSource
 
-/** 存储源页：类型切换 + 多存储源列表（新增/切换/删除/断开），从同步备份页顶部卡进入 */
+/** 存储源页签内容（同步备份合并页第 2 页签）：类型子页签（滑块式）+ 多存储源列表（新增/切换/删除/断开） */
 @Composable
-fun SyncStorageScreen(
-    onBack: () -> Unit,
-    vm: SyncViewModel = hiltViewModel(),
+fun SyncStoragePane(
+    state: SyncUiState,
+    vm: SyncViewModel,
 ) {
-    val state by vm.state.collectAsStateWithLifecycle()
+    val kindIndex = when (state.kind) {
+        ProviderKind.S3 -> 1
+        else -> 0
+    }
+    val kindPos by animateFloatAsState(
+        targetValue = kindIndex.toFloat(),
+        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+        label = "storageKindPos",
+    )
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = Spacing.page),
-    ) {
-        JiabanTopBar(title = stringResource(R.string.sync_storage_title), showBack = true, onBack = onBack)
-
-        if (!state.loaded) {
-            CircularProgressIndicator(Modifier.padding(Spacing.xl))
-            return@Column
-        }
-
-        // 类型切换 + 右上角新增。v0.6.3 起 S3 放开（真实 MinIO E2E 通过后移除暂藏）；
+    // 外层 SyncTabPage 已提供垂直滚动，此处不可再套滚动（滚动嵌套会让内层收到无限高约束而崩溃）
+    Column(Modifier.fillMaxWidth()) {
+        // 类型子页签（滑块式，对齐统计/记月子页签）+ 右上角新增。v0.6.3 起 S3 放开；
         // 新增/编辑/删除/断开与 WebDAV 同一套交互，弹窗表单按类型切换
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            FilterChip(
-                selected = state.kind == ProviderKind.WEBDAV,
-                onClick = { vm.onKind(ProviderKind.WEBDAV) },
-                label = { Text("WebDAV") },
-            )
-            Spacer(Modifier.width(Spacing.s))
-            FilterChip(
-                selected = state.kind == ProviderKind.S3,
-                onClick = { vm.onKind(ProviderKind.S3) },
-                label = { Text("S3") },
+            SegmentBar(
+                labels = listOf("WebDAV", "S3"),
+                selected = kindIndex,
+                onSelect = { index -> vm.onKind(if (index == 1) ProviderKind.S3 else ProviderKind.WEBDAV) },
+                segWidth = 112.dp,
+                position = kindPos,
             )
             Spacer(Modifier.weight(1f))
             IconButton(

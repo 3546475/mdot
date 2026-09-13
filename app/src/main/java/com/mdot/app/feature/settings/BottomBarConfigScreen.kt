@@ -118,9 +118,7 @@ fun BottomBarPane(
         BottomBarPreview(slots = draft, iconOnly = iconOnly)
         Spacer(Modifier.height(Spacing.l))
 
-        // ---- 功能配置卡片：开关 + 拖拽排序 ----
-        Text(stringResource(R.string.appearance_functions), style = MaterialTheme.typography.titleSmall)
-        Spacer(Modifier.height(Spacing.s))
+        // ---- 功能配置卡片：开关 + 拖拽排序（v0.6.9 起去掉上方「功能」标题） ----
         SlotConfigCard(
             draft = draft,
             onSwap = { from, to ->

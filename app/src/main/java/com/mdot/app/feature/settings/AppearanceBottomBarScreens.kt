@@ -64,115 +64,101 @@ import com.mdot.app.domain.model.ThemeMode
 @Composable
 fun AppearanceScreen(
     onBack: () -> Unit,
-    onOpenBottomBar: () -> Unit = {},
-    onOpenHomeCards: () -> Unit = {},
     vm: AppearanceViewModel = hiltViewModel(),
 ) {
-    val appearance by vm.appearance.collectAsStateWithLifecycle()
-    val bottomBarCount by vm.bottomBarCount.collectAsStateWithLifecycle()
-    val homeCardsCount by vm.homeCardsCount.collectAsStateWithLifecycle()
+    Column(Modifier.fillMaxSize()) {
+        JiabanTopBar(title = stringResource(R.string.appearance_title), onBack = onBack)
+        AppearancePane(vm = vm)
+    }
+}
 
+/** 外观内容（深浅/配色/动态取色）：独立外观页与「外观/首页/底栏」合并页共用（自带滚动与边距） */
+@Composable
+fun AppearancePane(vm: AppearanceViewModel = hiltViewModel()) {
+    val appearance by vm.appearance.collectAsStateWithLifecycle()
     Column(
         Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.page),
     ) {
-        JiabanTopBar(title = stringResource(R.string.appearance_title), onBack = onBack)
-        Spacer(Modifier.height(Spacing.m))
 
-        SectionCard {
-            Column {
-                Text(stringResource(R.string.appearance_theme_heading), style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.height(Spacing.s))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(
-                        ThemeMode.LIGHT to stringResource(R.string.appearance_theme_light),
-                        ThemeMode.DARK to stringResource(R.string.appearance_theme_dark),
-                        ThemeMode.SYSTEM to stringResource(R.string.appearance_theme_system),
-                    ).forEach { (mode, label) ->
-                        FilterChip(
-                            selected = appearance.themeMode == mode,
-                            onClick = { vm.setMode(mode) },
-                            label = { Text(label) },
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(Spacing.l))
-                Text(stringResource(R.string.appearance_palette_heading), style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.height(Spacing.s))
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    paletteOptions().forEach { (id, label) ->
-                        val isSelected = appearance.paletteId == id && !appearance.dynamicColor
-                        val interaction = remember { MutableInteractionSource() }
-                        // 选中描边宽度/颜色平滑过渡 + 按压缩放
-                        val borderWidth by animateDpAsState(
-                            targetValue = if (isSelected) 3.dp else 1.dp,
-                            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-                            label = "paletteBorderW",
-                        )
-                        val borderColor by animateColorAsState(
-                            targetValue = if (isSelected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.outlineVariant,
-                            animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
-                            label = "paletteBorderC",
-                        )
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(
-                                Modifier
-                                    .size(40.dp)
-                                    .pressScale(interaction, pressedScale = 0.88f)
-                                    .background(paletteSeed(id), CircleShape)
-                                    .border(borderWidth, borderColor, CircleShape)
-                                    .clip(CircleShape)
-                                    .clickable(
-                                        interactionSource = interaction,
-                                        indication = LocalIndication.current,
-                                    ) { vm.setPalette(id) },
+            SectionCard {
+                Column {
+                    Text(stringResource(R.string.appearance_theme_heading), style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(Spacing.s))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            ThemeMode.LIGHT to stringResource(R.string.appearance_theme_light),
+                            ThemeMode.DARK to stringResource(R.string.appearance_theme_dark),
+                            ThemeMode.SYSTEM to stringResource(R.string.appearance_theme_system),
+                        ).forEach { (mode, label) ->
+                            FilterChip(
+                                selected = appearance.themeMode == mode,
+                                onClick = { vm.setMode(mode) },
+                                label = { Text(label) },
                             )
-                            Spacer(Modifier.height(4.dp))
-                            Text(stringResource(label), style = MaterialTheme.typography.labelSmall)
                         }
                     }
-                }
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     Spacer(Modifier.height(Spacing.l))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.appearance_dynamic_color), style = MaterialTheme.typography.bodyMedium)
-                            Text(
-                                stringResource(R.string.appearance_dynamic_color_desc),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    Text(stringResource(R.string.appearance_palette_heading), style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(Spacing.s))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        paletteOptions().forEach { (id, label) ->
+                            val isSelected = appearance.paletteId == id && !appearance.dynamicColor
+                            val interaction = remember { MutableInteractionSource() }
+                            // 选中描边宽度/颜色平滑过渡 + 按压缩放
+                            val borderWidth by animateDpAsState(
+                                targetValue = if (isSelected) 3.dp else 1.dp,
+                                animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                                label = "paletteBorderW",
                             )
+                            val borderColor by animateColorAsState(
+                                targetValue = if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.outlineVariant,
+                                animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
+                                label = "paletteBorderC",
+                            )
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(
+                                    Modifier
+                                        .size(40.dp)
+                                        .pressScale(interaction, pressedScale = 0.88f)
+                                        .background(paletteSeed(id), CircleShape)
+                                        .border(borderWidth, borderColor, CircleShape)
+                                        .clip(CircleShape)
+                                        .clickable(
+                                            interactionSource = interaction,
+                                            indication = LocalIndication.current,
+                                        ) { vm.setPalette(id) },
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(stringResource(label), style = MaterialTheme.typography.labelSmall)
+                            }
                         }
-                        Switch(checked = appearance.dynamicColor, onCheckedChange = { vm.setDynamic(it) })
+                    }
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        Spacer(Modifier.height(Spacing.l))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(stringResource(R.string.appearance_dynamic_color), style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    stringResource(R.string.appearance_dynamic_color_desc),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(checked = appearance.dynamicColor, onCheckedChange = { vm.setDynamic(it) })
+                        }
                     }
                 }
             }
         }
-        Spacer(Modifier.height(Spacing.l))
-
-        // ---- 首页卡片 + 底栏配置入口（首页卡片在上） ----
-        SectionCard {
-            Column {
-                SettingRow(
-                    stringResource(R.string.appearance_home_cards_config), stringResource(R.string.appearance_home_cards_summary, homeCardsCount),
-                    painterResource(R.drawable.ic_ms_palette), onClick = onOpenHomeCards,
-                )
-                SettingRow(
-                    stringResource(R.string.appearance_bottom_bar_config), stringResource(R.string.appearance_bottom_bar_summary, bottomBarCount),
-                    painterResource(R.drawable.ic_ms_dashboard), onClick = onOpenBottomBar,
-                )
-            }
-        }
-        Spacer(Modifier.height(Spacing.xl))
-    }
 }
 
 private fun paletteSeed(id: String): Color = when (id) {
