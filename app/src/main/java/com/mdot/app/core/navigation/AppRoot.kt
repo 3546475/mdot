@@ -103,8 +103,7 @@ import com.mdot.app.feature.comp.CompBalanceScreen
 import com.mdot.app.feature.stats.StatsScreen
 import com.mdot.app.feature.sync.SyncScreen
 import com.mdot.app.feature.sync.SyncStorageScreen
-import com.mdot.app.feature.settings.BottomBarScreen
-import com.mdot.app.feature.settings.HomeCardsScreen
+import com.mdot.app.feature.settings.HomeBottomConfigScreen
 import com.mdot.app.feature.site.SiteProjectsScreen
 import com.mdot.app.feature.site.SiteProjectEditScreen
 import com.mdot.app.feature.site.SiteSettlementScreen
@@ -460,10 +459,10 @@ private fun AppRootContent(
                 }
             }
             composable(Routes.BOTTOM_BAR) {
-                AdaptiveContainer { BottomBarScreen(onBack = { navController.popBackStack() }) }
+                AdaptiveContainer { HomeBottomConfigScreen(initialTab = 1, onBack = { navController.popBackStack() }) }
             }
             composable(Routes.HOME_CARDS) {
-                AdaptiveContainer { HomeCardsScreen(onBack = { navController.popBackStack() }) }
+                AdaptiveContainer { HomeBottomConfigScreen(initialTab = 0, onBack = { navController.popBackStack() }) }
             }
             // ---- 工地记工（12 文档 F-S2/F-S6） ----
             composable(

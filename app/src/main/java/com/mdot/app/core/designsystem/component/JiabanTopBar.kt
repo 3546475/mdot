@@ -3,14 +3,18 @@ package com.mdot.app.core.designsystem.component
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.mdot.app.R
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -20,8 +24,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mdot.app.core.designsystem.Radius
+import com.mdot.app.core.designsystem.Spacing
 
 /**
  * 统一顶栏：中间当前页面名（回答"我在哪"）。
@@ -50,12 +58,26 @@ fun JiabanTopBar(
         title = {
             when {
                 titleContent != null -> titleContent()
+                // 二级页标题统一为单段胶囊（SegmentBar 同款视觉）：未来加页签时以 titleContent 换多段实现
                 title != null -> {
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.titleLarge,
-                        maxLines = 1,
-                    )
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(Radius.pill))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .padding(4.dp),
+                    ) {
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            maxLines = 1,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(Radius.pill))
+                                .background(MaterialTheme.colorScheme.primaryContainer)
+                                .padding(horizontal = Spacing.l, vertical = 8.dp),
+                        )
+                    }
                 }
             }
         },

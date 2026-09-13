@@ -51,7 +51,6 @@ import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.HomeCardRegistry
 import com.mdot.app.core.designsystem.component.HomeCardSpec
-import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.navigation.contentBottomPadding
@@ -61,9 +60,9 @@ import com.mdot.app.domain.model.HomeCardsConfig
  * 首页卡片配置（v0.6.0 首页卡片可编辑）：显示中（拖拽排序 + 开关）/ 已隐藏（开关回开）。
  * 交互与视觉对齐底栏配置页；拖拽缩放动效走 MaterialTheme.motionScheme 弹簧 specs。
  */
+/** 首页卡片配置内容页（首页卡片+底栏合并页的第 1 页签） */
 @Composable
-fun HomeCardsScreen(
-    onBack: () -> Unit,
+fun HomeCardsPane(
     vm: HomeCardsViewModel = hiltViewModel(),
 ) {
     val config by vm.config.collectAsStateWithLifecycle()
@@ -83,7 +82,6 @@ fun HomeCardsScreen(
             .contentBottomPadding(showBottomBar = false)
             .padding(horizontal = Spacing.page),
     ) {
-        JiabanTopBar(title = stringResource(R.string.home_cards_title), onBack = onBack)
         Spacer(Modifier.height(Spacing.s))
 
         Text(
@@ -93,8 +91,7 @@ fun HomeCardsScreen(
         )
         Spacer(Modifier.height(Spacing.l))
 
-        Text(stringResource(R.string.home_cards_visible_heading), style = MaterialTheme.typography.titleSmall)
-        Spacer(Modifier.height(Spacing.s))
+        // 卡片总表：显示中（可拖拽排序）在前、已隐藏在后——与底栏配置页同款单卡
         HomeCardsConfigCard(
             draft = draft,
             // 把 from 处的卡片移动到 to（均为 0-based；先取后插，越界双向钳制）
@@ -110,32 +107,6 @@ fun HomeCardsScreen(
             onDragEnd = { vm.applyOrder(draft) },
             onToggle = { id -> vm.toggle(id) },
         )
-
-        // 已隐藏（POOL 中不在 draft 的项，顺序按 POOL）
-        val hidden = HomeCardsConfig.POOL.filter { it !in draft }
-        if (hidden.isNotEmpty()) {
-            Spacer(Modifier.height(Spacing.l))
-            Text(stringResource(R.string.home_cards_hidden_heading), style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(Spacing.s))
-            SectionCard {
-                Column(Modifier.padding(vertical = 4.dp)) {
-                    hidden.forEach { id ->
-                        val spec = HomeCardRegistry.resolveSpec(id) ?: return@forEach
-                        Box(
-                            Modifier.fillMaxWidth().height(56.dp),
-                            contentAlignment = Alignment.CenterStart,
-                        ) {
-                            HomeCardRow(
-                                spec = spec,
-                                isOn = false,
-                                draggable = false,
-                                onToggle = { vm.toggle(id) },
-                            )
-                        }
-                    }
-                }
-            }
-        }
         Spacer(Modifier.height(Spacing.xl))
     }
 }
@@ -250,6 +221,26 @@ private fun HomeCardsConfigCard(
                                 onToggle = { onToggle(id) },
                             )
                     }
+                }
+            }
+
+            // 已隐藏（POOL 中不在 draft 的项，顺序按 POOL；开关回开，不可拖）
+            val hidden = HomeCardsConfig.POOL.filter { it !in draft }
+            if (hidden.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+            }
+            hidden.forEach { id ->
+                val spec = HomeCardRegistry.resolveSpec(id) ?: return@forEach
+                Box(
+                    Modifier.fillMaxWidth().height(56.dp),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    HomeCardRow(
+                        spec = spec,
+                        isOn = false,
+                        draggable = false,
+                        onToggle = { onToggle(id) },
+                    )
                 }
             }
         }

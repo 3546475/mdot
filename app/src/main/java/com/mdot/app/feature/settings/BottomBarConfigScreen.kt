@@ -59,7 +59,6 @@ import com.mdot.app.core.designsystem.Duration
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.JiabanBottomBar
-import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.SlotRegistry
 import com.mdot.app.core.designsystem.component.SlotSpec
@@ -69,8 +68,7 @@ import com.mdot.app.domain.model.BottomBarConfig
 
 /** 底栏配置：预览纯展示；功能卡片整合开关 + 垂直拖拽排序；首页固定不在卡片内 */
 @Composable
-fun BottomBarScreen(
-    onBack: () -> Unit,
+fun BottomBarPane(
     vm: BottomBarViewModel = hiltViewModel(),
 ) {
     val config by vm.config.collectAsStateWithLifecycle()
@@ -89,7 +87,6 @@ fun BottomBarScreen(
             .contentBottomPadding(showBottomBar = false)
             .padding(horizontal = Spacing.page),
     ) {
-        JiabanTopBar(title = stringResource(R.string.appearance_bottom_bar_title), onBack = onBack)
         Spacer(Modifier.height(Spacing.s))
 
         // 仅图标开关

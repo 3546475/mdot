@@ -4,6 +4,8 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -44,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -161,6 +165,11 @@ fun PayMonthContent(vm: PayMonthViewModel = hiltViewModel()) {
     }
     adding?.let { group ->
         AddItemDialog(
+            presets = if (group == PayGroup.SUBSIDY) {
+                stringArrayResource(R.array.paymonth_subsidy_presets).toList()
+            } else {
+                stringArrayResource(R.array.paymonth_deduction_presets).toList()
+            },
             onSave = { name, cents ->
                 vm.addItem(group, name, cents)
                 adding = null
@@ -384,9 +393,11 @@ private fun EditItemDialog(
     )
 }
 
-/** 添加条目：名称 + 金额 */
+/** 添加条目：名称 + 金额，名称附预选项快选（点击填入；调研自主流记工记账 App 常见工资项） */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AddItemDialog(
+    presets: List<String>,
     onSave: (String, Long) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -414,6 +425,19 @@ private fun AddItemDialog(
                     shape = RoundedCornerShape(Radius.textField),
                     isError = amount.isNotBlank() && cents == null,
                 )
+                Spacer(Modifier.height(Spacing.s))
+                // 预选项快选：点选填入名称（金额仍需自行填写）
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy((-2).dp),
+                ) {
+                    presets.forEach { preset ->
+                        AssistChip(
+                            onClick = { name = preset },
+                            label = { Text(preset, style = MaterialTheme.typography.labelSmall) },
+                        )
+                    }
+                }
             }
         },
         confirmButton = {

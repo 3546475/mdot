@@ -27,6 +27,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -82,6 +83,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -140,11 +142,14 @@ fun SiteRecordScreen(
     LaunchedEffect(Unit) { vm.open(LocalDate.now()) }
     LaunchedEffect(state.saved) { if (state.saved) onBack() }
 
-    // 顶栏 Tab 即 pager 页（0=记账 1=记借支/结算）：滑块与内容横滑同步，行为对齐统计页顶栏分段控件
-    val topPager = rememberPagerState(pageCount = { 2 })
-    var subTab by remember { mutableStateOf(0) } // 记账内：0=点工 1=包工/工量
-    var cashKind by remember { mutableStateOf(0) } // 记借支/结算内：0=借支 1=结算
+    // 表单分页（扁平 4 页）：0=记账·点工 1=记账·包工 2=记借支·借支 3=记借支·结算。
+    // 手势分区：顶栏横滑/点选切上级页签（记账↔记借支/结算）；内容区横滑切子页签，
+    // 子页签尽头继续滑由扁平序列自然联动上级（包工→借支、借支→包工）
+    val formPager = rememberPagerState(pageCount = { 4 })
     var showUnitSheet by remember { mutableStateOf(false) }
+    // 日期选择弹窗：项目+日期卡上移为固定区（四种表单共用），弹窗随之提升到弹层级
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showMultiDate by remember { mutableStateOf(false) }
     // 保存打勾反馈：点保存后按钮短暂变 ✓ 再执行保存（成功后经 saved 状态返回）
     var saveFlash by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
@@ -156,12 +161,18 @@ fun SiteRecordScreen(
 
     // 保存分发：记账·点工 / 记账·包工 / 借支 / 结算（本次结算金额）四种表单（悬浮保存按钮使用）
     fun saveCurrent(keepOpen: Boolean, onDone: () -> Unit = {}) {
-        when {
-            topPager.currentPage == 1 && cashKind == 1 -> vm.saveSettlementAmount(keepOpen, onDone)
-            topPager.currentPage == 1 -> vm.saveAdvance(keepOpen, onDone)
-            subTab == 1 -> vm.savePieceWork(keepOpen, onDone)
+        when (formPager.currentPage) {
+            1 -> vm.savePieceWork(keepOpen, onDone)
+            2 -> vm.saveAdvance(keepOpen, onDone)
+            3 -> vm.saveSettlementAmount(keepOpen, onDone)
             else -> vm.saveAttendance(keepOpen, onDone)
         }
+    }
+
+    /** 顶栏横滑/点选切换上级页签：记账→记借支落「借支」，记借支→记账保持当前子页 */
+    fun switchTop(target: Int) {
+        val targetPage = if (target == 1) 2 else minOf(formPager.currentPage, 1)
+        scope.launch { formPager.animateScrollToPage(targetPage) }
     }
 
     /** 保存 + 触觉/打勾反馈：延迟极短一拍展示 ✓，再真正执行保存 */
@@ -189,13 +200,45 @@ fun SiteRecordScreen(
                 .statusBarsPadding()
                 .padding(horizontal = Spacing.page),
         ) {
-            RecordHeader(topPager, onBack = onBack)
+            RecordHeader(formPager, onBack = onBack, onSwitchTop = ::switchTop)
 
-            // 内容区横滑与顶栏滑块同步（行为对齐统计页顶栏分段控件）
+            // 项目 + 日期：固定区（四种表单共用，横滑手势只发生在其下方）
+            ProjectDateCard(
+                state = state,
+                onOpenProjectPick = onOpenProjectPick,
+                onShowDatePicker = { showDatePicker = true },
+                onShowMultiDate = { showMultiDate = true },
+            )
+            Spacer(Modifier.height(Spacing.s))
+
+            // 子页签滑条：跟随表单分页（记账→点工/包工；记借支/结算→借支/结算），跨界时整组切换
+            val p = formPager.currentPage + formPager.currentPageOffsetFraction
+            val topTab = if (formPager.currentPage >= 2) 1 else 0
+            val subPos = (if (topTab == 0) p else p - 2f).coerceIn(0f, 1f)
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                SegmentBar(
+                    labels = if (topTab == 0) listOf(
+                        stringResource(R.string.site_sub_day),
+                        stringResource(R.string.site_sub_piece),
+                    ) else listOf(
+                        stringResource(R.string.site_sub_advance),
+                        stringResource(R.string.site_sub_settle),
+                    ),
+                    selected = formPager.currentPage % 2,
+                    onSelect = { target ->
+                        scope.launch { formPager.animateScrollToPage(topTab * 2 + target) }
+                    },
+                    segWidth = 112.dp,
+                    position = subPos,
+                )
+            }
+            Spacer(Modifier.height(Spacing.s))
+
+            // 表单分页：内容区横滑切子页签；子页签尽头继续滑自然联动上级页签（包工→借支、借支→包工）
             HorizontalPager(
-                state = topPager,
+                state = formPager,
                 modifier = Modifier.weight(1f),
-                beyondViewportPageCount = 1,
+                beyondViewportPageCount = 3,
             ) { page ->
                 Column(
                     Modifier
@@ -209,23 +252,36 @@ fun SiteRecordScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = Spacing.xl),
                         )
-                    } else if (page == 0) {
-                        BookkeepingContent(
-                            state = state,
-                            vm = vm,
-                            subTab = subTab,
-                            onSubTab = { subTab = it },
-                            onOpenProjectSettings = onOpenProjectSettings,
-                            onOpenProjectPick = onOpenProjectPick,
-                            onOpenUnitSheet = { showUnitSheet = true },
-                        )
-                    } else {
-                        AdvanceContent(state, vm, onOpenProjectPick, onOpenSettlement, cashKind) { cashKind = it }
+                    } else when (page) {
+                        0 -> AttendanceForm(state, vm)
+                        1 -> PieceForm(state, vm, onOpenUnitSheet = { showUnitSheet = true })
+                        2 -> AdvanceForm(state, vm)
+                        else -> SettleForm(state, vm, onOpenSettlement)
                     }
+                    val onCashPage = page >= 2
+                    NotePhotoSection(
+                        note = if (onCashPage) state.advanceNote else state.note,
+                        onNote = { if (onCashPage) vm.onAdvanceNote(it) else vm.onNote(it) },
+                        photos = state.photos,
+                        onAddPhotos = { vm.addPhotos(it) },
+                        onRemovePhoto = { vm.removePhoto(it) },
+                    )
                     // 底部操作条避让：用全局标准值（底栏高 + 边距 + 导航条），且必须位于滚动内容内部
                     Spacer(Modifier.height(bottomBarContentPaddingValues().calculateBottomPadding()))
                 }
             }
+        }
+
+        if (showDatePicker) {
+            DatePick(initial = state.date, onPick = { vm.onDate(it) }, onDismiss = { showDatePicker = false })
+        }
+        if (showMultiDate) {
+            MultiDateDialog(
+                primary = state.date,
+                selected = state.extraDates,
+                onToggle = { vm.onToggleExtraDate(it) },
+                onDismiss = { showMultiDate = false },
+            )
         }
 
         // 工量单位选择：自实现底部弹层（M3 ModalBottomSheet 锚点随内容高度变化会误判滑出，故不用）
@@ -313,14 +369,25 @@ private fun FloatingSaveButton(text: String, primary: Boolean, flash: Boolean = 
 // ---- 顶栏：tonal 圆形返回 + 胶囊分段 ----
 
 @Composable
-private fun RecordHeader(topPager: PagerState, onBack: () -> Unit) {
-    val scope = rememberCoroutineScope()
+private fun RecordHeader(formPager: PagerState, onBack: () -> Unit, onSwitchTop: (Int) -> Unit) {
     val backInteraction = remember { MutableInteractionSource() }
-    val segWidth = 112.dp
+    var dragX by remember { mutableStateOf(0f) }
+    // 顶栏整行响应横滑：左滑切下一上级页签、右滑切上一上级页签（子页签上方的手势分区）
     Box(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = Spacing.m),
+            .padding(vertical = Spacing.m)
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        if (dragX <= -60) onSwitchTop(1) else if (dragX >= 60) onSwitchTop(0)
+                        dragX = 0f
+                    },
+                ) { change, _ ->
+                    dragX += change.positionChange().x
+                    change.consume()
+                }
+            },
         contentAlignment = Alignment.Center,
     ) {
         // 返回按钮固定在左，顶部 Tab 胶囊整体居中
@@ -341,17 +408,24 @@ private fun RecordHeader(topPager: PagerState, onBack: () -> Unit) {
                 modifier = Modifier.size(22.dp),
             )
         }
-        // 分段胶囊：样式沿用出厂（tonal 轨道 + primaryContainer 选中胶囊），滑块连续跟随 pager（行为对齐统计页顶栏分段控件）
-        SegmentBar(
-            labels = listOf(
-                stringResource(R.string.site_tab_book),
-                stringResource(R.string.site_tab_advance_settle),
-            ),
-            selected = topPager.currentPage,
-            onSelect = { index -> scope.launch { topPager.animateScrollToPage(index) } },
-            segWidth = 112.dp,
-            position = topPager.currentPage + topPager.currentPageOffsetFraction,
-        )
+        // 分段胶囊：滑块连续跟随表单分页（顶栏整行手势已负责横滑切上级，此处不再重复挂手势）
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(Radius.pill))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .padding(4.dp),
+        ) {
+            SegmentBar(
+                labels = listOf(
+                    stringResource(R.string.site_tab_book),
+                    stringResource(R.string.site_tab_advance_settle),
+                ),
+                selected = if (formPager.currentPage >= 2) 1 else 0,
+                onSelect = onSwitchTop,
+                segWidth = 112.dp,
+                position = ((formPager.currentPage + formPager.currentPageOffsetFraction) - 1f).coerceIn(0f, 1f),
+            )
+        }
     }
 }
 
@@ -490,63 +564,42 @@ private fun NotePhotoCard(
     }
 }
 
+/** 备注 + 照片（每表单页独立一份，编辑弹窗随页绑定 note / advanceNote） */
+@Composable
+private fun NotePhotoSection(
+    note: String,
+    onNote: (String) -> Unit,
+    photos: List<String>,
+    onAddPhotos: (List<String>) -> Unit,
+    onRemovePhoto: (String) -> Unit,
+) {
+    var showNoteEdit by remember { mutableStateOf(false) }
+    NotePhotoCard(
+        note = note,
+        onEditNote = { showNoteEdit = true },
+        photos = photos,
+        onAddPhotos = onAddPhotos,
+        onRemovePhoto = onRemovePhoto,
+    )
+    if (showNoteEdit) {
+        NoteDialog(initial = note, onDismiss = { showNoteEdit = false }, onConfirm = onNote)
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun BookkeepingContent(
+private fun AttendanceForm(
     state: SiteRecordUiState,
     vm: SiteRecordViewModel,
-    subTab: Int,
-    onSubTab: (Int) -> Unit,
-    onOpenProjectSettings: (Long) -> Unit,
-    onOpenProjectPick: () -> Unit,
-    onOpenUnitSheet: () -> Unit,
 ) {
-    var showDatePicker by remember { mutableStateOf(false) }
-    var showMultiDate by remember { mutableStateOf(false) }
     var showWorkDayPicker by remember { mutableStateOf(false) }
     var showWorkHourPicker by remember { mutableStateOf(false) }
     var showOtDayPicker by remember { mutableStateOf(false) }
     var showOtHourPicker by remember { mutableStateOf(false) }
-    var showNoteEdit by remember { mutableStateOf(false) }
     var showStandardDialog by remember { mutableStateOf(false) }
-
-    Spacer(Modifier.height(Spacing.s))
-
-    // ---- 项目 + 日期：同一张 SectionCard 两行（共用组件） ----
-    ProjectDateCard(
-        state = state,
-        onOpenProjectPick = onOpenProjectPick,
-        onShowDatePicker = { showDatePicker = true },
-        onShowMultiDate = { showMultiDate = true },
-    )
-    Spacer(Modifier.height(Spacing.s))
-
-    // ---- 子 Tab：点工 | 包工/工量（滑块式，与顶部 Tab 同款胶囊容器，整体水平居中） ----
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        val subPos by animateFloatAsState(
-            targetValue = subTab.toFloat(),
-            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-            label = "subTabPos",
-        )
-        SegmentBar(
-            labels = listOf(
-                stringResource(R.string.site_sub_day),
-                stringResource(R.string.site_sub_piece),
-            ),
-            selected = subTab,
-            onSelect = onSubTab,
-            segWidth = 96.dp,
-            position = subPos,
-        )
-    }
-    Spacer(Modifier.height(Spacing.s))
 
     val base = state.project?.baseMinutes ?: 480
     val otBase = state.project?.otBaseMinutes ?: 360
-
-    if (subTab == 1) {
-        PieceForm(state, vm, onOpenUnitSheet)
-    } else {
 
     // ---- 上班 + 加班：一张卡两段（段间分隔线），减少散块 ----
     SectionCard {
@@ -621,31 +674,9 @@ private fun BookkeepingContent(
         } ?: "",
         onClick = { showStandardDialog = true },
     )
-    }
 
     Spacer(Modifier.height(Spacing.s))
 
-    // ---- 备注 + 照片：同一张 SectionCard 两行（共用组件） ----
-    NotePhotoCard(
-        note = state.note,
-        onEditNote = { showNoteEdit = true },
-        photos = state.photos,
-        onAddPhotos = { vm.addPhotos(it) },
-        onRemovePhoto = { vm.removePhoto(it) },
-    )
-
-    // ---- 对话框 ----
-    if (showDatePicker) {
-        DatePick(initial = state.date, onPick = { vm.onDate(it) }, onDismiss = { showDatePicker = false })
-    }
-    if (showMultiDate) {
-        MultiDateDialog(
-            primary = state.date,
-            selected = state.extraDates,
-            onToggle = { vm.onToggleExtraDate(it) },
-            onDismiss = { showMultiDate = false },
-        )
-    }
     if (showWorkDayPicker) {
         DayCountDialog(
             title = stringResource(R.string.site_pick_days),
@@ -705,130 +736,54 @@ private fun BookkeepingContent(
             )
         }
     }
-    if (showNoteEdit) {
-        NoteDialog(initial = state.note, onDismiss = { showNoteEdit = false }, onConfirm = { vm.onNote(it); showNoteEdit = false })
-    }
 }
 
 // ---- 借支内容 ----
 
 @Composable
-private fun AdvanceContent(
-    state: SiteRecordUiState,
-    vm: SiteRecordViewModel,
-    onOpenProjectPick: () -> Unit,
-    onOpenSettlement: () -> Unit,
-    cashKind: Int,
-    onCashKind: (Int) -> Unit,
-) {
-    var showNoteEdit by remember { mutableStateOf(false) }
-    var showDatePicker by remember { mutableStateOf(false) }
-    var showMultiDate by remember { mutableStateOf(false) }
-
-    Spacer(Modifier.height(Spacing.s))
-
-    // 项目 + 日期：与记账页同一张组合卡片（共用组件）
-    ProjectDateCard(
-        state = state,
-        onOpenProjectPick = onOpenProjectPick,
-        onShowDatePicker = { showDatePicker = true },
-        onShowMultiDate = { showMultiDate = true },
-    )
-    Spacer(Modifier.height(Spacing.m))
-
-    // 借支 | 结算：与记账页「点工/包工」同位置、同款居中胶囊（滑块式）
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        val cashPos by animateFloatAsState(
-            targetValue = cashKind.toFloat(),
-            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-            label = "cashKindPos",
+private fun AdvanceForm(state: SiteRecordUiState, vm: SiteRecordViewModel) {
+    // ---- 借支：本次金额（大字直填，样式同包工工钱） ----
+    BigAmountRow(
+        iconRes = R.drawable.ic_ms_paid,
+        label = stringResource(R.string.site_advance_amount_label),
+        value = state.advanceYuanText,
+        fallback = "0.00",
+        onValueChange = vm::onAdvanceAmount,
+    ) {
+        Text(
+            stringResource(R.string.site_advance_yuan_unit),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        SegmentBar(
-            labels = listOf(
-                stringResource(R.string.site_sub_advance),
-                stringResource(R.string.site_sub_settle),
-            ),
-            selected = cashKind,
-            onSelect = onCashKind,
-            segWidth = 112.dp,
-            position = cashPos,
+    }
+}
+
+@Composable
+private fun SettleForm(state: SiteRecordUiState, vm: SiteRecordViewModel, onOpenSettlement: () -> Unit) {
+    // ---- 结算：本次结算金额（部分结算，像借支一样拿走一笔；结清入口见页面底部） ----
+    SectionLabel(stringResource(R.string.site_settlement_partial_title))
+    BigAmountRow(
+        iconRes = R.drawable.ic_ms_paid,
+        label = stringResource(R.string.site_settlement_partial_amount_label),
+        value = state.settleAmountText,
+        fallback = "0.00",
+        onValueChange = vm::onSettleAmount,
+    ) {
+        Text(
+            stringResource(R.string.site_yuan_symbol),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
     Spacer(Modifier.height(Spacing.m))
 
-    if (cashKind == 0) {
-        // ---- 借支：本次金额（大字直填，样式同包工工钱） ----
-        BigAmountRow(
-            iconRes = R.drawable.ic_ms_paid,
-            label = stringResource(R.string.site_advance_amount_label),
-            value = state.advanceYuanText,
-            fallback = "0.00",
-            onValueChange = vm::onAdvanceAmount,
-        ) {
-            Text(
-                stringResource(R.string.site_advance_yuan_unit),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Spacer(Modifier.height(Spacing.m))
-    } else {
-        // ---- 结算：本次结算金额（部分结算，像借支一样拿走一笔；结清入口见页面底部） ----
-        SectionLabel(stringResource(R.string.site_settlement_partial_title))
-        BigAmountRow(
-            iconRes = R.drawable.ic_ms_paid,
-            label = stringResource(R.string.site_settlement_partial_amount_label),
-            value = state.settleAmountText,
-            fallback = "0.00",
-            onValueChange = vm::onSettleAmount,
-        ) {
-            Text(
-                stringResource(R.string.site_yuan_symbol),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Spacer(Modifier.height(Spacing.m))
-    }
-
-    // 备注 + 照片：与记账页同一张组合卡片（共用组件）
-    NotePhotoCard(
-        note = state.advanceNote,
-        onEditNote = { showNoteEdit = true },
-        photos = state.photos,
-        onAddPhotos = { vm.addPhotos(it) },
-        onRemovePhoto = { vm.removePhoto(it) },
+    // ---- 结清（原结算页主流程）：锁定全部未结算记录并归档快照，一次清零待结余额 ----
+    TonalRowCard(
+        iconRes = R.drawable.ic_ms_flip,
+        label = stringResource(R.string.site_settlement_settle_all),
+        value = stringResource(R.string.site_settlement_settle_all_hint),
+        onClick = onOpenSettlement,
     )
-
-    if (cashKind == 1) {
-        // ---- 结清（原结算页主流程）：锁定全部未结算记录并归档快照，一次清零待结余额 ----
-        Spacer(Modifier.height(Spacing.m))
-        TonalRowCard(
-            iconRes = R.drawable.ic_ms_flip,
-            label = stringResource(R.string.site_settlement_settle_all),
-            value = stringResource(R.string.site_settlement_settle_all_hint),
-            onClick = onOpenSettlement,
-        )
-    }
-
-    if (showDatePicker) {
-        DatePick(initial = state.date, onPick = { vm.onDate(it) }, onDismiss = { showDatePicker = false })
-    }
-    if (showMultiDate) {
-        MultiDateDialog(
-            primary = state.date,
-            selected = state.extraDates,
-            onToggle = { vm.onToggleExtraDate(it) },
-            onDismiss = { showMultiDate = false },
-        )
-    }
-    if (showNoteEdit) {
-        NoteDialog(
-            initial = state.advanceNote,
-            onDismiss = { showNoteEdit = false },
-            onConfirm = { vm.onAdvanceNote(it); showNoteEdit = false },
-        )
-    }
 }
 
 // ---- M3E 组件 ----

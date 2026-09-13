@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -55,8 +56,8 @@ class PayMonthViewModel @Inject constructor(
         .map { it.workSystem == WorkSystem.SITE }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    /** 当月工资计算结果（非工地；供同步回填） */
-    private val monthCalc: StateFlow<PayrollCalculator.Output?> = _month
+    /** 当月工资计算结果（非工地；供同步回填）。保持冷流：syncFromRecords 按需订阅计算 */
+    private val monthCalc = _month
         .flatMapLatest { m ->
             val from = m.atDay(1)
             val to = m.atEndOfMonth()
@@ -81,7 +82,7 @@ class PayMonthViewModel @Inject constructor(
                     )
                 )
             }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+        }
 
     fun prevMonth() {
         _month.value = _month.value.minusMonths(1)
@@ -118,8 +119,9 @@ class PayMonthViewModel @Inject constructor(
     /** 同步本月考勤：加班工资/基本工资/事假/病假 ← PayrollCalculator 当月结果（可再手改） */
     fun syncFromRecords() {
         viewModelScope.launch {
-            // first() 按需触发计算（monthCalc 是 WhileSubscribed，无 UI 收集者时 .value 恒为初始 null）
-            val out = monthCalc.first() ?: return@launch
+            if (isSite.value) return@launch // 工地无引擎值
+            // 订阅冷流触发计算并等到首个非空结果（修：stateIn .value 在无订阅者时恒为初始 null，点一次无效）
+            val out = monthCalc.filterNotNull().first()
             val fillBase = settings.salaryFlow.first().includeBase
             settings.setPayMonth(_month.value.toString(), applyRecordSync(sheet.value, out, fillBase))
         }
