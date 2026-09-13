@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -26,10 +28,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -48,6 +49,7 @@ import com.mdot.app.core.sync.SyncPhase
 import com.mdot.app.domain.util.TimeUtils
 import java.time.Instant
 import java.time.ZoneId
+import kotlinx.coroutines.launch
 
 private fun selectedSourceName2(state: SyncUiState): String? {
     val selected = state.sources.selectedId ?: return null
@@ -65,7 +67,8 @@ fun SyncScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var tab by rememberSaveable { mutableIntStateOf(initialTab.coerceIn(0, 1)) }
+    val pagerState = rememberPagerState(initialPage = initialTab.coerceIn(0, 1), pageCount = { 2 })
+    val scope = rememberCoroutineScope()
 
     // 本地文件备份：导出选择位置 / 导入打开文件
     val createDoc = rememberLauncherForActivityResult(
@@ -92,10 +95,10 @@ fun SyncScreen(
                             stringResource(R.string.sync_tab_backup),
                             stringResource(R.string.sync_tab_storage),
                         ),
-                        selected = tab,
-                        onSelect = { tab = it },
+                        selected = pagerState.currentPage,
+                        onSelect = { i -> scope.launch { pagerState.animateScrollToPage(i) } },
                         segWidth = 112.dp,
-                        position = tab.toFloat(),
+                        position = pagerState.currentPage + pagerState.currentPageOffsetFraction,
                     )
                 },
                 showBack = canBack,
@@ -104,14 +107,20 @@ fun SyncScreen(
 
             // 页签用静态切换（不用 Pager）：NavHost 转场 forceMeasure 会把无限高约束传给
             // pager 页内容，页内 verticalScroll 会抛「infinite maximum height」（实测 2/3 崩溃率）
-            SyncTabPage(
-                page = tab,
-                state = state,
-                vm = vm,
-                canBack = canBack,
-                createDoc = createDoc,
-                openDoc = openDoc,
-            )
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                beyondViewportPageCount = 1,
+            ) { page ->
+                SyncTabPage(
+                    page = page,
+                    state = state,
+                    vm = vm,
+                    canBack = canBack,
+                    createDoc = createDoc,
+                    openDoc = openDoc,
+                )
+            }
         }
         // ---- 云端恢复确认卡 ----
             state.confirmRestore?.let { summary ->
