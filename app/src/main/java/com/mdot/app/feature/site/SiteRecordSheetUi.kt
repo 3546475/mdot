@@ -5,19 +5,22 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -100,6 +103,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.BottomBarSpec
+import com.mdot.app.core.designsystem.component.SegmentBar
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.WindowSpec
@@ -136,7 +140,8 @@ fun SiteRecordScreen(
     LaunchedEffect(Unit) { vm.open(LocalDate.now()) }
     LaunchedEffect(state.saved) { if (state.saved) onBack() }
 
-    var topTab by remember { mutableStateOf(0) } // 0=记账 1=记借支/结算
+    // 顶栏 Tab 即 pager 页（0=记账 1=记借支/结算）：滑块与内容横滑同步，行为对齐统计页顶栏分段控件
+    val topPager = rememberPagerState(pageCount = { 2 })
     var subTab by remember { mutableStateOf(0) } // 记账内：0=点工 1=包工/工量
     var cashKind by remember { mutableStateOf(0) } // 记借支/结算内：0=借支 1=结算
     var showUnitSheet by remember { mutableStateOf(false) }
@@ -152,8 +157,8 @@ fun SiteRecordScreen(
     // 保存分发：记账·点工 / 记账·包工 / 借支 / 结算（本次结算金额）四种表单（悬浮保存按钮使用）
     fun saveCurrent(keepOpen: Boolean, onDone: () -> Unit = {}) {
         when {
-            topTab == 1 && cashKind == 1 -> vm.saveSettlementAmount(keepOpen, onDone)
-            topTab == 1 -> vm.saveAdvance(keepOpen, onDone)
+            topPager.currentPage == 1 && cashKind == 1 -> vm.saveSettlementAmount(keepOpen, onDone)
+            topPager.currentPage == 1 -> vm.saveAdvance(keepOpen, onDone)
             subTab == 1 -> vm.savePieceWork(keepOpen, onDone)
             else -> vm.saveAttendance(keepOpen, onDone)
         }
@@ -184,18 +189,14 @@ fun SiteRecordScreen(
                 .statusBarsPadding()
                 .padding(horizontal = Spacing.page),
         ) {
-            RecordHeader(selected = topTab, onSelect = { topTab = it }, onBack = onBack)
+            RecordHeader(topPager, onBack = onBack)
 
-            AnimatedContent(
-                targetState = topTab,
-                transitionSpec = {
-                    val dir = if (targetState > initialState) 1 else -1
-                    (slideInHorizontally(spatialSpec) { it / 6 * dir } + fadeIn(effectsSpec)) togetherWith
-                        (slideOutHorizontally(spatialSpec) { -it / 6 * dir } + fadeOut(effectsSpec))
-                },
-                label = "recordTab",
+            // 内容区横滑与顶栏滑块同步（行为对齐统计页顶栏分段控件）
+            HorizontalPager(
+                state = topPager,
                 modifier = Modifier.weight(1f),
-            ) { tab ->
+                beyondViewportPageCount = 1,
+            ) { page ->
                 Column(
                     Modifier
                         .fillMaxSize()
@@ -208,7 +209,7 @@ fun SiteRecordScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = Spacing.xl),
                         )
-                    } else if (tab == 0) {
+                    } else if (page == 0) {
                         BookkeepingContent(
                             state = state,
                             vm = vm,
@@ -312,8 +313,10 @@ private fun FloatingSaveButton(text: String, primary: Boolean, flash: Boolean = 
 // ---- 顶栏：tonal 圆形返回 + 胶囊分段 ----
 
 @Composable
-private fun RecordHeader(selected: Int, onSelect: (Int) -> Unit, onBack: () -> Unit) {
+private fun RecordHeader(topPager: PagerState, onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
     val backInteraction = remember { MutableInteractionSource() }
+    val segWidth = 112.dp
     Box(
         Modifier
             .fillMaxWidth()
@@ -338,20 +341,21 @@ private fun RecordHeader(selected: Int, onSelect: (Int) -> Unit, onBack: () -> U
                 modifier = Modifier.size(22.dp),
             )
         }
-        Box(
-            Modifier
-                .clip(RoundedCornerShape(Radius.pill))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(4.dp),
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                SegmentPill(stringResource(R.string.site_tab_book), selected == 0) { onSelect(0) }
-                SegmentPill(stringResource(R.string.site_tab_advance_settle), selected == 1) { onSelect(1) }
-            }
-        }
+        // 分段胶囊：样式沿用出厂（tonal 轨道 + primaryContainer 选中胶囊），滑块连续跟随 pager（行为对齐统计页顶栏分段控件）
+        SegmentBar(
+            labels = listOf(
+                stringResource(R.string.site_tab_book),
+                stringResource(R.string.site_tab_advance_settle),
+            ),
+            selected = topPager.currentPage,
+            onSelect = { index -> scope.launch { topPager.animateScrollToPage(index) } },
+            segWidth = 112.dp,
+            position = topPager.currentPage + topPager.currentPageOffsetFraction,
+        )
     }
 }
 
+/** 分段胶囊（子页签共用：点工/包工、借支/结算、单位选择等；顶栏主 Tab 已改为滑块式 RecordHeader） */
 @Composable
 internal fun SegmentPill(text: String, selected: Boolean, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
@@ -517,19 +521,23 @@ private fun BookkeepingContent(
     )
     Spacer(Modifier.height(Spacing.s))
 
-    // ---- 子 Tab：点工 | 包工/工量（与顶部 Tab 同款胶囊容器，整体水平居中） ----
+    // ---- 子 Tab：点工 | 包工/工量（滑块式，与顶部 Tab 同款胶囊容器，整体水平居中） ----
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Box(
-            Modifier
-                .clip(RoundedCornerShape(Radius.pill))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(4.dp),
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                SegmentPill(stringResource(R.string.site_sub_day), subTab == 0) { onSubTab(0) }
-                SegmentPill(stringResource(R.string.site_sub_piece), subTab == 1) { onSubTab(1) }
-            }
-        }
+        val subPos by animateFloatAsState(
+            targetValue = subTab.toFloat(),
+            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+            label = "subTabPos",
+        )
+        SegmentBar(
+            labels = listOf(
+                stringResource(R.string.site_sub_day),
+                stringResource(R.string.site_sub_piece),
+            ),
+            selected = subTab,
+            onSelect = onSubTab,
+            segWidth = 96.dp,
+            position = subPos,
+        )
     }
     Spacer(Modifier.height(Spacing.s))
 
@@ -728,19 +736,23 @@ private fun AdvanceContent(
     )
     Spacer(Modifier.height(Spacing.m))
 
-    // 借支 | 结算：与记账页「点工/包工」同位置、同款居中胶囊
+    // 借支 | 结算：与记账页「点工/包工」同位置、同款居中胶囊（滑块式）
     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Box(
-            Modifier
-                .clip(RoundedCornerShape(Radius.pill))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(4.dp),
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                SegmentPill(stringResource(R.string.site_sub_advance), cashKind == 0) { onCashKind(0) }
-                SegmentPill(stringResource(R.string.site_sub_settle), cashKind == 1) { onCashKind(1) }
-            }
-        }
+        val cashPos by animateFloatAsState(
+            targetValue = cashKind.toFloat(),
+            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+            label = "cashKindPos",
+        )
+        SegmentBar(
+            labels = listOf(
+                stringResource(R.string.site_sub_advance),
+                stringResource(R.string.site_sub_settle),
+            ),
+            selected = cashKind,
+            onSelect = onCashKind,
+            segWidth = 112.dp,
+            position = cashPos,
+        )
     }
     Spacer(Modifier.height(Spacing.m))
 

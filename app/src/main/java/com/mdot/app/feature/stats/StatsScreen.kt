@@ -74,6 +74,7 @@ import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.WeekBarCard
 import com.mdot.app.core.designsystem.component.buildWeekBars
 import com.mdot.app.core.designsystem.component.WorkHeatmap
+import com.mdot.app.core.designsystem.component.SegmentBar
 import com.mdot.app.core.designsystem.component.modeValueText
 import com.mdot.app.core.designsystem.component.DatePick
 import com.mdot.app.core.designsystem.component.JiabanTopBar
@@ -438,12 +439,14 @@ fun StatsScreen(
     val state by vm.uiState.collectAsStateWithLifecycle()
     val pieMode by vm.pieMode.collectAsStateWithLifecycle()
     val selectedBar by vm.selectedBar.collectAsStateWithLifecycle()
-    val pagerState = rememberPagerState(pageCount = { 2 })
+    // 记月按月度加班/请假口径统计，工地记工不适用——该制度下隐藏记月页签（后续各制度配专属页）
+    val monthTab = state.workSystem != WorkSystem.SITE
+    val pagerState = rememberPagerState(pageCount = { if (monthTab) 2 else 1 })
 
     Column(Modifier.fillMaxSize()) {
         JiabanTopBar(
             title = null,
-            titleContent = { StatsTabBar(pagerState) },
+            titleContent = { StatsTabBar(pagerState, monthTab) },
             showBack = canBack,
             onBack = onBack,
         )
@@ -655,51 +658,21 @@ private fun StatsContent(
     }
 }
 
-/** 顶栏分段控件：两个标签（统计/记月），选中块连续跟随 pager 位移，内容区同步横滑 */
+/** 顶栏分段控件（样式对齐工地记工记录页顶栏胶囊）：统计常驻；记月仅非工地制度显示（工地模式后续配专属页） */
 @Composable
-private fun StatsTabBar(pagerState: PagerState) {
+private fun StatsTabBar(pagerState: PagerState, showMonth: Boolean) {
     val scope = rememberCoroutineScope()
-    val segWidth = 86.dp
-    Box(
-        Modifier
-            .width(segWidth * 2)
-            .height(34.dp)
-            .clip(RoundedCornerShape(Radius.pill))
-            .background(MaterialTheme.colorScheme.secondaryContainer),
-    ) {
-        // 滑块：offset 连续取 currentPage + 滑动分数，点标签的 animateScrollToPage 与手势拖动都跟随
-        Box(
-            Modifier
-                .width(segWidth)
-                .fillMaxHeight()
-                .offset(x = segWidth * (pagerState.currentPage + pagerState.currentPageOffsetFraction))
-                .clip(RoundedCornerShape(Radius.pill))
-                .background(MaterialTheme.colorScheme.primary),
-        )
-        Row(Modifier.fillMaxSize()) {
-            listOf(R.string.stats_title, R.string.stats_tab_month).forEachIndexed { index, labelRes ->
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        // 按压反馈即滑块位移本身，不叠涟漪（避免涟漪盖住移动中的选中块）
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { scope.launch { pagerState.animateScrollToPage(index) } },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    val selected = index == pagerState.currentPage
-                    Text(
-                        stringResource(labelRes),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = if (selected) MaterialTheme.colorScheme.onPrimary
-                        else MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
-                }
-            }
-        }
+    val labels = buildList {
+        add(stringResource(R.string.stats_title))
+        if (showMonth) add(stringResource(R.string.stats_tab_month))
     }
+    SegmentBar(
+        labels = labels,
+        selected = pagerState.currentPage,
+        onSelect = { index -> scope.launch { pagerState.animateScrollToPage(index) } },
+        segWidth = 86.dp,
+        position = pagerState.currentPage + pagerState.currentPageOffsetFraction,
+    )
 }
 
 /** 模式取值文本：非工地=时长（小时），工地=工数（"N 工"） */
