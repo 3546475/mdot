@@ -52,9 +52,15 @@ jobs:
           keyPassword=${{ secrets.SIGNING_KEY_PASSWORD }}
           EOF
 
-      - name: Build release APKs
+      - name: Run unit tests (quality gate)
+        # 13 文档 B8-01：发版前单测门禁。E2E 两例在 CI 无 docs/test-s3.local.properties
+        # 时自动跳过（assumeTrue），不会阻塞离线门禁。
         run: |
           chmod +x ./gradlew
+          ./gradlew :app:testDebugUnitTest --no-daemon
+
+      - name: Build release APKs
+        run: |
           ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
       - name: Rename APKs (v8a / v7a / dual)
