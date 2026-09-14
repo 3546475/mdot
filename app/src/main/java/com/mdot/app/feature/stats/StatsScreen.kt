@@ -94,6 +94,7 @@ import com.mdot.app.domain.model.RecordType
 import com.mdot.app.domain.model.WorkSystem
 import com.mdot.app.domain.util.Money
 import com.mdot.app.domain.util.TimeUtils
+import com.mdot.app.feature.detail.DetailPane
 import com.mdot.app.feature.record.RecordSheetController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -428,20 +429,22 @@ class StatsViewModel @Inject constructor(
 
 }
 
-/** 统计页（03 文档 §5.4 线框；v0.6 全制度统一布局：维度行→汇总→热点图→本周柱状→饼图→明细入口） */
+/** 统计页（03 文档 §5.4 线框；v0.6 全制度统一布局：维度行→汇总→热点图→本周柱状→饼图；
+ * 顶栏页签 统计/记月/明细——明细内容并入为末位页签，独立明细页保留给首页收入卡入口） */
 @Composable
 fun StatsScreen(
     canBack: Boolean = false,
     onBack: () -> Unit = {},
-    onOpenDetail: () -> Unit = {},
     vm: StatsViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val pieMode by vm.pieMode.collectAsStateWithLifecycle()
     val selectedBar by vm.selectedBar.collectAsStateWithLifecycle()
-    // 记月按月度加班/请假口径统计，工地记工不适用——该制度下隐藏记月页签（后续各制度配专属页）
-    val monthTab = state.workSystem != WorkSystem.SITE
-    val pagerState = rememberPagerState(pageCount = { if (monthTab) 2 else 1 })
+    // 记月=月度工资单（基本项目卡：基本工资/加班工资/调休 + 「同步本月考勤」回填），仅底薪制有意义——
+    // 标准工时/综合工时显示；小时工（纯时薪，引擎 baseIncludedCents=0 无底薪、compBalanceMinutes=0 无调休，
+    // 基本项目卡 2/3 行恒空值）与工地记工（无 PayrollCalculator 引擎值）隐藏——两制度为「统计/明细」两页签
+    val monthTab = state.workSystem == WorkSystem.STANDARD || state.workSystem == WorkSystem.COMPREHENSIVE
+    val pagerState = rememberPagerState(pageCount = { if (monthTab) 3 else 2 })
 
     Column(Modifier.fillMaxSize()) {
         JiabanTopBar(
@@ -461,23 +464,22 @@ fun StatsScreen(
                     state = state,
                     pieMode = pieMode,
                     selectedBar = selectedBar,
-                    onOpenDetail = onOpenDetail,
                     showBottomBar = !canBack,
                 )
-                else -> PayMonthContent()
+                1 -> if (monthTab) PayMonthContent() else DetailPane(showBottomBar = !canBack)
+                else -> DetailPane(showBottomBar = !canBack)
             }
         }
     }
 }
 
-/** 统计页第 0 页：原统计内容（维度行→汇总→热点图→柱状→饼图→明细入口） */
+/** 统计页第 0 页：原统计内容（维度行→汇总→热点图→柱状→饼图） */
 @Composable
 private fun StatsContent(
     vm: StatsViewModel,
     state: StatsUiState,
     pieMode: PieMode,
     selectedBar: String?,
-    onOpenDetail: () -> Unit,
     showBottomBar: Boolean,
 ) {
     var picking by remember { mutableStateOf<String?>(null) } // "from" | "to"
@@ -619,27 +621,6 @@ private fun StatsContent(
             // ---- 饼图卡 ----
             item {
                 PieCard(state, pieMode, vm::onPieMode)
-                Spacer(Modifier.height(Spacing.m))
-            }
-
-            // ---- 明细入口（明细列表独立成页，从首页收入卡/此处均可进入） ----
-            item {
-                SectionCard(onClick = onOpenDetail) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            stringResource(R.string.stats_detail_title),
-                            style = MaterialTheme.typography.titleSmall,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text(
-                            stringResource(R.string.home_income_detail),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.width(Spacing.xs))
-                        Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
                 Spacer(Modifier.height(Spacing.xl))
             }
         }
@@ -658,19 +639,21 @@ private fun StatsContent(
     }
 }
 
-/** 顶栏分段控件（样式对齐工地记工记录页顶栏胶囊）：统计常驻；记月仅非工地制度显示（工地模式后续配专属页） */
+/** 顶栏分段控件（样式对齐工地记工记录页顶栏胶囊）：统计、明细常驻；记月仅非工地制度显示（工地模式后续配专属页） */
 @Composable
 private fun StatsTabBar(pagerState: PagerState, showMonth: Boolean) {
     val scope = rememberCoroutineScope()
     val labels = buildList {
         add(stringResource(R.string.stats_title))
         if (showMonth) add(stringResource(R.string.stats_tab_month))
+        add(stringResource(R.string.stats_tab_detail))
     }
     SegmentBar(
         labels = labels,
         selected = pagerState.currentPage,
         onSelect = { index -> scope.launch { pagerState.animateScrollToPage(index) } },
-        segWidth = 86.dp,
+        // 三段总宽（3×84+8=260dp）须 ≤ 顶栏标题区（屏宽 − 两侧 48dp 占位）
+        segWidth = 84.dp,
         position = pagerState.currentPage + pagerState.currentPageOffsetFraction,
     )
 }

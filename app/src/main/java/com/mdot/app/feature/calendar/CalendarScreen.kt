@@ -353,6 +353,8 @@ class CalendarViewModel @Inject constructor(
     }
 
     fun nextMonth() {
+        // 未来不可记（未来日期不可选）→ 不允许切到未来月份；网格横滑到尽头与 › 按钮同此规则
+        if (!month.value.isBefore(YearMonth.now())) return
         exitBatchSelect()
         month.value = month.value.plusMonths(1)
     }
@@ -370,6 +372,8 @@ class CalendarViewModel @Inject constructor(
     }
 
     fun selectDate(date: LocalDate) {
+        // 未来日期不可选（与网格置灰一致）；多选入口 startBatchSelect/toggleBatchSelect 已有同款守卫
+        if (date.isAfter(LocalDate.now())) return
         selectedDate.value = date
         recordSheet.setCalendarSelectedDate(date)
     }
@@ -508,7 +512,8 @@ private fun MonthHeaderRow(vm: CalendarViewModel) {
             )
         }
         TextButton(onClick = vm::goToday) { Text(stringResource(R.string.calendar_back_today)) }
-        IconButton(onClick = vm::nextMonth) {
+        // 当前月即尽头（未来不可记）：› 置灰，与网格横滑规则一致
+        IconButton(onClick = vm::nextMonth, enabled = state.month.isBefore(YearMonth.now())) {
             Icon(painterResource(R.drawable.ic_ms_keyboard_arrow_right), contentDescription = stringResource(R.string.calendar_next_month))
         }
     }
@@ -578,6 +583,8 @@ private fun MonthGrid(state: CalendarUiState, vm: CalendarViewModel) {
                                 isSelected = !batchSelecting && cell.date == state.selectedDate,
                                 isSite = state.workSystem == com.mdot.app.domain.model.WorkSystem.SITE,
                                 isBatchSelected = batchSelecting && cell.date != null && cell.date in batchSelected,
+                                // 今天之后的日期不可选：置灰且不响应点击/长按（与切月限制一致）
+                                isFuture = cell.date?.isAfter(today) == true,
                                 modifier = Modifier
                                     .weight(1f)
                                     .aspectRatio(0.95f),
@@ -805,6 +812,8 @@ private fun CalendarCellView(
     isSelected: Boolean = false,
     isSite: Boolean = false,
     isBatchSelected: Boolean = false,
+    /** 今天之后：置灰不可点（未来不可记） */
+    isFuture: Boolean = false,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
@@ -829,6 +838,7 @@ private fun CalendarCellView(
     )
     val textColor by animateColorAsState(
         targetValue = when {
+            isFuture -> colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
             isBatchSelected || isSelected || isToday -> colorScheme.onPrimaryContainer
             cell.holiday?.kind == com.mdot.app.domain.model.HolidayKind.HOLIDAY -> colorScheme.secondary
             else -> colorScheme.onSurface
@@ -878,23 +888,26 @@ private fun CalendarCellView(
                     .border(1.5.dp, strokeColor, shape)
             )
             // 涟漪层夹在指示圈与文字之间： indication 画在本层 children 之下，
-            // 若挂在外层容器会被不透明指示圈（尤其绽放动画中）整个盖住
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .combinedClickable(
-                        interactionSource = interaction,
-                        indication = LocalIndication.current,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onClick()
-                        },
-                        onLongClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onLongClick()
-                        },
-                    )
-            )
+            // 若挂在外层容器会被不透明指示圈（尤其绽放动画中）整个盖住。
+            // 未来日期不可选：不挂点击层（无涟漪无触感），onLongClick 同样不响应
+            if (!isFuture) {
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .combinedClickable(
+                            interactionSource = interaction,
+                            indication = LocalIndication.current,
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onClick()
+                            },
+                            onLongClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onLongClick()
+                            },
+                        )
+                )
+            }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,

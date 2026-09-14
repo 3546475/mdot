@@ -2,6 +2,7 @@
 <resources>
     <string name="stats_title">统计</string>
     <string name="stats_tab_month">记月</string>
+    <string name="stats_tab_detail">明细</string>
     <!-- 记月（月度工资单） -->
     <string name="paymonth_month">%1$d年%2$d月</string>
     <string name="paymonth_prev_cd">上个月</string>
@@ -82,7 +83,6 @@
     <string name="stats_site_detail_rest">休息</string>
     <string name="stats_site_detail_piece">包工 · %1$s</string>
     <string name="stats_site_detail_advance">借支 · %1$s</string>
-    <string name="stats_detail_title">明细</string>
     <string name="stats_detail_ot_line">%1$s %2$s · %3$s</string>
     <string name="stats_detail_ot_comp">" · 转调休%1$s"</string>
     <string name="stats_detail_leave">请假 %1$s · %2$s</string>

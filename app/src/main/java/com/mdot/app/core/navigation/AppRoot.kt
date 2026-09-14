@@ -363,7 +363,6 @@ private fun AppRootContent(
                     StatsScreen(
                         canBack = !inBar("stats"),
                         onBack = { navController.popBackStack() },
-                        onOpenDetail = { navTo(navController, Routes.DETAIL, slots) },
                     )
                 }
             }

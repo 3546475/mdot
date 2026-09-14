@@ -5,7 +5,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -41,7 +40,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.JiabanTopBar
-import com.mdot.app.core.designsystem.component.SegmentBar
 import com.mdot.app.core.designsystem.component.SegmentBar
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.navigation.contentBottomPadding
@@ -105,8 +103,10 @@ fun SyncScreen(
                 onBack = onBack,
             )
 
-            // 页签用静态切换（不用 Pager）：NavHost 转场 forceMeasure 会把无限高约束传给
-            // pager 页内容，页内 verticalScroll 会抛「infinite maximum height」（实测 2/3 崩溃率）
+            // 页签用 Pager 横滑（与统计/外观合并页一致）；各页根必须 fillMaxSize 顶对齐——
+            // Pager 会把不足一屏的页在视口内垂直居中（实测存储源页上方留白 ~330dp）。
+            // 页内自带垂直滚动、严禁再嵌套：NavHost 转场 forceMeasure 传无界约束时
+            // 内层滚动会抛「infinite maximum height」（实测高概率崩溃，见 c43f078）
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
@@ -207,6 +207,8 @@ private fun SyncTabPage(
 ) {
     Column(
         Modifier
+            // 必须撑满 pager 视口：内容不足一屏时 pager 会把页垂直居中，顶上留大片空白
+            .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .contentBottomPadding(showBottomBar = !canBack)
             .padding(horizontal = Spacing.page),
@@ -264,13 +266,6 @@ private fun SyncTabPage(
                         state.status.lastError?.let {
                             Text(it, style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.error)
-                        }
-                        if (!state.status.configured) {
-                            Text(
-                                stringResource(R.string.sync_backup_restore_hint),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                         }
                         Button(
                             onClick = vm::backupNow,

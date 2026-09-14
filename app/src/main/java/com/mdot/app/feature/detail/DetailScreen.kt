@@ -42,7 +42,7 @@ import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.designsystem.component.SectionCard
-import com.mdot.app.core.navigation.bottomBarContentPaddingValues
+import com.mdot.app.core.navigation.contentPaddingValues
 import com.mdot.app.core.repository.DataRevision
 import com.mdot.app.core.repository.RecordRepository
 import com.mdot.app.core.datastore.SettingsDataSource
@@ -214,74 +214,87 @@ class DetailViewModel @Inject constructor(
  * 明细页（二级页）：所有模式首页收入卡点击进入——本考勤周期内的收入构成逐条明细。
  * 模式化美化：顶部周期标签 + 模式化 hero 汇总卡（标准=三档时薪分布/小时工=纯工时/综合=周期口径/
  * 工地=应得·借支·部分结算·待结三色）+ 按日期分组的行列表（行内档位/类型徽章与图标瓦片）。
+ * 内容主体抽为 [DetailPane]（统计页「明细」页签复用同一渲染，本独立页保留给首页收入卡入口）。
  */
 @Composable
 fun DetailScreen(
     onBack: () -> Unit,
     vm: DetailViewModel = hiltViewModel(),
 ) {
-    val state by vm.uiState.collectAsStateWithLifecycle()
     Column(
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
-            .statusBarsPadding()
-            .padding(horizontal = Spacing.page),
+            .statusBarsPadding(),
     ) {
         JiabanTopBar(title = stringResource(R.string.detail_title), onBack = onBack)
         Spacer(Modifier.height(Spacing.s))
 
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            item {
-                if (state.rangeLabel.isNotEmpty()) {
-                    // 区间胶囊（与首页数据区日期同款样式）
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(Radius.pill))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.ic_ms_calendar_month), null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            state.rangeLabel,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Spacer(Modifier.height(Spacing.s))
+        // 水平留白由 DetailPane 自带（页签形态无外层 padding，避免双份）
+        DetailPane(showBottomBar = false, vm = vm)
+    }
+}
+
+/** 明细内容主体（统计页「明细」页签与本页共用）：区间胶囊 + 模式化汇总卡 + 逐条明细列表 */
+@Composable
+fun DetailPane(
+    showBottomBar: Boolean,
+    vm: DetailViewModel = hiltViewModel(),
+) {
+    val state by vm.uiState.collectAsStateWithLifecycle()
+
+    LazyColumn(
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = Spacing.page),
+        contentPadding = com.mdot.app.core.navigation.contentPaddingValues(showBottomBar = showBottomBar),
+    ) {
+        item {
+            if (state.rangeLabel.isNotEmpty()) {
+                // 区间胶囊（与首页数据区日期同款样式）
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(Radius.pill))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_ms_calendar_month), null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        state.rangeLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(Spacing.s))
+            }
+        }
+        item {
+            DetailSummary(state)
+            Spacer(Modifier.height(Spacing.m))
+        }
+        when {
+            state.workSystem == WorkSystem.SITE -> {
+                // 平铺单行明细（日期星期并入行内）
+                if (state.siteDetails.isEmpty()) item { EmptyHint() }
+                items(state.siteDetails) { row -> SiteDetailRowItem(row) }
+            }
+            else -> {
+                if (state.breakdowns.isEmpty() && state.output != null) item { EmptyHint() }
+                items(state.breakdowns) { bd ->
+                    NormalDetailRow(
+                        state.workSystem,
+                        bd,
+                        onOpen = { vm.recordSheet.open(bd.record.date, bd.record.type) },
+                    )
                 }
             }
-            item {
-                DetailSummary(state)
-                Spacer(Modifier.height(Spacing.m))
-            }
-            when {
-                state.workSystem == WorkSystem.SITE -> {
-                    // 平铺单行明细（日期星期并入行内）
-                    if (state.siteDetails.isEmpty()) item { EmptyHint() }
-                    items(state.siteDetails) { row -> SiteDetailRowItem(row) }
-                }
-                else -> {
-                    if (state.breakdowns.isEmpty() && state.output != null) item { EmptyHint() }
-                    items(state.breakdowns) { bd ->
-                        NormalDetailRow(
-                            state.workSystem,
-                            bd,
-                            onOpen = { vm.recordSheet.open(bd.record.date, bd.record.type) },
-                        )
-                    }
-                }
-            }
-            item { Spacer(Modifier.height(bottomBarContentPaddingValues().calculateBottomPadding())) }
         }
     }
 }

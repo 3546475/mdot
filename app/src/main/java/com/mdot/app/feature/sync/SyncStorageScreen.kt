@@ -1,18 +1,18 @@
 package com.mdot.app.feature.sync
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -28,6 +28,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,22 +49,32 @@ import com.mdot.app.core.sync.S3Creds
 import com.mdot.app.core.sync.S3Source
 import com.mdot.app.core.sync.WebDavCreds
 import com.mdot.app.core.sync.WebDavSource
+import kotlinx.coroutines.launch
 
-/** 存储源页签内容（同步备份合并页第 2 页签）：类型子页签（滑块式）+ 多存储源列表（新增/切换/删除/断开） */
+/** 存储源页签内容（同步备份合并页第 2 页签）：类型子页签（滑块式、内容横滑切换，同记工页点工/包工）+ 多存储源列表（新增/切换/删除/断开） */
 @Composable
 fun SyncStoragePane(
     state: SyncUiState,
     vm: SyncViewModel,
 ) {
-    val kindIndex = when (state.kind) {
-        ProviderKind.S3 -> 1
-        else -> 0
-    }
-    val kindPos by animateFloatAsState(
-        targetValue = kindIndex.toFloat(),
-        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-        label = "storageKindPos",
+    val scope = rememberCoroutineScope()
+    // 类型子页签 = 横滑 Pager（与记工页点工/包工一致）：滑块连续跟随手势，
+    // 内容区横滑切类型；WebDAV 尽头继续滑经嵌套滚动自然联动上级（↔ 备份页签）
+    val kindPager = rememberPagerState(
+        initialPage = if (state.kind == ProviderKind.S3) 1 else 0,
+        pageCount = { 2 },
     )
+    // VM kind（初始载入等外部变化）→ pager 归位；以 targetPage 判重，避免打断进行中的拖拽
+    LaunchedEffect(state.kind) {
+        val target = if (state.kind == ProviderKind.S3) 1 else 0
+        if (kindPager.targetPage != target) kindPager.scrollToPage(target)
+    }
+    // pager 停靠页 → VM kind（onKind 仅更新本地状态，无副作用；新增弹窗类型跟随此值）
+    LaunchedEffect(kindPager) {
+        snapshotFlow { kindPager.currentPage }.collect { page ->
+            vm.onKind(if (page == 1) ProviderKind.S3 else ProviderKind.WEBDAV)
+        }
+    }
 
     // 外层 SyncTabPage 已提供垂直滚动，此处不可再套滚动（滚动嵌套会让内层收到无限高约束而崩溃）
     Column(Modifier.fillMaxWidth()) {
@@ -74,10 +86,13 @@ fun SyncStoragePane(
         ) {
             SegmentBar(
                 labels = listOf("WebDAV", "S3"),
-                selected = kindIndex,
-                onSelect = { index -> vm.onKind(if (index == 1) ProviderKind.S3 else ProviderKind.WEBDAV) },
+                selected = kindPager.currentPage,
+                onSelect = { index ->
+                    vm.onKind(if (index == 1) ProviderKind.S3 else ProviderKind.WEBDAV)
+                    scope.launch { kindPager.animateScrollToPage(index) }
+                },
                 segWidth = 112.dp,
-                position = kindPos,
+                position = kindPager.currentPage + kindPager.currentPageOffsetFraction,
             )
             Spacer(Modifier.weight(1f))
             IconButton(
@@ -90,46 +105,51 @@ fun SyncStoragePane(
 
         Spacer(Modifier.height(Spacing.m))
 
-        when (state.kind) {
-            ProviderKind.WEBDAV -> {
-                if (state.sources.webdav.isEmpty()) {
-                    EmptySourcesText(stringResource(R.string.sync_storage_empty_webdav))
-                } else {
-                    state.sources.webdav.forEach { source ->
-                        SourceCard(
-                            name = source.name,
-                            lines = listOf(source.creds.baseUrl, source.creds.username),
-                            selected = source.id == state.sources.selectedId,
-                            testing = state.testingId == source.id,
-                            onClick = { vm.onSelectSource(source.id) },
-                            onEdit = { vm.openEditDialog(source.id) },
-                            onDelete = { vm.requestDelete(source.id) },
-                        )
-                        Spacer(Modifier.height(Spacing.s))
+        // 内容横滑切类型；页内禁套垂直滚动（垂直滚动归外层 SyncTabPage，高度随内容自适应）
+        HorizontalPager(state = kindPager, modifier = Modifier.fillMaxWidth()) { page ->
+            Column {
+                when (if (page == 1) ProviderKind.S3 else ProviderKind.WEBDAV) {
+                    ProviderKind.WEBDAV -> {
+                        if (state.sources.webdav.isEmpty()) {
+                            EmptySourcesText(stringResource(R.string.sync_storage_empty_webdav))
+                        } else {
+                            state.sources.webdav.forEach { source ->
+                                SourceCard(
+                                    name = source.name,
+                                    lines = listOf(source.creds.baseUrl, source.creds.username),
+                                    selected = source.id == state.sources.selectedId,
+                                    testing = state.testingId == source.id,
+                                    onClick = { vm.onSelectSource(source.id) },
+                                    onEdit = { vm.openEditDialog(source.id) },
+                                    onDelete = { vm.requestDelete(source.id) },
+                                )
+                                Spacer(Modifier.height(Spacing.s))
+                            }
+                        }
                     }
+
+                    ProviderKind.S3 -> {
+                        if (state.sources.s3.isEmpty()) {
+                            EmptySourcesText(stringResource(R.string.sync_storage_empty_s3))
+                        } else {
+                            state.sources.s3.forEach { source ->
+                                SourceCard(
+                                    name = source.name,
+                                    lines = listOf(source.creds.endpoint, source.creds.bucket),
+                                    selected = source.id == state.sources.selectedId,
+                                    testing = state.testingId == source.id,
+                                    onClick = { vm.onSelectSource(source.id) },
+                                    onEdit = { vm.openEditDialog(source.id) },
+                                    onDelete = { vm.requestDelete(source.id) },
+                                )
+                                Spacer(Modifier.height(Spacing.s))
+                            }
+                        }
+                    }
+
+                    ProviderKind.NONE -> Unit
                 }
             }
-
-            ProviderKind.S3 -> {
-                if (state.sources.s3.isEmpty()) {
-                    EmptySourcesText(stringResource(R.string.sync_storage_empty_s3))
-                } else {
-                    state.sources.s3.forEach { source ->
-                        SourceCard(
-                            name = source.name,
-                            lines = listOf(source.creds.endpoint, source.creds.bucket),
-                            selected = source.id == state.sources.selectedId,
-                            testing = state.testingId == source.id,
-                            onClick = { vm.onSelectSource(source.id) },
-                            onEdit = { vm.openEditDialog(source.id) },
-                            onDelete = { vm.requestDelete(source.id) },
-                        )
-                        Spacer(Modifier.height(Spacing.s))
-                    }
-                }
-            }
-
-            ProviderKind.NONE -> Unit
         }
 
         // 当前使用中的存储源
