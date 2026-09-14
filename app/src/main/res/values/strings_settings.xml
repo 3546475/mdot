@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- 关于/设置 双页签（关于页第 2 页签） -->
+    <string name="about_tab_setup">设置</string>
+    <!-- 制度设定多页签短标签（顶栏齿轮进入；段宽按页签数收缩，标签取短词） -->
+    <string name="sysset_tab_salary">工资</string>
+    <string name="sysset_tab_comp">调休</string>
+    <string name="sysset_tab_cycle">周期</string>
+    <string name="sysset_tab_workdays">工作日</string>
+    <string name="sysset_tab_shifts">班次</string>
     <!-- 设置中心 -->
-    <string name="settings_title">设置</string>
     <string name="settings_group_view_share">查看与分享</string>
     <string name="settings_row_calendar">日历</string>
     <string name="settings_row_stats">统计</string>
@@ -14,27 +21,16 @@
     <string name="settings_row_appearance">外观</string>
     <string name="settings_group_other">其他</string>
     <string name="settings_row_update_datasource">更新与数据源</string>
-    <string name="settings_row_about_privacy">关于与隐私</string>
 
     <!-- 工时设置 -->
-    <string name="settings_worktime_title">工时设置</string>
     <string name="settings_system_desc_hourly">按小时计薪，纯时薪制，无底薪无转调休</string>
     <string name="settings_system_desc_comprehensive">按周期总工时算加班，单日超 8h 不算；法定节假日 3 倍即时</string>
     <string name="settings_system_desc_standard">工资 = 底薪 + 加班工资；超过正常上班 8 小时算加班</string>
-    <string name="settings_switch_action">切换</string>
     <string name="settings_row_salary">工资设定</string>
-    <string name="settings_salary_per_hour">%1$s 元/小时</string>
-    <string name="settings_salary_per_month">%1$s 元/月</string>
-    <string name="settings_not_set">未设置</string>
-    <string name="settings_manual_rate">手动单价</string>
     <string name="settings_row_comp_balance">调休余额</string>
     <string name="settings_row_cycle">考勤周期</string>
-    <string name="settings_cycle_anchor_summary">每月%1$d号起</string>
     <string name="settings_row_workdays">工作日设定</string>
-    <string name="settings_workdays_standard">周一至周五</string>
-    <string name="settings_workdays_custom_count">自定义 %1$d 天</string>
     <string name="settings_row_shifts">班次管理</string>
-    <string name="settings_shift_count_summary">%1$d 个</string>
 
     <!-- 切换工时制度 -->
     <string name="settings_switch_title">切换工时制度</string>

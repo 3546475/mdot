@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -39,7 +38,6 @@ import com.mdot.app.R
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.SiteMoneyColors
 import com.mdot.app.core.designsystem.Spacing
-import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.navigation.contentPaddingValues
@@ -208,31 +206,6 @@ class DetailViewModel @Inject constructor(
         partial: Long,
     ): SitePayCalculator.Output =
         if (partial > 0) summary.copy(pendingCents = summary.pendingCents - partial) else summary
-}
-
-/**
- * 明细页（二级页）：所有模式首页收入卡点击进入——本考勤周期内的收入构成逐条明细。
- * 模式化美化：顶部周期标签 + 模式化 hero 汇总卡（标准=三档时薪分布/小时工=纯工时/综合=周期口径/
- * 工地=应得·借支·部分结算·待结三色）+ 按日期分组的行列表（行内档位/类型徽章与图标瓦片）。
- * 内容主体抽为 [DetailPane]（统计页「明细」页签复用同一渲染，本独立页保留给首页收入卡入口）。
- */
-@Composable
-fun DetailScreen(
-    onBack: () -> Unit,
-    vm: DetailViewModel = hiltViewModel(),
-) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
-            .statusBarsPadding(),
-    ) {
-        JiabanTopBar(title = stringResource(R.string.detail_title), onBack = onBack)
-        Spacer(Modifier.height(Spacing.s))
-
-        // 水平留白由 DetailPane 自带（页签形态无外层 padding，避免双份）
-        DetailPane(showBottomBar = false, vm = vm)
-    }
 }
 
 /** 明细内容主体（统计页「明细」页签与本页共用）：区间胶囊 + 模式化汇总卡 + 逐条明细列表 */

@@ -70,14 +70,13 @@ import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.ConfirmDialog
 import com.mdot.app.core.designsystem.component.SectionCard
-import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.domain.model.Shift
 import java.time.DayOfWeek
 
-/** 考勤周期（F7-3：1–31 号起始日；29–31 在天数不足的月份自动落到月末） */
+/** 考勤周期内容主体（设定多页签「周期」页签复用；F7-3：1–31 号起始日，29–31 在天数不足的月份自动落到月末） */
 @Composable
-fun CycleScreen(onBack: () -> Unit, vm: CycleViewModel = hiltViewModel()) {
+fun CyclePane(vm: CycleViewModel = hiltViewModel()) {
     val anchor by vm.anchorDay.collectAsStateWithLifecycle()
     val example = stringResource(R.string.cycle_period_example, remember(anchor) { buildExample(anchor) })
 
@@ -87,8 +86,7 @@ fun CycleScreen(onBack: () -> Unit, vm: CycleViewModel = hiltViewModel()) {
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.page),
     ) {
-        JiabanTopBar(title = stringResource(R.string.cycle_title), onBack = onBack)
-        Spacer(Modifier.height(Spacing.m))
+        Spacer(Modifier.height(Spacing.s))
 
         // 说明卡 + 当前周期示例
         SectionCard {
@@ -242,9 +240,9 @@ private fun CompactIconButton(
     }
 }
 
-/** 工作日设定（F7-4：影响档位自动判定的兜底） */
+/** 工作日设定内容主体（设定多页签「工作日」页签复用；F7-4：影响档位自动判定的兜底） */
 @Composable
-fun WorkdaysScreen(onBack: () -> Unit, vm: WorkdaysViewModel = hiltViewModel()) {
+fun WorkdaysPane(vm: WorkdaysViewModel = hiltViewModel()) {
     val workdays by vm.workdays.collectAsStateWithLifecycle()
     val days = listOf(
         DayOfWeek.MONDAY to stringResource(R.string.workdays_mon),
@@ -259,10 +257,10 @@ fun WorkdaysScreen(onBack: () -> Unit, vm: WorkdaysViewModel = hiltViewModel()) 
     Column(
         Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.page),
     ) {
-        JiabanTopBar(title = stringResource(R.string.workdays_title), onBack = onBack)
-        Spacer(Modifier.height(Spacing.xs))
+        Spacer(Modifier.height(Spacing.s))
         Text(
             stringResource(R.string.workdays_desc),
             style = MaterialTheme.typography.bodyMedium,
@@ -282,10 +280,10 @@ fun WorkdaysScreen(onBack: () -> Unit, vm: WorkdaysViewModel = hiltViewModel()) 
     }
 }
 
-/** 班次管理（F7-5：预置可隐藏不可删；自定义可增删改、排序）；
+/** 班次管理内容主体（设定多页签「班次」页签复用；F7-5：预置可隐藏不可删；自定义可增删改、排序）；
  *  仿底栏配置卡：左侧六点手柄拖动排序，Switch 控制显示/隐藏，⋮ 菜单收纳改名/删除 */
 @Composable
-fun ShiftsScreen(onBack: () -> Unit, vm: ShiftsViewModel = hiltViewModel()) {
+fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
     val shifts by vm.shifts.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     var showCreate by remember { mutableStateOf(false) }
@@ -323,8 +321,7 @@ fun ShiftsScreen(onBack: () -> Unit, vm: ShiftsViewModel = hiltViewModel()) {
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = Spacing.page),
         ) {
-            JiabanTopBar(title = stringResource(R.string.shifts_title), onBack = onBack)
-            Spacer(Modifier.height(Spacing.xs))
+            Spacer(Modifier.height(Spacing.s))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(R.string.shifts_drag_hint),

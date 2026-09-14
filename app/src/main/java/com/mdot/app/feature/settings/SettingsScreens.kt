@@ -9,191 +9,47 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import com.mdot.app.domain.model.WorkSystem
-import com.mdot.app.domain.model.RateTier
-import com.mdot.app.domain.model.SalaryMode
-import com.mdot.app.domain.util.Money
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.foundation.layout.wrapContentWidth
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.AdaptiveSpecs
-import com.mdot.app.core.designsystem.LocalWindowSpec
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.widthIn
-import com.mdot.app.core.designsystem.component.TopBarHeight
 import com.mdot.app.core.designsystem.Radius
-import com.mdot.app.core.designsystem.WindowSpec
 import com.mdot.app.core.designsystem.Spacing
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.core.designsystem.component.JiabanTopBar
+import com.mdot.app.core.designsystem.component.SegmentBar
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.SettingRow
 import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.core.navigation.Routes
-import com.mdot.app.domain.util.TimeUtils
+import com.mdot.app.domain.model.WorkSystem
+import kotlinx.coroutines.launch
 
-/** 设置中心——二级页面：全部页面入口统一收纳、分组布局 */
-@Composable
-fun SettingsScreen(
-    onBack: () -> Unit,
-    onOpen: (String) -> Unit,
-    hub: SettingsHubViewModel = hiltViewModel(),
-) {
-    val appearance by hub.appearance.collectAsStateWithLifecycle()
-    val syncStatus by hub.syncStatus.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-
-    // 响应式（docs 03 §3.2）：EXPANDED 分组两列（720dp 居中）；其余单列 600dp 居中
-    val twoPane = LocalWindowSpec.current == WindowSpec.EXPANDED
-
-    if (twoPane) {
-        Row(
-            Modifier
-                .fillMaxSize()
-                .wrapContentWidth(Alignment.CenterHorizontally)
-                .widthIn(max = AdaptiveSpecs.twoPaneMaxWidth),
-        ) {
-            Column(
-                Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .contentBottomPadding(showBottomBar = false)
-                    .padding(horizontal = Spacing.page),
-            ) {
-                JiabanTopBar(title = stringResource(R.string.settings_title), onBack = onBack)
-                Spacer(Modifier.height(Spacing.m))
-                // ---- 查看与分享 ----
-                SettingsGroup(stringResource(R.string.settings_group_view_share)) {
-                    SettingRow(stringResource(R.string.settings_row_calendar), null, painterResource(R.drawable.ic_ms_calendar_month), onClick = { onOpen(Routes.CALENDAR_PATTERN) })
-                    SettingRow(stringResource(R.string.settings_row_stats), null, painterResource(R.drawable.ic_ms_bar_chart), onClick = { onOpen(Routes.STATS) })
-                    SettingRow(stringResource(R.string.settings_row_share), null, painterResource(R.drawable.ic_ms_file_download), onClick = { onOpen(Routes.EXPORT) })
-                }
-                Spacer(Modifier.height(Spacing.m))
-                // ---- 个性化 ----
-                SettingsGroup(stringResource(R.string.settings_group_personalization)) {
-                    SettingRow(
-                        stringResource(R.string.settings_row_appearance), appearanceSummary(context, appearance),
-                        painterResource(R.drawable.ic_ms_palette), onClick = { onOpen(Routes.APPEARANCE) },
-                    )
-                }
-                Spacer(Modifier.height(Spacing.xl))
-            }
-            Column(
-                Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .contentBottomPadding(showBottomBar = false)
-                    .padding(horizontal = Spacing.page),
-            ) {
-                // 右栏顶栏占位（与左栏 JiabanTopBar 等高，首卡对齐）
-                Spacer(Modifier.height(WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + TopBarHeight))
-                Spacer(Modifier.height(Spacing.m))
-                // ---- 数据与备份 ----
-                SettingsGroup(stringResource(R.string.settings_group_data_backup)) {
-                    SettingRow(
-                        stringResource(R.string.settings_row_sync_backup),
-                        if (syncStatus.configured) stringResource(R.string.settings_sync_configured)
-                        else stringResource(R.string.settings_sync_not_configured),
-                        painterResource(R.drawable.ic_ms_cloud_sync), onClick = { onOpen(Routes.SYNC) },
-                    )
-                    /* 更新与数据源入口已隐藏：hero 卡迁至关于页（Routes.DATASOURCE 页面保留）
-                    SettingRow(
-                        stringResource(R.string.settings_row_update_datasource), null,
-                        painterResource(R.drawable.ic_ms_settings), onClick = { onOpen(Routes.DATASOURCE) },
-                    )
-                    */
-                }
-                Spacer(Modifier.height(Spacing.m))
-                // ---- 其他 ----
-                SettingsGroup(stringResource(R.string.settings_group_other)) {
-                    SettingRow(stringResource(R.string.settings_row_about_privacy), null, painterResource(R.drawable.ic_ms_shield), onClick = { onOpen(Routes.ABOUT) })
-                }
-                Spacer(Modifier.height(Spacing.xl))
-            }
-        }
-    } else {
-        // ---- 手机：单列（原布局，600dp 居中） ----
-        Column(
-            Modifier
-                .fillMaxSize()
-                .wrapContentWidth(Alignment.CenterHorizontally)
-                .verticalScroll(rememberScrollState())
-                .contentBottomPadding(showBottomBar = false)
-                .widthIn(max = AdaptiveSpecs.contentMaxWidth)
-                .padding(horizontal = Spacing.page),
-        ) {
-            JiabanTopBar(title = stringResource(R.string.settings_title), onBack = onBack)
-            Spacer(Modifier.height(Spacing.m))
-            // ---- 查看与分享 ----
-            SettingsGroup(stringResource(R.string.settings_group_view_share)) {
-                SettingRow(stringResource(R.string.settings_row_calendar), null, painterResource(R.drawable.ic_ms_calendar_month), onClick = { onOpen(Routes.CALENDAR_PATTERN) })
-                SettingRow(stringResource(R.string.settings_row_stats), null, painterResource(R.drawable.ic_ms_bar_chart), onClick = { onOpen(Routes.STATS) })
-                SettingRow(stringResource(R.string.settings_row_share), null, painterResource(R.drawable.ic_ms_file_download), onClick = { onOpen(Routes.EXPORT) })
-            }
-            Spacer(Modifier.height(Spacing.m))
-            // ---- 数据与备份 ----
-            SettingsGroup(stringResource(R.string.settings_group_data_backup)) {
-                SettingRow(
-                    stringResource(R.string.settings_row_sync_backup),
-                    if (syncStatus.configured) stringResource(R.string.settings_sync_configured)
-                    else stringResource(R.string.settings_sync_not_configured),
-                    painterResource(R.drawable.ic_ms_cloud_sync), onClick = { onOpen(Routes.SYNC) },
-                )
-                /* 更新与数据源入口已隐藏：hero 卡迁至关于页（Routes.DATASOURCE 页面保留）
-                SettingRow(
-                    stringResource(R.string.settings_row_update_datasource), null,
-                    painterResource(R.drawable.ic_ms_settings), onClick = { onOpen(Routes.DATASOURCE) },
-                )
-                */
-            }
-            Spacer(Modifier.height(Spacing.m))
-            // ---- 个性化 ----
-            SettingsGroup(stringResource(R.string.settings_group_personalization)) {
-                SettingRow(
-                    stringResource(R.string.settings_row_appearance), appearanceSummary(context, appearance),
-                    painterResource(R.drawable.ic_ms_palette), onClick = { onOpen(Routes.APPEARANCE) },
-                )
-            }
-            Spacer(Modifier.height(Spacing.m))
-            // ---- 其他 ----
-            SettingsGroup(stringResource(R.string.settings_group_other)) {
-                SettingRow(stringResource(R.string.settings_row_about_privacy), null, painterResource(R.drawable.ic_ms_shield), onClick = { onOpen(Routes.ABOUT) })
-            }
-            Spacer(Modifier.height(Spacing.xl))
-        }
-    }
-}
 
 /** 设置分组：小标题 + 卡片容器 */
 @Composable
@@ -208,109 +64,6 @@ private fun SettingsGroup(title: String, content: @Composable () -> Unit) {
         Column {
             content()
         }
-    }
-}
-
-/** 工时设置（03 文档 §5.5）——二级页面：顶栏 + 无底栏 */
-@Composable
-fun SystemScreen(
-    onBack: () -> Unit,
-    onOpen: (String) -> Unit,
-    onOpenPayroll: () -> Unit,
-    hub: SettingsHubViewModel = hiltViewModel(),
-) {
-    val anchorDay by hub.cycleAnchorDay.collectAsStateWithLifecycle()
-    val workdays by hub.workdays.collectAsStateWithLifecycle()
-    val shiftCount by hub.shiftCount.collectAsStateWithLifecycle()
-    val salary by hub.salary.collectAsStateWithLifecycle()
-    val compBalance by hub.compBalance.collectAsStateWithLifecycle()
-    val isHourly = salary.workSystem == WorkSystem.HOURLY
-    val isStandard = salary.workSystem == WorkSystem.STANDARD
-    val isSite = salary.workSystem == WorkSystem.SITE
-    val siteProject by hub.siteCurrentProject.collectAsStateWithLifecycle()
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = Spacing.page),
-    ) {
-        JiabanTopBar(title = stringResource(R.string.settings_worktime_title), onBack = onBack)
-        Spacer(Modifier.height(Spacing.m))
-
-        // 当前制度卡：hero 样式（primaryContainer）；整卡可点，效果同「切换」按钮
-        SectionCard(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            onClick = { onOpen(Routes.SYSTEM_SWITCH) },
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        salary.workSystem.displayName,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                    Text(
-                        when (salary.workSystem) {
-                            WorkSystem.HOURLY -> stringResource(R.string.settings_system_desc_hourly)
-                            WorkSystem.COMPREHENSIVE -> stringResource(R.string.settings_system_desc_comprehensive)
-                            WorkSystem.STANDARD -> stringResource(R.string.settings_system_desc_standard)
-                            WorkSystem.SITE -> stringResource(R.string.site_system_desc)
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                    )
-                }
-                Text(
-                    stringResource(R.string.settings_switch_action),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-            }
-        }
-
-        Spacer(Modifier.height(Spacing.m))
-        SectionCard {
-            Column {
-                SettingRow(
-                    if (isSite) stringResource(R.string.site_projects_settle_title)
-                    else stringResource(R.string.settings_row_salary),
-                    when {
-                        isSite -> siteProject?.name ?: stringResource(R.string.settings_not_set)
-                        isHourly -> {
-                            val hourlyCents = salary.hourlyRatesCents[RateTier.WEEKDAY] ?: 0
-                            if (hourlyCents > 0) stringResource(R.string.settings_salary_per_hour, Money.yuanText(hourlyCents)) else stringResource(R.string.settings_not_set)
-                        }
-                        salary.hasBaseSalary -> stringResource(R.string.settings_salary_per_month, Money.yuanText(salary.baseSalaryCents))
-                        salary.mode == SalaryMode.MANUAL -> stringResource(R.string.settings_manual_rate)
-                        else -> stringResource(R.string.settings_not_set)
-                    },
-                    onClick = onOpenPayroll,
-                )
-                if (isStandard) {
-                    SettingRow(
-                        stringResource(R.string.settings_row_comp_balance),
-                        if (compBalance < 0) "-" + TimeUtils.prettyDuration(-compBalance)
-                        else TimeUtils.prettyDuration(compBalance),
-                        onClick = { onOpen(Routes.COMP) },
-                    )
-                }
-                if (!isSite) {
-                    SettingRow(stringResource(R.string.settings_row_cycle), stringResource(R.string.settings_cycle_anchor_summary, anchorDay), onClick = { onOpen(Routes.CYCLE) })
-                    if (!isHourly) {
-                        // 小时工纯时薪无档位，不看周末/节假日 → 无需工作日设定
-                        SettingRow(
-                            stringResource(R.string.settings_row_workdays),
-                            if (workdays == SettingsHubDefaults.STANDARD_WORKDAYS) stringResource(R.string.settings_workdays_standard)
-                            else stringResource(R.string.settings_workdays_custom_count, workdays.size),
-                            onClick = { onOpen(Routes.WORKDAYS) },
-                        )
-                    }
-                    SettingRow(stringResource(R.string.settings_row_shifts), stringResource(R.string.settings_shift_count_summary, shiftCount), onClick = { onOpen(Routes.SHIFTS) })
-                }
-            }
-        }
-        Spacer(Modifier.height(Spacing.xl))
     }
 }
 
@@ -470,55 +223,67 @@ private fun SystemCard(
     }
 }
 
-/** 关于页（03 文档 §5.5：隐私说明、版本、检查更新；版本卡已升级为更新与数据源页同款 hero） */
+/** 关于/设置 双页签页（v0.6.12：「设置」页签=原设置中心内容，独立设置中心页移除；我的页入口更名「关于与设置」） */
 @Composable
 fun AboutScreen(
     onBack: () -> Unit,
-    context: android.content.Context = androidx.compose.ui.platform.LocalContext.current,
+    onOpen: (String) -> Unit,
     updateVm: UpdateViewModel = hiltViewModel(),
     dsVm: DataSourceViewModel = hiltViewModel(),
 ) {
-    val updateMsg by updateVm.notice.collectAsStateWithLifecycle()
+    val hub: SettingsHubViewModel = hiltViewModel()
+    val pagerState = rememberPagerState(pageCount = { 2 })
+    val scope = rememberCoroutineScope()
+
+    Column(Modifier.fillMaxSize()) {
+        JiabanTopBar(
+            title = null,
+            titleContent = {
+                SegmentBar(
+                    labels = listOf(
+                        stringResource(R.string.settings_about_title),
+                        stringResource(R.string.about_tab_setup),
+                    ),
+                    selected = pagerState.currentPage,
+                    onSelect = { i -> scope.launch { pagerState.animateScrollToPage(i) } },
+                    segWidth = 84.dp,
+                    position = pagerState.currentPage + pagerState.currentPageOffsetFraction,
+                )
+            },
+            showBack = true,
+            onBack = onBack,
+        )
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+            beyondViewportPageCount = 1,
+        ) { page ->
+            when (page) {
+                0 -> AboutPane(updateVm = updateVm, dsVm = dsVm)
+                else -> SettingsHubPane(hub = hub, onOpen = onOpen)
+            }
+        }
+    }
+    UpdateFlow(updateVm)
+}
+
+/** 「关于」页签内容主体：hero 版本卡（自更新+数据源）+ 隐私说明 + 开源许可 + 项目地址 */
+@Composable
+private fun AboutPane(
+    updateVm: UpdateViewModel,
+    dsVm: DataSourceViewModel,
+) {
+    val context = LocalContext.current
     Column(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.page),
     ) {
-        JiabanTopBar(title = stringResource(R.string.settings_about_title), onBack = onBack)
         Spacer(Modifier.height(Spacing.m))
 
-        // hero 版本卡（自更新与数据源页迁入）：当前版本大字 + 检查更新 + from 源选择胶囊（弹窗内选/增/删，UpdateFlow 承载更新弹窗）
+        // hero 版本卡（自更新与数据源页迁入）：当前版本大字 + 检查更新 + from 源选择胶囊
         UpdateHeroCard(updateVm = updateVm, dsVm = dsVm)
-        /* ---- 原版本/检查更新卡：已被上方 UpdateHeroCard 替代（代码保留备查） ----
-        SectionCard {
-            Column {
-                SettingRow(stringResource(R.string.settings_row_app), stringResource(R.string.app_name))
-                SettingRow(
-                    stringResource(R.string.settings_row_version),
-                    runCatching {
-                        val pi = context.packageManager.getPackageInfo(context.packageName, 0)
-                        @Suppress("DEPRECATION")
-                        "${pi.versionName} (${pi.versionCode})"
-                    }.getOrDefault("-"),
-                )
-                // 点击拉取 update.json → 比对版本 → 提示更新（UpdateFlow 承载弹窗）
-                SettingRow(stringResource(R.string.settings_row_check_update), null, onClick = updateVm::check)
-                updateMsg?.let { msg ->
-                    LaunchedEffect(msg) {
-                        kotlinx.coroutines.delay(3000)
-                        updateVm.clearNotice()
-                    }
-                    Text(
-                        msg,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = Spacing.s, top = 4.dp),
-                    )
-                }
-            }
-        }
-        ---- 原卡片结束 ---- */
         Spacer(Modifier.height(Spacing.m))
         SectionCard {
             Column {
@@ -560,5 +325,49 @@ fun AboutScreen(
         }
         Spacer(Modifier.height(Spacing.xl))
     }
-    UpdateFlow(updateVm)
+}
+
+/** 「设置」页签内容主体（原设置中心单列版）：查看与分享/数据与备份/个性化 分组入口 */
+@Composable
+private fun SettingsHubPane(hub: SettingsHubViewModel, onOpen: (String) -> Unit) {
+    val appearance by hub.appearance.collectAsStateWithLifecycle()
+    val syncStatus by hub.syncStatus.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .wrapContentWidth(Alignment.CenterHorizontally)
+            .widthIn(max = AdaptiveSpecs.contentMaxWidth)
+            .contentBottomPadding(showBottomBar = false)
+            .padding(horizontal = Spacing.page),
+    ) {
+        Spacer(Modifier.height(Spacing.s))
+        // ---- 查看与分享 ----
+        SettingsGroup(stringResource(R.string.settings_group_view_share)) {
+            SettingRow(stringResource(R.string.settings_row_calendar), null, painterResource(R.drawable.ic_ms_calendar_month), onClick = { onOpen(Routes.CALENDAR_PATTERN) })
+            SettingRow(stringResource(R.string.settings_row_stats), null, painterResource(R.drawable.ic_ms_bar_chart), onClick = { onOpen(Routes.STATS) })
+            SettingRow(stringResource(R.string.settings_row_share), null, painterResource(R.drawable.ic_ms_file_download), onClick = { onOpen(Routes.EXPORT) })
+        }
+        Spacer(Modifier.height(Spacing.m))
+        // ---- 数据与备份 ----
+        SettingsGroup(stringResource(R.string.settings_group_data_backup)) {
+            SettingRow(
+                stringResource(R.string.settings_row_sync_backup),
+                if (syncStatus.configured) stringResource(R.string.settings_sync_configured)
+                else stringResource(R.string.settings_sync_not_configured),
+                painterResource(R.drawable.ic_ms_cloud_sync), onClick = { onOpen(Routes.SYNC) },
+            )
+        }
+        Spacer(Modifier.height(Spacing.m))
+        // ---- 个性化 ----
+        SettingsGroup(stringResource(R.string.settings_group_personalization)) {
+            SettingRow(
+                stringResource(R.string.settings_row_appearance), appearanceSummary(context, appearance),
+                painterResource(R.drawable.ic_ms_palette), onClick = { onOpen(Routes.APPEARANCE) },
+            )
+        }
+        Spacer(Modifier.height(Spacing.xl))
+    }
 }

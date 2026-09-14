@@ -435,6 +435,8 @@ class StatsViewModel @Inject constructor(
 fun StatsScreen(
     canBack: Boolean = false,
     onBack: () -> Unit = {},
+    /** 初始页签（首页收入卡直达明细：工地=1、非工地=2；默认 0=统计） */
+    initialTab: Int = 0,
     vm: StatsViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -444,7 +446,8 @@ fun StatsScreen(
     // 标准工时/综合工时显示；小时工（纯时薪，引擎 baseIncludedCents=0 无底薪、compBalanceMinutes=0 无调休，
     // 基本项目卡 2/3 行恒空值）与工地记工（无 PayrollCalculator 引擎值）隐藏——两制度为「统计/明细」两页签
     val monthTab = state.workSystem == WorkSystem.STANDARD || state.workSystem == WorkSystem.COMPREHENSIVE
-    val pagerState = rememberPagerState(pageCount = { if (monthTab) 3 else 2 })
+    // 首帧 workSystem 尚未加载（默认 STANDARD=3 页签），按初始页签夹取防越界
+    val pagerState = rememberPagerState(initialPage = initialTab.coerceAtMost(2), pageCount = { if (monthTab) 3 else 2 })
 
     Column(Modifier.fillMaxSize()) {
         JiabanTopBar(

@@ -144,11 +144,32 @@ class SiteProjectsViewModel @Inject constructor(
  * pickMode（v0.6.2）：从记工页「项目」行进入的**选择模式**——点行即把该项目设为当前项目并返回记工页；
  * 普通模式点行进入项目设置。两种模式下「修改」图标都可进入项目设置。
  */
+/**
+ * 项目管理页（12 文档 F-S2）：记工页「项目」行进入的**选择模式**（pickMode=true）走本页；
+ * 普通模式内容主体已抽为 [SiteProjectsPane]（设定多页签「项目」页签复用）。
+ */
 @Composable
 fun SiteProjectsScreen(
     onBack: () -> Unit,
     onOpenProject: (Long) -> Unit,
     pickMode: Boolean = false,
+    onPicked: () -> Unit = {},
+    vm: SiteProjectsViewModel = hiltViewModel(),
+) {
+    Column(Modifier.fillMaxSize()) {
+        JiabanTopBar(
+            title = stringResource(if (pickMode) R.string.site_projects_pick_title else R.string.site_projects_title),
+            onBack = onBack,
+        )
+        SiteProjectsPane(pickMode = pickMode, onOpenProject = onOpenProject, onPicked = onPicked, vm = vm)
+    }
+}
+
+/** 项目管理内容主体：六点手柄拖拽排序 + 修改/删除图标 + 归档恢复（pickMode=记工页选择模式：点行即切当前项目并返回） */
+@Composable
+fun SiteProjectsPane(
+    pickMode: Boolean = false,
+    onOpenProject: (Long) -> Unit = {},
     onPicked: () -> Unit = {},
     vm: SiteProjectsViewModel = hiltViewModel(),
 ) {
@@ -185,12 +206,6 @@ fun SiteProjectsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = Spacing.page),
         ) {
-            JiabanTopBar(
-                title = stringResource(
-                    if (pickMode) R.string.site_projects_pick_title else R.string.site_projects_title
-                ),
-                onBack = onBack,
-            )
             Spacer(Modifier.height(Spacing.xs))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(

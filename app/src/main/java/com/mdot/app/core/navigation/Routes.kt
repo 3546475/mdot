@@ -6,12 +6,14 @@ object Routes {
     const val HOME = "home"
     const val CALENDAR_PATTERN = "calendar?month={month}"
     const val STATS = "stats"
-    const val COMP = "comp"
+    /** 统计页带初始页签：tab=1 工地制度「明细」、tab=2 非工地「明细」；0=统计 */
+    const val STATS_PATTERN = "stats?tab={tab}"
+
+    fun stats(tab: Int): String = if (tab <= 0) STATS else "stats?tab=$tab"
     const val PAYROLL = "payroll"
     const val EXPORT = "export"
     const val SYNC = "sync"
     const val SYNC_STORAGE = "sync/storage"
-    const val SETTINGS = "settings"
     const val PROFILE = "profile"
     const val BOTTOM_BAR = "settings/bottombar"
     const val HOME_CARDS = "settings/homecards"
@@ -19,7 +21,6 @@ object Routes {
     const val SITE_PROJECTS_PATTERN = "site/projects?pick={pick}"
     const val SITE_SETTLEMENT = "site/settlement"
     const val SITE_RECORD = "site/record"
-    const val DETAIL = "detail"
     const val SITE_PROJECT_EDIT_PATTERN = "site/project/{projectId}"
 
     fun siteProjectEdit(projectId: Long) = "site/project/$projectId"
@@ -30,9 +31,6 @@ object Routes {
 
     const val SYSTEM = "settings/system"
     const val SYSTEM_SWITCH = "settings/system/switch"
-    const val CYCLE = "settings/cycle"
-    const val WORKDAYS = "settings/workdays"
-    const val SHIFTS = "settings/shifts"
     const val APPEARANCE = "settings/appearance"
     const val DATASOURCE = "settings/datasource"
     const val ABOUT = "settings/about"

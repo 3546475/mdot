@@ -25,7 +25,6 @@
     <string name="detail_worked_hours">工时 %1$s 小时</string>
     <string name="detail_ot_leave_line">加班 %1$s 小时</string>
     <string name="detail_leave_deduct">请假扣款 %1$s</string>
-    <string name="detail_title">明细</string>
     <string name="detail_cycle_label">本周期明细</string>
     <string name="detail_empty">本周期暂无收入明细</string>
     <!-- 首页卡片名（HomeCardRegistry，配置页与预览用） -->

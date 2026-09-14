@@ -11,7 +11,6 @@
     <string name="site_tab_ot">出工</string>
     <!-- 项目管理/项目设置（F-S2） -->
     <string name="site_projects_title">项目管理</string>
-    <string name="site_projects_settle_title">项目与结算</string>
     <string name="site_projects_archived">已归档</string>
     <string name="site_projects_restore">恢复</string>
     <string name="site_project_purge_title">彻底删除项目？</string>
@@ -206,8 +205,5 @@
     <string name="site_project_summary_day_format">上班 %1$s 小时 = 1 个工 = %2$s 元 · 加班 %3$s 小时 = 1 个工</string>
     <string name="site_project_standard_unset">未设置</string>
     <!-- 显示单位偏好（F-S11） -->
-    <string name="site_display_unit">切换显示单位</string>
-    <string name="site_display_unit_day">上班按工天</string>
-    <string name="site_display_unit_hour">上班按小时</string>
     <string name="site_cycle_label_hour">本月工时</string>
 </resources>

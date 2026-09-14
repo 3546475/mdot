@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="shifts_title">班次管理</string>
     <string name="shifts_drag_hint">拖六点手柄排序；开关控制显示/隐藏。</string>
     <string name="shifts_add">新建</string>
     <string name="shifts_empty">还没有班次，点右上角「新建」添加</string>

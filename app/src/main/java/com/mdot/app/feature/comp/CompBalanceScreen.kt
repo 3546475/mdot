@@ -40,7 +40,6 @@ import androidx.lifecycle.viewModelScope
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.ConfirmDialog
-import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.core.repository.RecordRepository
@@ -110,10 +109,9 @@ class CompBalanceViewModel @Inject constructor(
     }
 }
 
-/** 调休余额管理页：查看余额、手动补差/扣减（留痕）、删除误操作调整 */
+/** 调休余额内容主体（设定多页签「调休」页签复用）：查看余额、手动补差/扣减（留痕）、删除误操作调整 */
 @Composable
-fun CompBalanceScreen(
-    onBack: () -> Unit,
+fun CompBalancePane(
     vm: CompBalanceViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -138,7 +136,6 @@ fun CompBalanceScreen(
             .contentBottomPadding(showBottomBar = false)
             .padding(horizontal = Spacing.page),
     ) {
-        JiabanTopBar(title = stringResource(R.string.comp_balance_title), onBack = onBack)
         Spacer(Modifier.height(Spacing.s))
 
         // ---- 当前余额 ----

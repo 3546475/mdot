@@ -214,11 +214,32 @@ class PayrollViewModel @Inject constructor(
     }
 }
 
-/** 工资设定页 —— 参考布局：悬浮保存按钮、预览上移、倍率三栏、请假系数折叠 */
+/** 工资设定页（底栏「工资」槽位页）——内容主体抽为 [PayrollPane]（设定多页签「工资」页签复用） */
 @Composable
 fun PayrollScreen(
     canBack: Boolean = false,
     onBack: () -> Unit = {},
+    onOpenSiteProjects: () -> Unit = {},
+    onOpenSiteSettlement: () -> Unit = {},
+    vm: PayrollViewModel = hiltViewModel(),
+) {
+    Column(Modifier.fillMaxSize()) {
+        JiabanTopBar(
+            title = if (canBack) stringResource(R.string.payroll_title) else null,
+            showBack = canBack,
+            onBack = onBack,
+        )
+        PayrollPane(onSaved = onBack, vm = vm)
+    }
+}
+
+/**
+ * 工资设定内容主体：按制度渲染表单（标准/小时/综合=薪资本体；工地=项目与结算入口，
+ * 点工标准在项目设置内维护）+ 底部悬浮保存按钮（onSaved=保存成功后回调，独立页为返回、页签内停留）。
+ */
+@Composable
+fun PayrollPane(
+    onSaved: () -> Unit = {},
     onOpenSiteProjects: () -> Unit = {},
     onOpenSiteSettlement: () -> Unit = {},
     vm: PayrollViewModel = hiltViewModel(),
@@ -234,22 +255,13 @@ fun PayrollScreen(
                 .padding(horizontal = Spacing.page)
                 .padding(bottom = 96.dp), // 留出悬浮按钮空间
         ) {
-            JiabanTopBar(
-                title = if (canBack) {
-                    // 工地记工：本页承载项目管理与结算入口，更名「项目与结算」（12 文档 F-S2）
-                    if (state.workSystem == WorkSystem.SITE) stringResource(R.string.site_projects_settle_title)
-                    else stringResource(R.string.payroll_title)
-                } else null,
-                showBack = canBack,
-                onBack = onBack,
-            )
             Spacer(Modifier.height(Spacing.s))
 
             when (state.workSystem) {
                 WorkSystem.STANDARD -> StandardPayrollContent(state, vm)
                 WorkSystem.HOURLY -> HourlyPayrollContent(state, vm)
                 WorkSystem.COMPREHENSIVE -> ComprehensivePayrollContent(state, vm)
-                // 工地记工（12 文档 F-S2）：点工标准在项目设置内，此处仅入口与说明（项目管理页见 site/projects）
+                // 工地记工（12 文档 F-S2）：点工标准在项目设置内，此处仅入口与说明
                 WorkSystem.SITE -> SitePayrollContent(state, vm, onOpenSiteProjects, onOpenSiteSettlement)
             }
         }
@@ -263,7 +275,7 @@ fun PayrollScreen(
                 .padding(horizontal = Spacing.page, vertical = 12.dp),
         ) {
             Button(
-                onClick = { vm.save(onDone = onBack) },
+                onClick = { vm.save(onDone = onSaved) },
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(com.mdot.app.core.designsystem.Radius.pill),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -280,7 +292,7 @@ private fun SitePayrollContent(
     onOpenProjects: () -> Unit,
     onOpenSettlement: () -> Unit,
 ) {
-    // 工地记工（F-S2）：点工标准在项目设置内维护；借支与结算独立页
+    // 工地记工（F-S2）：点工标准在项目设置内维护；借支与结算独立页（显示单位切换按钮已随 v0.6.11 移除）
     SectionCard {
         Column {
             Text(stringResource(R.string.payroll_site_hint_title), style = MaterialTheme.typography.titleSmall)
@@ -296,13 +308,6 @@ private fun SitePayrollContent(
                 stringResource(R.string.payroll_site_settlement_summary),
                 painterResource(R.drawable.ic_ms_paid),
                 onClick = onOpenSettlement,
-            )
-            SettingRow(
-                stringResource(R.string.site_display_unit),
-                if (state.siteDisplayUnit == "DAY") stringResource(R.string.site_display_unit_day)
-                else stringResource(R.string.site_display_unit_hour),
-                painterResource(R.drawable.ic_ms_swap_horiz),
-                onClick = { vm.toggleSiteDisplayUnit() },
             )
             Text(
                 stringResource(R.string.payroll_site_hint_body),

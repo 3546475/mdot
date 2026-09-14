@@ -213,10 +213,21 @@ private suspend fun SiteRepository.settlementRows(projectId: Long): List<SiteSet
 }
 
 
-/** 结算与借支页（12 文档 F-S6）：本期待结摘要 + 发起结算 + 借支流水 + 历史结算单 */
+/** 结算与借支页（12 文档 F-S6；记工页「结清」入口走本页）：内容主体见 [SiteSettlementPane] */
 @Composable
 fun SiteSettlementScreen(
     onBack: () -> Unit,
+    vm: SiteSettlementViewModel = hiltViewModel(),
+) {
+    Column(Modifier.fillMaxSize()) {
+        JiabanTopBar(title = stringResource(R.string.site_settlement_title), onBack = onBack)
+        SiteSettlementPane(vm = vm)
+    }
+}
+
+/** 结算与借支内容主体（设定多页签「结算」页签复用）：本期待结摘要 + 发起结算 + 借支流水 + 历史结算单 */
+@Composable
+fun SiteSettlementPane(
     vm: SiteSettlementViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -227,7 +238,6 @@ fun SiteSettlementScreen(
             .fillMaxSize()
             .padding(horizontal = Spacing.page),
     ) {
-        JiabanTopBar(title = stringResource(R.string.site_settlement_title), onBack = onBack)
         Spacer(Modifier.height(Spacing.s))
 
         LazyColumn(

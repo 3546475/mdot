@@ -92,14 +92,9 @@ import com.mdot.app.feature.profile.ProfileScreen
 import com.mdot.app.feature.record.RecordSheet
 import com.mdot.app.feature.settings.AboutScreen
 import com.mdot.app.feature.settings.AppearanceScreen
-import com.mdot.app.feature.settings.CycleScreen
 import com.mdot.app.feature.settings.DataSourceScreen
-import com.mdot.app.feature.settings.SettingsScreen
-import com.mdot.app.feature.settings.ShiftsScreen
-import com.mdot.app.feature.settings.SystemScreen
+import com.mdot.app.feature.settings.SystemSettingsScreen
 import com.mdot.app.feature.settings.SystemSwitchScreen
-import com.mdot.app.feature.settings.WorkdaysScreen
-import com.mdot.app.feature.comp.CompBalanceScreen
 import com.mdot.app.feature.stats.StatsScreen
 import com.mdot.app.feature.sync.SyncScreen
 import com.mdot.app.feature.settings.HomeBottomConfigScreen
@@ -332,7 +327,7 @@ private fun AppRootContent(
                     HomeScreen(
                         onOpenCalendar = { navTo(navController, Routes.CALENDAR_PATTERN, slots) },
                         onOpenStats = { navTo(navController, Routes.STATS, slots) },
-                        onOpenDetail = { navTo(navController, Routes.DETAIL, slots) },
+                        onOpenDetail = { navTo(navController, Routes.stats(if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) 1 else 2), slots) },
                         onOpenRecord = {
                             if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
                                 navTo(navController, Routes.SITE_RECORD, slots)
@@ -358,17 +353,16 @@ private fun AppRootContent(
                     )
                 }
             }
-            composable(Routes.STATS) {
+            composable(
+                Routes.STATS_PATTERN,
+                arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = 0 }),
+            ) { entry ->
                 SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.STATS, onNavigate = { navTo(navController, it, slots) }) {
                     StatsScreen(
                         canBack = !inBar("stats"),
                         onBack = { navController.popBackStack() },
+                        initialTab = entry.arguments?.getInt("tab") ?: 0,
                     )
-                }
-            }
-            composable(Routes.COMP) {
-                AdaptiveContainer {
-                    CompBalanceScreen(onBack = { navController.popBackStack() })
                 }
             }
             composable(Routes.PAYROLL) {
@@ -405,13 +399,6 @@ private fun AppRootContent(
                     SyncScreen(canBack = true, initialTab = 1, onBack = { navController.popBackStack() })
                 }
             }
-            composable(Routes.SETTINGS) {
-                // EXPANDED 双列分组页（设置中心自管双栏形态），不走统一限宽
-                SettingsScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpen = { route -> navTo(navController, route, slots) },
-                )
-            }
             composable(Routes.PROFILE) {
                 SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.PROFILE, onNavigate = { navTo(navController, it, slots) }) {
                     AdaptiveContainer {
@@ -425,10 +412,10 @@ private fun AppRootContent(
             }
             composable(Routes.SYSTEM) {
                 AdaptiveContainer {
-                    SystemScreen(
+                    // 顶栏齿轮：当前工时制度的设定多页签页（原工时设置入口列表页移除）
+                    SystemSettingsScreen(
                         onBack = { navController.popBackStack() },
-                        onOpen = { route -> navTo(navController, route, slots) },
-                        onOpenPayroll = { navTo(navController, Routes.PAYROLL, slots) },
+                        onOpenProject = { id -> navTo(navController, Routes.siteProjectEdit(id), slots) },
                     )
                 }
             }
@@ -436,15 +423,6 @@ private fun AppRootContent(
                 AdaptiveContainer {
                     SystemSwitchScreen(onBack = { navController.popBackStack() })
                 }
-            }
-            composable(Routes.CYCLE) {
-                AdaptiveContainer { CycleScreen(onBack = { navController.popBackStack() }) }
-            }
-            composable(Routes.WORKDAYS) {
-                AdaptiveContainer { WorkdaysScreen(onBack = { navController.popBackStack() }) }
-            }
-            composable(Routes.SHIFTS) {
-                AdaptiveContainer { ShiftsScreen(onBack = { navController.popBackStack() }) }
             }
             composable(Routes.APPEARANCE) {
                 AdaptiveContainer {
@@ -485,11 +463,6 @@ private fun AppRootContent(
                     SiteSettlementScreen(onBack = { navController.popBackStack() })
                 }
             }
-            composable(Routes.DETAIL) {
-                AdaptiveContainer {
-                    com.mdot.app.feature.detail.DetailScreen(onBack = { navController.popBackStack() })
-                }
-            }
             composable(Routes.SITE_RECORD) {
                 AdaptiveContainer {
                     SiteRecordScreen(
@@ -508,7 +481,12 @@ private fun AppRootContent(
                 AdaptiveContainer { DataSourceScreen(onBack = { navController.popBackStack() }) }
             }
             composable(Routes.ABOUT) {
-                AdaptiveContainer { AboutScreen(onBack = { navController.popBackStack() }) }
+                AdaptiveContainer {
+                    AboutScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpen = { route -> navTo(navController, route, slots) },
+                    )
+                }
             }
         }
 
@@ -528,8 +506,8 @@ private fun AppRootContent(
             ) {
                 TopLevelBar(
                     workSystem = workSystem,
-                    onOpenWorkSystem = { navTo(navController, Routes.SYSTEM, slots) },
-                    onOpenSettings = { navTo(navController, Routes.SETTINGS, slots) },
+                    onOpenWorkSystem = { navTo(navController, Routes.SYSTEM_SWITCH, slots) },
+                    onOpenSettings = { navTo(navController, Routes.SYSTEM, slots) },
                 )
             }
         }

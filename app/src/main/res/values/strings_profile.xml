@@ -23,7 +23,7 @@
     <string name="profile_sync_configured">已配置</string>
     <string name="profile_sync_unconfigured">未配置</string>
     <string name="profile_entry_appearance">外观</string>
-    <string name="profile_entry_about">关于与隐私</string>
+    <string name="profile_entry_about">关于与设置</string>
     <string name="profile_save">保存</string>
     <string name="profile_cancel">取消</string>
     <string name="profile_close">关闭</string>
