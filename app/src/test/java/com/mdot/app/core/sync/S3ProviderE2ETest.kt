@@ -47,9 +47,23 @@ class S3ProviderE2ETest {
     private fun randomBytes(size: Int): ByteArray =
         ByteArray(size).also { SecureRandom().nextBytes(it) }
 
+    /** 服务端可达性探测结果（null=未探测过；true/false=可达与否）。文件存在但服务端不可达时
+     *  整类按环境问题跳过（skipped 而非 FAILED）——凭据错误仍会在用例内正常失败。 */
+    private var reachability: Boolean? = null
+
+    private fun assumeServerReachable(cfg: S3Config) {
+        if (reachability == null) {
+            reachability = runCatching {
+                runBlocking { provider(cfg).ensureBaseDir().isSuccess }
+            }.getOrDefault(false)
+        }
+        assumeTrue("S3 服务端不可达（环境问题，跳过：${cfg.endpoint}）", reachability == true)
+    }
+
     @Test
     fun e2e_fullFlow() = runBlocking {
         val cfg = config; assumeTrue("需要 docs/test-s3.local.properties（见测试类注释）", cfg != null)
+        assumeServerReachable(cfg!!)
         // 独立前缀隔离：失败残留不污染真实备份目录
         val prefix = "mdot-e2e/${System.currentTimeMillis()}"
         val s3 = provider(cfg!!.copy(pathPrefix = prefix))
@@ -97,7 +111,8 @@ class S3ProviderE2ETest {
     @Test
     fun e2e_wrongSecret_mapsToReadableError() = runBlocking {
         val cfg = config; assumeTrue("需要 docs/test-s3.local.properties（见测试类注释）", cfg != null)
-        val bad = cfg!!.copy(secretAccessKey = cfg.secretAccessKey + "x")
+        assumeServerReachable(cfg!!)  // 服务端必须可达，403 才是"密钥错"而非"连不上"
+        val bad = cfg.copy(secretAccessKey = cfg.secretAccessKey + "x")
         val result = provider(bad).ensureBaseDir()
         assertTrue(result.isFailure)
         val msg = result.exceptionOrNull()!!.message.orEmpty()

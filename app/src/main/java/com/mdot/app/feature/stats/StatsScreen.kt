@@ -132,13 +132,19 @@ data class PieSlice(
 data class SiteDetailRow(
     val date: LocalDate,
     val kind: SiteDetailKind,
+    /** 源记录 id（出勤/包工/借支/结算单各表内自增）——与 kind 组合成列表稳定 key。
+     *  同一天同用途可有多笔（如两笔借支），故不能用 date+用途做 key（重复 → LazyColumn 崩溃）。 */
+    val id: Long = 0,
     /** 出勤工数×1000 */
     val worksMilli: Long = 0,
     val otMinutes: Int = 0,
     val amountCents: Long = 0,
     val itemName: String = "",
     val purpose: AdvancePurpose? = null,
-)
+) {
+    /** LazyColumn 稳定 key：跨表自增 id 会撞，必须带 kind 段前缀（同 11 文档 005 教训） */
+    val stableKey: String get() = "${kind}_$id"
+}
 
 enum class SiteDetailKind {
     /** 出工（含加班） */
@@ -289,6 +295,7 @@ class StatsViewModel @Inject constructor(
                             SiteDetailRow(
                                 date = LocalDate.parse(a.date),
                                 kind = if (a.dayStatus == "REST") SiteDetailKind.REST else SiteDetailKind.WORK,
+                                id = a.id,
                                 worksMilli = worksMilliOf(a.workMinutes, a.baseMinutes),
                                 otMinutes = a.otMinutes,
                                 amountCents = a.workPayCents + a.otPayCents,
@@ -300,6 +307,7 @@ class StatsViewModel @Inject constructor(
                             SiteDetailRow(
                                 date = LocalDate.parse(p.date),
                                 kind = SiteDetailKind.PIECE,
+                                id = p.id,
                                 amountCents = p.amountCents,
                                 itemName = p.itemName,
                             )
@@ -310,6 +318,7 @@ class StatsViewModel @Inject constructor(
                             SiteDetailRow(
                                 date = LocalDate.parse(a.date),
                                 kind = SiteDetailKind.ADVANCE,
+                                id = a.id,
                                 amountCents = a.amountCents,
                                 purpose = runCatching { AdvancePurpose.valueOf(a.purpose) }.getOrNull(),
                             )

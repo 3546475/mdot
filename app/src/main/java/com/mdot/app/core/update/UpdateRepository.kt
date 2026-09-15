@@ -13,10 +13,16 @@ import com.mdot.app.core.util.AppError
 import com.mdot.app.core.util.AppResult
 import com.mdot.app.core.util.AppResult.Failure
 import com.mdot.app.core.util.AppResult.Success
+import com.mdot.app.core.util.rethrowIfCancellation
+import com.mdot.app.di.ApplicationScope
 import com.mdot.app.di.IoDispatcher
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -38,7 +44,9 @@ class UpdateRepository @Inject constructor(
     private val settings: SettingsDataSource,
     private val jsonFetcher: JsonFetcher,
     private val client: OkHttpClient,
+    private val cleartextGate: com.mdot.app.core.network.CleartextGate,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    @ApplicationScope private val appScope: CoroutineScope,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -49,8 +57,11 @@ class UpdateRepository @Inject constructor(
     /** 检查更新：有新版本返回 [UpdateInfo]，已是最新返回 null；网络/解析失败返回 Failure。 */
     suspend fun check(): AppResult<UpdateInfo?> = try {
         val url = settings.updateUrlFlow.first()
+        cleartextGate.allowUrl(url) // 用户配置的更新源允许明文（13 文档 B2-04）
         val info = json.decodeFromString<UpdateInfo>(jsonFetcher.fetchText(url))
         if (info.versionCode > BuildConfig.VERSION_CODE) Success(info) else Success(null)
+    } catch (c: kotlinx.coroutines.CancellationException) {
+        throw c
     } catch (e: Exception) {
         Failure(AppError.Storage(e.message ?: "检查更新失败"))
     }
@@ -62,15 +73,63 @@ class UpdateRepository @Inject constructor(
     /**
      * 下载 APK 到缓存目录（同名已存在则直接复用），[onProgress] 回调 0–100。
      * 下载走独立调用（流式写盘），不复用 JSON 的重试策略。
+     * 整包 sha256 校验（13 文档 B2-03）：update.json 带 sha256 时强校验，不匹配拒绝安装。
+     * 下载中退出页面不中断：任务挂 [appScope]（13 文档 B5-01，进度经 [downloadProgress] StateFlow 可再订阅）。
      */
-    suspend fun download(info: UpdateInfo, onProgress: (Int) -> Unit): AppResult<File> =
+    private val downloadProgress = MutableStateFlow<Int?>(null)
+
+    /** 当前后台下载进度（null=无下载进行中）。页面级 VM 订阅它恢复 UI 态。 */
+    val downloadProgressFlow: kotlinx.coroutines.flow.StateFlow<Int?> = downloadProgress.asStateFlow()
+
+    suspend fun download(info: UpdateInfo, onProgress: (Int) -> Unit): AppResult<File> {
+        // 已有后台任务在跑：直接等它（页面重建场景）——否则并发两份写同一 .part
+        if (downloadProgress.value != null) {
+            downloadProgress.asStateFlow().first { it == null || it == 100 }
+            return apkResultFor(info)
+        }
+        val progressSink = { p: Int ->
+            downloadProgress.value = p
+            onProgress(p)
+        }
+        val result = kotlinx.coroutines.CompletableDeferred<AppResult<File>>()
+        val job = appScope.launch {
+            try {
+                result.complete(downloadInternal(info, progressSink))
+            } catch (e: Exception) {
+                e.rethrowIfCancellation()
+                result.complete(Failure(AppError.Storage(e.message ?: "下载失败")))
+            } finally {
+                downloadProgress.value = null
+            }
+        }
+        return try {
+            result.await()
+        } catch (c: kotlinx.coroutines.CancellationException) {
+            job.cancel() // 调用方取消 → 后台任务随停（不留半途 .part 的孤儿任务）
+            throw c
+        }
+    }
+
+    private fun apkResultFor(info: UpdateInfo): AppResult<File> {
+        val f = apkFile(info)
+        return if (f.exists() && f.length() > 0) Success(f)
+        else Failure(AppError.Storage("下载已结束但缓存文件缺失，请重试"))
+    }
+
+    private suspend fun downloadInternal(info: UpdateInfo, onProgress: (Int) -> Unit): AppResult<File> =
         withContext(ioDispatcher) {
             val url = pickApkUrl(info)
                 ?: return@withContext Failure(AppError.Storage("没有可用的下载地址"))
+            cleartextGate.allowUrl(url) // APK 与 update.json 同源（或官方 release 域），同放行（13 文档 B2-04）
             val dir = File(context.cacheDir, "updates").apply { mkdirs() }
+            // 顺带清理旧版本缓存（13 文档 B5-02）：只保留当前版本与目标版本的 APK
+            val keepNames = setOf("mdot-${BuildConfig.VERSION_NAME}.apk", "mdot-${info.versionName}.apk")
+            dir.listFiles()?.filter { it.name !in keepNames && it.name.endsWith(".apk") }?.forEach {
+                runCatching { it.delete() }
+            }
             val target = File(dir, "mdot-${info.versionName}.apk")
             // 只信任完整且有效的缓存文件；无效残留直接删除重下
-            if (target.exists() && target.length() > 0 && isCompleteZip(target)) {
+            if (target.exists() && target.length() > 0 && isCompleteZip(target) && sha256Matches(target, info)) {
                 onProgress(100)
                 return@withContext Success(target)
             }
@@ -86,6 +145,7 @@ class UpdateRepository @Inject constructor(
                     val body = resp.body ?: return@withContext Failure(AppError.Storage("下载失败：空响应"))
                     val total = body.contentLength()
                     var sent = 0L
+                    val md = if (info.hasSha256()) java.security.MessageDigest.getInstance("SHA-256") else null
                     body.byteStream().use { input ->
                         java.io.FileOutputStream(part).use { out ->
                             val buf = ByteArray(8 * 1024)
@@ -93,6 +153,7 @@ class UpdateRepository @Inject constructor(
                                 val n = input.read(buf)
                                 if (n == -1) break
                                 out.write(buf, 0, n)
+                                md?.update(buf, 0, n)
                                 sent += n
                                 if (total > 0) {
                                     onProgress(((sent * 100) / total).toInt().coerceIn(0, 100))
@@ -106,6 +167,15 @@ class UpdateRepository @Inject constructor(
                     if (!isCompleteZip(part)) {
                         return@withContext Failure(AppError.Storage("下载失败：文件无效"))
                     }
+                    // 端到端完整性（13 文档 B2-03）：update.json 带 sha256 时强校验，MITM 换包/降级包在此拦截
+                    if (md != null) {
+                        val actual = md.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+                        val expected = info.expectedSha256()
+                        if (actual != expected) {
+                            part.delete()
+                            return@withContext Failure(AppError.Storage("下载失败：文件校验不符（可能被篡改或源配置错误），已放弃安装"))
+                        }
+                    }
                     if (!part.renameTo(target)) {
                         return@withContext Failure(AppError.Storage("下载失败：缓存写入失败"))
                     }
@@ -113,6 +183,7 @@ class UpdateRepository @Inject constructor(
                     Success(target)
                 }
             } catch (e: Exception) {
+                e.rethrowIfCancellation()
                 part.delete()
                 Failure(AppError.Storage(e.message ?: "下载失败"))
             }
@@ -125,6 +196,27 @@ class UpdateRepository @Inject constructor(
         } catch (_: Exception) {
             false
         }
+
+    /** update.json 是否携带本次 ABI 包的 sha256（13 文档 B2-03；旧版 update.json 无此字段=不校验，向后兼容） */
+    private fun UpdateInfo.hasSha256(): Boolean = expectedSha256() != null
+
+    /** 当前 ABI 应校验的 sha256（按 pickApkUrl 同序取对应字段） */
+    private fun UpdateInfo.expectedSha256(): String? {
+        val abis = Build.SUPPORTED_ABIS ?: emptyArray()
+        return when {
+            abis.contains("arm64-v8a") -> apkSha256?.arm64V8a
+            abis.contains("armeabi-v7a") -> apkSha256?.armeabiV7a
+            else -> apkSha256?.universal
+        } ?: apkSha256?.universal
+    }
+
+    /** 已缓存文件的 sha256 是否与 update.json 一致（无期望值=通过） */
+    private fun sha256Matches(f: File, info: UpdateInfo): Boolean {
+        val expected = info.expectedSha256() ?: return true
+        val actual = java.security.MessageDigest.getInstance("SHA-256").digest(f.readBytes())
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        return actual == expected
+    }
 
     /**
      * 用 PackageInstaller Session API 安装已下载的 APK。
@@ -153,6 +245,8 @@ class UpdateRepository @Inject constructor(
                 session.commit(pendingIntent.intentSender)
             }
             true
+        } catch (c: kotlinx.coroutines.CancellationException) {
+            throw c
         } catch (e: Exception) {
             Log.e(TAG, "Session 安装调起失败", e)
             false
@@ -171,6 +265,15 @@ data class UpdateInfo(
     val tag: String = "",
     val releaseNotes: String = "",
     val apkUrl: ApkUrls = ApkUrls(),
+    /** 三包 sha256（13 文档 B2-03 端到端完整性；旧 update.json 缺省=不校验，向后兼容） */
+    val apkSha256: ApkSha256? = null,
+)
+
+@Serializable
+data class ApkSha256(
+    @SerialName("arm64-v8a") val arm64V8a: String? = null,
+    @SerialName("armeabi-v7a") val armeabiV7a: String? = null,
+    val universal: String? = null,
 )
 
 @Serializable

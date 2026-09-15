@@ -17,6 +17,7 @@ import com.mdot.app.core.sync.SyncEngine
 import com.mdot.app.core.sync.SyncStatus
 import com.mdot.app.core.sync.WebDavCreds
 import com.mdot.app.core.util.AppResult
+import com.mdot.app.core.util.runCatchingSuspend
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -350,7 +351,7 @@ class SyncViewModel @Inject constructor(
     /** 导出全量备份 ZIP 到用户选择的位置 */
     fun exportLocalFile(uri: Uri) = viewModelScope.launch {
         _state.update { it.copy(localBusy = true, message = null, isError = false) }
-        runCatching {
+        runCatchingSuspend {
             val pkg = codec.export(
                 ManifestBase(
                     appVersionName = BuildConfig.VERSION_NAME,
@@ -381,7 +382,7 @@ class SyncViewModel @Inject constructor(
     /** 读取用户选择的备份文件，校验后进入确认卡 */
     fun prepareLocalRestore(uri: Uri) = viewModelScope.launch {
         _state.update { it.copy(localBusy = true, message = null, isError = false) }
-        runCatching {
+        runCatchingSuspend {
             val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 ?: error("无法读取所选文件")
             val parsed = codec.unzip(bytes)
@@ -410,7 +411,7 @@ class SyncViewModel @Inject constructor(
     fun confirmLocalRestore() = viewModelScope.launch {
         val pending = _state.value.pendingLocal ?: return@launch
         _state.update { it.copy(localBusy = true) }
-        runCatching {
+        runCatchingSuspend {
             val parsed = codec.unzip(pending.bytes)
             codec.import(parsed.data)
         }.onSuccess {

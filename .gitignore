@@ -13,6 +13,8 @@ local.properties
 keystore/
 keystore.properties
 docs/test-webdav.local.md
+docs/test-s3.local.md
+docs/test-s3.local.properties
 # 发布产物（本地构建后复制到根目录，含单架构与双架构包）
 /MDOT-RELEASE*.apk
 
@@ -21,3 +23,25 @@ docs/test-webdav.local.md
 
 # archify 架构图导出物（本地产物，不入库）
 docs/结构图/
+# Added by code-review-graph
+.code-review-graph/
+
+# ---- 13 文档审查 B7-06：开发工具与本地产物（勿再误提交） ----
+patch_tools/
+patch_vm2.py
+sqlc/
+/holidays.json
+.claude/
+.codebuddy/
+.cursor/
+.cursorrules
+.gemini/
+.kiro/
+.kotlin/
+.qoder/
+.windsurfrules
+.mcp.json
+opencode.jsonc
+CLAUDE.md
+CODEBUDDY.md
+GEMINI.md

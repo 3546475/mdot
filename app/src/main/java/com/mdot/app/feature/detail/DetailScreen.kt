@@ -120,6 +120,7 @@ class DetailViewModel @Inject constructor(
                             SiteDetailRow(
                                 date = LocalDate.parse(a.date),
                                 kind = SiteDetailKind.WORK,
+                                id = a.id,
                                 worksMilli = worksMilliOf(a.workMinutes, a.baseMinutes),
                                 otMinutes = a.otMinutes,
                                 amountCents = a.workPayCents + a.otPayCents,
@@ -131,6 +132,7 @@ class DetailViewModel @Inject constructor(
                             SiteDetailRow(
                                 date = LocalDate.parse(p.date),
                                 kind = SiteDetailKind.PIECE,
+                                id = p.id,
                                 amountCents = p.amountCents,
                                 itemName = p.itemName,
                             )
@@ -141,6 +143,7 @@ class DetailViewModel @Inject constructor(
                             SiteDetailRow(
                                 date = LocalDate.parse(a.date),
                                 kind = SiteDetailKind.ADVANCE,
+                                id = a.id,
                                 amountCents = a.amountCents,
                                 purpose = runCatching { AdvancePurpose.valueOf(a.purpose) }.getOrNull(),
                             )
@@ -151,6 +154,7 @@ class DetailViewModel @Inject constructor(
                             SiteDetailRow(
                                 date = p.periodStart,
                                 kind = SiteDetailKind.PARTIAL,
+                                id = p.id,
                                 amountCents = p.netCents,
                             )
                         )
@@ -256,11 +260,11 @@ fun DetailPane(
             state.workSystem == WorkSystem.SITE -> {
                 // 平铺单行明细（日期星期并入行内）
                 if (state.siteDetails.isEmpty()) item { EmptyHint() }
-                items(state.siteDetails) { row -> SiteDetailRowItem(row) }
+                items(state.siteDetails, key = { it.stableKey }) { row -> SiteDetailRowItem(row) }
             }
             else -> {
                 if (state.breakdowns.isEmpty() && state.output != null) item { EmptyHint() }
-                items(state.breakdowns) { bd ->
+                items(state.breakdowns, key = { it.record.date.toString() + it.record.type.name }) { bd ->
                     NormalDetailRow(
                         state.workSystem,
                         bd,

@@ -1,7 +1,7 @@
 package com.mdot.app.core.sync
 
+import com.mdot.app.core.network.CertPin
 import com.mdot.app.core.network.executeWithBackoff
-import com.mdot.app.core.network.withTrustAllCerts
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -33,16 +33,24 @@ class S3Provider @Inject constructor(
 
     private lateinit var config: S3Config
 
+    /** 指纹校验模式的自签信任 client（trustSelfSigned 开启时；13 文档 B2-02 替代信任一切） */
     @Volatile
-    private var trustAllClient: OkHttpClient? = null
+    private var pinnedClient: OkHttpClient? = null
 
     fun configure(config: S3Config): S3Provider {
         this.config = config
-        trustAllClient = if (config.trustSelfSigned) client.withTrustAllCerts() else null
+        pinnedClient = if (config.trustSelfSigned) {
+            CertPin.clientWith(
+                CertPin.trustManager(config.certSha256) { fp ->
+                    // TLS 握手线程内同步回调：实现方（SyncEngine）自行 runBlocking/切线程落库
+                    config.onCertPinned?.invoke(fp)
+                }
+            )
+        } else null
         return this
     }
 
-    private fun httpClient(): OkHttpClient = trustAllClient ?: client
+    private fun httpClient(): OkHttpClient = pinnedClient ?: client
 
     private fun requireConfig(): S3Config =
         if (::config.isInitialized) config else throw IOException("S3 未配置")
@@ -151,6 +159,14 @@ class S3Provider @Inject constructor(
     override suspend fun put(path: String, bytes: ByteArray, ifMatch: String?): Result<PutResult> =
         runCatching {
             val key = prefix + path.trimStart('/')
+            // S3 兼容服务对 PUT 条件写支持不一（AWS 2024 底才加 If-Match），无法像 WebDAV 那样
+            // 原子拒写——改两次请求近似：远端 etag 与锚点不符即拒（13 文档 B3-03，防静默覆盖别处新备份）
+            if (ifMatch != null) {
+                val remote = head(path).getOrThrow()
+                if (remote?.etag != null && remote.etag != ifMatch) {
+                    throw IOException("远端备份已被其他设备更新，为防覆盖已取消本次上传——请先恢复远端最新备份")
+                }
+            }
             val req = Request.Builder()
                 .url(objectUrl(key))
                 .put(bytes.toRequestBody("application/zip".toMediaType()))
@@ -168,6 +184,18 @@ class S3Provider @Inject constructor(
             when {
                 resp.code == 404 -> null
                 resp.isSuccessful -> resp.body?.bytes()
+                else -> throw mapError(resp.code, resp.body?.string())
+            }
+        }
+    }
+
+    override suspend fun getWithEtag(path: String): Result<Pair<ByteArray?, String?>> = runCatching {
+        val key = prefix + path.trimStart('/')
+        val req = Request.Builder().url(objectUrl(key)).get().build()
+        exec(req).use { resp ->
+            when {
+                resp.code == 404 -> null to resp.header("ETag")
+                resp.isSuccessful -> resp.body?.bytes() to resp.header("ETag")
                 else -> throw mapError(resp.code, resp.body?.string())
             }
         }

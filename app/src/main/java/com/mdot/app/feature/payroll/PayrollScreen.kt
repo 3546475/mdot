@@ -35,6 +35,13 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -245,6 +252,32 @@ fun PayrollPane(
     vm: PayrollViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    // 保存反馈：触觉 + 按钮变身 ✓（与工地记工表单同一套反馈语言）
+    val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    var saveFlash by remember { mutableStateOf(false) }
+    val flashSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
+    val flashAlpha by animateFloatAsState(
+        targetValue = if (saveFlash) 1f else 0f,
+        animationSpec = flashSpec,
+        label = "payrollSaveFlash",
+    )
+    // 用户再改任意字段即撤下 ✓（各 onXxx 会把 state.saved 置回 false）
+    LaunchedEffect(state.saved) { if (!state.saved) saveFlash = false }
+    // ✓ 短暂停留后自动回退为「保存」——页签形态不关闭界面，必须自行收起反馈
+    //（工地表单不同：那边靠弹层关闭收尾，故无回退逻辑）
+    LaunchedEffect(saveFlash) {
+        if (saveFlash) {
+            delay(900)
+            saveFlash = false
+        }
+    }
+
+    fun saveWithFeedback() {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        saveFlash = true
+        vm.save(onDone = onSaved)
+    }
 
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -275,12 +308,28 @@ fun PayrollPane(
                 .padding(horizontal = Spacing.page, vertical = 12.dp),
         ) {
             Button(
-                onClick = { vm.save(onDone = onSaved) },
+                onClick = ::saveWithFeedback,
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(com.mdot.app.core.designsystem.Radius.pill),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
-            ) { Text(stringResource(R.string.payroll_save), style = MaterialTheme.typography.titleMedium) }
+            ) {
+                // 保存后短暂变身 ✓（同一位置，不改布局尺寸），给出明确成功反馈
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        stringResource(R.string.payroll_save),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.graphicsLayer { alpha = 1f - flashAlpha },
+                    )
+                    Icon(
+                        painter = painterResource(R.drawable.ic_ms_check),
+                        contentDescription = stringResource(R.string.payroll_saved_cd),
+                        modifier = Modifier
+                            .size(24.dp)
+                            .graphicsLayer { alpha = flashAlpha },
+                    )
+                }
+            }
         }
     }
 }

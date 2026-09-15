@@ -7,6 +7,7 @@ import com.mdot.app.core.database.RecordDao
 import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.core.util.AppError
 import com.mdot.app.core.util.AppResult
+import com.mdot.app.core.util.rethrowIfCancellation
 import com.mdot.app.core.util.AppResult.Failure
 import com.mdot.app.core.util.AppResult.Success
 import com.mdot.app.domain.model.CompAdjustment
@@ -76,6 +77,7 @@ class RecordRepository @Inject constructor(
             settings.touch()
             Success(Unit)
         } catch (e: Exception) {
+            e.rethrowIfCancellation()
             Failure(AppError.Storage(e.message ?: "保存失败"))
         }
     }
@@ -107,6 +109,7 @@ class RecordRepository @Inject constructor(
             settings.touch()
             Success(Unit)
         } catch (e: Exception) {
+            e.rethrowIfCancellation()
             Failure(AppError.Storage(e.message ?: "保存失败"))
         }
     }
@@ -117,6 +120,7 @@ class RecordRepository @Inject constructor(
         settings.touch()
         Success(Unit)
     } catch (e: Exception) {
+            e.rethrowIfCancellation()
         Failure(AppError.Storage(e.message ?: "删除失败"))
     }
 
@@ -138,6 +142,7 @@ class RecordRepository @Inject constructor(
         settings.touch()
         Success(Unit)
     } catch (e: Exception) {
+            e.rethrowIfCancellation()
         Failure(AppError.Storage(e.message ?: "调整失败"))
     }
 
@@ -146,6 +151,7 @@ class RecordRepository @Inject constructor(
         settings.touch()
         Success(Unit)
     } catch (e: Exception) {
+            e.rethrowIfCancellation()
         Failure(AppError.Storage(e.message ?: "删除失败"))
     }
 

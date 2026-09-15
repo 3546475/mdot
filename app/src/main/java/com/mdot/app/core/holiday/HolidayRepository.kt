@@ -7,6 +7,7 @@ import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.core.network.JsonFetcher
 import com.mdot.app.core.util.AppError
 import com.mdot.app.core.util.AppResult
+import com.mdot.app.core.util.rethrowIfCancellation
 import com.mdot.app.core.util.AppResult.Failure
 import com.mdot.app.core.util.AppResult.Success
 import com.mdot.app.domain.TierResolver
@@ -39,6 +40,7 @@ class HolidayRepository @Inject constructor(
     private val holidayDao: HolidayDao,
     private val settings: SettingsDataSource,
     private val jsonFetcher: JsonFetcher,
+    private val cleartextGate: com.mdot.app.core.network.CleartextGate,
     @ApplicationScope private val appScope: CoroutineScope,
 ) {
 
@@ -147,6 +149,7 @@ class HolidayRepository @Inject constructor(
     suspend fun refresh(): AppResult<String> {
         return try {
             val url = settings.holidayUrlFlow.first()
+            cleartextGate.allowUrl(url) // 用户配置的节假日源允许明文（13 文档 B2-04）
             val text = jsonFetcher.fetchText(url)
             val file = json.decodeFromString<HolidaysFile>(text)
             if (file.years.isEmpty()) {
@@ -162,6 +165,7 @@ class HolidayRepository @Inject constructor(
                 }
             }
         } catch (e: Exception) {
+            e.rethrowIfCancellation()
             Failure(AppError.Storage(e.message ?: "刷新失败"))
         }
     }

@@ -10,9 +10,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -25,7 +22,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.gestures.draggable
@@ -158,6 +154,8 @@ private fun SwipeTabHost(
     val scope = rememberCoroutineScope()
     val offset = remember { Animatable(0f) }
     var pageWidth by remember { mutableStateOf(0) }
+    // B6-02：跟手飞出时长接入 motionScheme（原硬编码 tween(220)）
+    val flyOutSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
 
     LaunchedEffect(isActive) {
         if (isActive) {
@@ -212,7 +210,7 @@ private fun SwipeTabHost(
                             } else {
                                 // 跟手飞出交给 NavHost 转场接力；防抖保证转场不会被
                                 // 新导航打断（打断会把页面定格在退出位 → 空白/偏移）
-                                offset.animateTo(target, tween(220))
+                                offset.animateTo(target, flyOutSpec)
                             }
                         }
                     },
@@ -280,7 +278,7 @@ private fun AppRootContent(
                         scaleIn(tween(Duration.slow), initialScale = 0.96f)
             },
             exitTransition = {
-                if (isTabEntry(targetState) && isTabEntry(initialState) || isTabEntry(targetState))
+                if (isTabEntry(targetState))
                     slideOutHorizontally(
                         spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
                     ) { -it * lastTabSwipeDir.value / 4 } +

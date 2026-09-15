@@ -311,7 +311,7 @@ class CalendarViewModel @Inject constructor(
                     val date = m.atDay(day)
                     val dayAtts = byDate[date].orEmpty()
                     val workAtt = dayAtts.firstOrNull { it.dayStatus == "WORK" }
-                    val worksMilli = dayAtts.sumOf { it.workMinutes * 1000L / it.baseMinutes.coerceAtLeast(1) }
+                    val worksMilli = dayAtts.sumOf { com.mdot.app.domain.SitePayCalculator.worksMilliOf(it.workMinutes, it.baseMinutes) }
                     val otMinutes = dayAtts.sumOf { it.otMinutes }
                     add(
                         CalendarCell(

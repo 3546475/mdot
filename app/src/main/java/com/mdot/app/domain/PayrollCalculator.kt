@@ -159,7 +159,7 @@ object StandardPayrollStrategy : PayrollStrategy {
         val compAdjust = input.compAdjustments.sumOf { it.deltaMinutes }
 
         return PayrollCalculator.Output(
-            breakdowns = breakdowns.sortedBy { it.record.date },
+            breakdowns = breakdowns.sortedByDescending { it.record.date }, // 明细倒序：最新在前（与工地明细口径一致）
             otMinutes = otMinutes,
             paidOtMinutes = paidOtMinutes,
             otPayCents = otPay,
@@ -244,7 +244,7 @@ object HourlyPayrollStrategy : PayrollStrategy {
         val deduct = leaveDeductByType.values.sum()
 
         return PayrollCalculator.Output(
-            breakdowns = breakdowns.sortedBy { it.record.date },
+            breakdowns = breakdowns.sortedByDescending { it.record.date }, // 明细倒序：最新在前（与工地明细口径一致）
             otMinutes = workMinutes,        // 复用字段，语义为"工作分钟"
             paidOtMinutes = workMinutes,
             otPayCents = workPay,           // 复用字段，语义为"工时收入"
@@ -336,7 +336,7 @@ object ComprehensivePayrollStrategy : PayrollStrategy {
         val base = if (input.salary.includeBase) input.salary.baseSalaryCents else 0L
 
         return PayrollCalculator.Output(
-            breakdowns = breakdowns.sortedBy { it.record.date },
+            breakdowns = breakdowns.sortedByDescending { it.record.date }, // 明细倒序：最新在前（与工地明细口径一致）
             otMinutes = workMinutes,                    // 语义：周期内普通工时（法定节假日另计）
             paidOtMinutes = holidayMinutes + overtimeMinutes,
             otPayCents = otPay,

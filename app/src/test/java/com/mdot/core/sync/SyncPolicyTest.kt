@@ -9,73 +9,25 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
 
 /**
  * 同步策略纯逻辑测试：
  * - remotePath：WebDAV 必须带 mdot/ 前缀（回归：history 清理 PROPFIND 404 永不清理）
- * - selectHistoryToDelete：保留最新 5 份语义
- * - lastChangeTrigger：同值重发射不触发（回归：backupNow 写 DataStore 自触发 30s 死循环）
+ * - lastChangeTrigger：自动备份触发链（丢弃初始快照 / 同值去重防自触发 / 防抖取最新）
+ *
+ * 注：history 滚动保留算法（selectHistoryToDelete）已随"只保留 current.zip"的备份模型删除
+ * （13 文档 B3-09），对应测试同步移除。
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SyncPolicyTest {
 
-    // ---- remotePath：WebDAV rel 前缀 ----
+    // ---- remotePath ----
 
     @Test
-    fun `remotePath adds mdot prefix for WebDAV only`() {
-        assertEquals(
-            "mdot/backup/history",
-            SyncPolicy.remotePath(ProviderKind.WEBDAV, "backup/history"),
-        )
-        assertEquals(
-            "backup/history",
-            SyncPolicy.remotePath(ProviderKind.S3, "backup/history"),
-        )
-        assertEquals(
-            "backup/history",
-            SyncPolicy.remotePath(ProviderKind.NONE, "backup/history"),
-        )
-    }
-
-    // ---- selectHistoryToDelete：滚动保留 ----
-
-    @Test
-    fun `keeps newest history and deletes oldest beyond limit`() {
-        val files = (1L..7L).map { n ->
-            RemoteFileMeta(
-                path = "mdot/backup/history/backup-2026090$n.zip",
-                size = 1,
-                lastModified = Instant.ofEpochSecond(n),
-            )
-        }
-        val toDelete = SyncPolicy.selectHistoryToDelete(files, maxHistory = 5)
-        // 时间最旧的两份（epoch 1、2）应被删，最新 5 份保留
-        assertEquals(listOf("backup-20260902.zip", "backup-20260901.zip"), toDelete)
-    }
-
-    @Test
-    fun `no deletion at or below limit and non-zip or dirs ignored`() {
-        val files = listOf(
-            RemoteFileMeta("mdot/backup/history/a.zip", 1, Instant.ofEpochSecond(3)),
-            RemoteFileMeta("mdot/backup/history/b.zip", 1, Instant.ofEpochSecond(2)),
-            RemoteFileMeta("mdot/backup/history/c.zip", 1, Instant.ofEpochSecond(1)),
-            // 非 zip 与目录不应参与计数/删除
-            RemoteFileMeta("mdot/backup/history/current.json", 1, Instant.ofEpochSecond(9)),
-            RemoteFileMeta("mdot/backup/history/", 0, Instant.ofEpochSecond(8)),
-        )
-        assertTrue(SyncPolicy.selectHistoryToDelete(files, maxHistory = 5).isEmpty())
-    }
-
-    @Test
-    fun `sorts by lastModified descending not by listing order`() {
-        // 列表乱序返回，仍应按时间删最旧
-        val files = listOf(
-            RemoteFileMeta("mdot/backup/history/old.zip", 1, Instant.ofEpochSecond(1)),
-            RemoteFileMeta("mdot/backup/history/new.zip", 1, Instant.ofEpochSecond(10)),
-            RemoteFileMeta("mdot/backup/history/mid.zip", 1, Instant.ofEpochSecond(5)),
-        )
-        assertEquals(listOf("old.zip"), SyncPolicy.selectHistoryToDelete(files, maxHistory = 2))
+    fun `webdav 路径带 mdot 前缀而 s3 不加`() {
+        assertEquals("mdot/backup/current.zip", SyncPolicy.remotePath(ProviderKind.WEBDAV, "backup/current.zip"))
+        assertEquals("backup/current.zip", SyncPolicy.remotePath(ProviderKind.S3, "backup/current.zip"))
+        assertEquals("backup/current.zip", SyncPolicy.remotePath(ProviderKind.NONE, "backup/current.zip"))
     }
 
     // ---- lastChangeTrigger：自动备份触发链 ----

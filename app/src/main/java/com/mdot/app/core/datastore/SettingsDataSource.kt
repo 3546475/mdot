@@ -127,10 +127,6 @@ class SettingsDataSource @Inject constructor(
     suspend fun setAutoBackupEnabled(enabled: Boolean) =
         dataStore.edit { it[AUTO_BACKUP_ENABLED] = enabled }
 
-    val historyCopyEnabledFlow: Flow<Boolean> = dataStore.data.map { it[HISTORY_COPY_ENABLED] ?: true }
-    suspend fun setHistoryCopyEnabled(enabled: Boolean) =
-        dataStore.edit { it[HISTORY_COPY_ENABLED] = enabled }
-
     val lastLocalChangeAtFlow: Flow<Long> = dataStore.data.map { it[LAST_LOCAL_CHANGE_AT] ?: 0 }
 
     /** 任何业务写入后调用：本地脏标记 */
@@ -144,18 +140,6 @@ class SettingsDataSource @Inject constructor(
             if (value == null) prefs.remove(LAST_SYNCED_REMOTE_CREATED_AT)
             else prefs[LAST_SYNCED_REMOTE_CREATED_AT] = value
         }
-
-    // ---- 凭据密文（Keystore 加密后的 Base64，随包排除） ----
-    val webdavCredCipherFlow: Flow<String?> = dataStore.data.map { it[WEBDAV_CRED_CIPHER] }
-    val s3CredCipherFlow: Flow<String?> = dataStore.data.map { it[S3_CRED_CIPHER] }
-
-    suspend fun setWebdavCredCipher(cipher: String?) = dataStore.edit { prefs ->
-        if (cipher == null) prefs.remove(WEBDAV_CRED_CIPHER) else prefs[WEBDAV_CRED_CIPHER] = cipher
-    }
-
-    suspend fun setS3CredCipher(cipher: String?) = dataStore.edit { prefs ->
-        if (cipher == null) prefs.remove(S3_CRED_CIPHER) else prefs[S3_CRED_CIPHER] = cipher
-    }
 
     // ---- 同步小状态（ETag 等） ----
     val lastEtagFlow: Flow<String?> = dataStore.data.map { it[LAST_ETAG] }
@@ -220,12 +204,9 @@ class SettingsDataSource @Inject constructor(
         private val HOLIDAY_LAST_FETCH_AT = longPreferencesKey("holiday_last_fetch_at")
         private val LAST_UPDATE_CHECK_AT = longPreferencesKey("last_update_check_at")
         private val AUTO_BACKUP_ENABLED = booleanPreferencesKey("auto_backup_enabled")
-        private val HISTORY_COPY_ENABLED = booleanPreferencesKey("history_copy_enabled")
         private val LAST_BACKUP_AT = longPreferencesKey("last_backup_at")
         private val LAST_LOCAL_CHANGE_AT = longPreferencesKey("last_local_change_at")
         private val LAST_SYNCED_REMOTE_CREATED_AT = stringPreferencesKey("last_synced_remote_created_at")
-        private val WEBDAV_CRED_CIPHER = stringPreferencesKey("webdav_cred_cipher")
-        private val S3_CRED_CIPHER = stringPreferencesKey("s3_cred_cipher")
         private val LAST_ETAG = stringPreferencesKey("last_etag")
         private val DB_FAST_KDF = booleanPreferencesKey("db_fast_kdf")
         private val NICKNAME = stringPreferencesKey("nickname")

@@ -17,11 +17,19 @@ class InstallResultReceiver : BroadcastReceiver() {
         when (status) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                 // 需要用户确认安装：系统会自动弹出确认界面，这里不额外处理
-                val confirmIntent = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+                val confirmIntent = if (android.os.Build.VERSION.SDK_INT >= 33) {
+                    intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+                }
                 if (confirmIntent != null) {
                     try {
                         context.startActivity(confirmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                    } catch (_: Exception) {}
+                    } catch (e: Exception) {
+                        // B5-04：原为空 catch——用户点「安装」无反应时无从排查，补日志
+                        android.util.Log.w("InstallResult", "安装确认界面启动失败", e)
+                    }
                 }
             }
             PackageInstaller.STATUS_SUCCESS -> {

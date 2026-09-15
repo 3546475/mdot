@@ -24,19 +24,26 @@ object Money {
         return if (cents < 0) "-$text" else text
     }
 
-    /** 元字符串 → 分；非法输入返回 null。支持 "5000" / "5000.5" / "5,000.50" */
+    /** 元字符串 → 分；非法输入返回 null。支持 "5000" / "5000.5" / "5,000.50"；负数拒绝（金额域非负，13 文档 B4-04） */
     fun parseYuanToCents(text: String): Long? {
         val cleaned = text.trim().replace(",", "")
         if (cleaned.isEmpty()) return null
         return runCatching {
-            BigDecimal(cleaned).setScale(2, RoundingMode.HALF_UP)
+            val bd = BigDecimal(cleaned)
+            if (bd.signum() < 0) return null
+            bd.setScale(2, RoundingMode.HALF_UP)
                 .movePointRight(2).toLong()
         }.getOrNull()
     }
 
-    /** 时薪（分/小时 → 元文本），仅展示用：底薪 ÷ 21.75 ÷ 8，保留 2 位 */
+    /** 时薪（分/小时 → 元文本），仅展示用：底薪 ÷ 21.75 ÷ 8，保留 2 位。
+     *  复用 [com.mdot.app.domain.PayrollCalculator.HOURS_PER_MONTH]（B4-05：原双写 "174" 有口径分叉风险） */
     fun hourlyRateText(baseSalaryCents: Long): String =
-        yuanText(BigDecimal(baseSalaryCents).divide(BigDecimal("174"), 2, RoundingMode.HALF_UP).toLong())
+        yuanText(
+            BigDecimal(baseSalaryCents)
+                .divide(com.mdot.app.domain.PayrollCalculator.HOURS_PER_MONTH, 2, RoundingMode.HALF_UP)
+                .toLong()
+        )
 
     /** 倍率显示：1.5 / 2 / 3.0 → "1.5" "2" "3" */
     fun multiplierText(value: Double): String =

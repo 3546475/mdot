@@ -225,9 +225,9 @@ class SiteRepository @Inject constructor(
     fun observeAllProjects(): Flow<List<SiteProject>> =
         projectDao.observeAll().map { list -> list.map { it.toDomain() } }
 
-    /** 保存出勤：按当日标准快照算金额（链 1）；REST=显式休息（工钱 0）；已结算记录拒绝覆盖 */
+    /** 保存出勤：按当日标准快照算金额（链 1）；REST=显式休息（工钱 0）；已结算记录拒绝覆盖。
+     *  结算锁与日期下界由仓储读库自证（13 文档 B3-01/B3-02/B3-13）——不信任调用方传入的 settlementId/日期。 */
     suspend fun saveAttendance(draft: SiteAttendance): AppResult<Unit> {
-        if (draft.settlementId != null) return Failure(AppError.InvalidMessage("该日已结算，请先撤销结算单"))
         if (draft.workMinutes !in 0..MAX_DAY_MINUTES || draft.otMinutes !in 0..MAX_DAY_MINUTES) {
             return Failure(AppError.InvalidDuration)
         }
@@ -235,6 +235,14 @@ class SiteRepository @Inject constructor(
             if (draft.workMinutes > 0 || draft.otMinutes > 0) return Failure(AppError.InvalidDuration)
         }
         val project = projectDao.getById(draft.projectId) ?: return Failure(AppError.InvalidMessage("项目不存在"))
+        val date = runCatching { LocalDate.parse(draft.date) }.getOrNull()
+            ?: return Failure(AppError.InvalidMessage("日期格式不正确"))
+        date.withinSavableWindow(draft.projectId)?.let { return Failure(it) }
+        // 结算锁读库自证：existing 的 settlementId 才是可信状态（UI 草稿从不携带）
+        val existing = attDao.getByDate(draft.projectId, date)
+        if (existing?.settlementId != null || draft.settlementId != null) {
+            return Failure(AppError.InvalidMessage("该日已结算，请先撤销结算单"))
+        }
         val std = SitePayCalculator.DayStandard(
             rateCents = draft.rateCents, baseMinutes = draft.baseMinutes,
             otMode = draft.otMode, otBaseMinutes = draft.otBaseMinutes, otHourlyCents = draft.otHourlyCents,
@@ -242,12 +250,11 @@ class SiteRepository @Inject constructor(
         val workPay = SitePayCalculator.workPayCents(std, draft.workMinutes)
         val otPay = SitePayCalculator.otPayCents(std, draft.otMinutes)
         val now = System.currentTimeMillis()
-        val existing = attDao.getByDate(draft.projectId, LocalDate.parse(draft.date))
         attDao.upsert(
             SiteAttendanceEntity(
                 id = existing?.id ?: 0,
                 projectId = draft.projectId,
-                date = LocalDate.parse(draft.date),
+                date = date,
                 dayStatus = draft.dayStatus,
                 halfOfDay = draft.halfOfDay,
                 workMinutes = draft.workMinutes,
@@ -263,6 +270,18 @@ class SiteRepository @Inject constructor(
         )
         settings.touch()
         return Success(Unit)
+    }
+
+    /** 记录日期的合法窗口（13 文档 B3-02/B3-13）：不得晚于今天、不得早于最近结算单截止日。
+     *  早于结算截止日的记录会被全部 getUnsettledRange 的 BETWEEN 排除——永不结算的黑洞账。
+     *  返回 null=合法；非 null=应向用户展示的失败原因。 */
+    private suspend fun LocalDate.withinSavableWindow(projectId: Long): AppError? {
+        if (isAfter(LocalDate.now())) return AppError.FutureDate
+        val lastEnd = settlementDao.lastSettlementEnd(projectId)
+        if (lastEnd != null && !isAfter(lastEnd)) {
+            return AppError.InvalidMessage("该日期在最近结算单（截至 $lastEnd）之前，不能新增记录")
+        }
+        return null
     }
 
     suspend fun deleteAttendance(id: Long): AppResult<Unit> {
@@ -282,6 +301,8 @@ class SiteRepository @Inject constructor(
         purpose: AdvancePurpose, note: String?, photos: String? = null,
     ): AppResult<Unit> {
         if (amountCents <= 0) return Failure(AppError.InvalidMessage("借支金额需大于 0"))
+        if (projectDao.getById(projectId) == null) return Failure(AppError.InvalidMessage("项目不存在"))
+        date.withinSavableWindow(projectId)?.let { return Failure(it) }
         advanceDao.insert(
             SiteAdvanceEntity(
                 projectId = projectId, date = date, amountCents = amountCents,
@@ -317,6 +338,8 @@ class SiteRepository @Inject constructor(
         }
         val amount = SitePayCalculator.pieceAmountCents(quantityMilli, unitPriceCents, directAmountCents)
         if (amount <= 0L) return Failure(AppError.InvalidMessage("工钱需大于 0"))
+        if (projectDao.getById(projectId) == null) return Failure(AppError.InvalidMessage("项目不存在"))
+        date.withinSavableWindow(projectId)?.let { return Failure(it) }
         val now = System.currentTimeMillis()
         pieceDao.insert(
             com.mdot.app.core.database.SitePieceWorkEntity(
@@ -432,7 +455,19 @@ class SiteRepository @Inject constructor(
         )
         val now = System.currentTimeMillis()
         var settlementId = 0L
-        db.withTransaction {
+        try {
+            db.withTransaction {
+            // 乐观校验（13 文档 B3-14）：preview 到 confirm 的窗口内若区间有新记录落库，
+            // lockRange 会把不在快照里的记录一并锁定——先重数核对，不一致让用户刷新重试
+            val attNow = attDao.getUnsettledRange(projectId, preview.from, preview.to)
+            val pieceNow = pieceDao.getUnsettledRange(projectId, preview.from, preview.to)
+            val advNow = advanceDao.getUnsettledRange(projectId, preview.from, preview.to)
+            if (attNow.size != preview.attendance.size ||
+                pieceNow.size != preview.pieceWorks.size ||
+                advNow.size != preview.advances.size
+            ) {
+                throw IllegalStateException("区间数据已变化，请刷新结算预览后重试")
+            }
             settlementId = settlementDao.insert(
                 SiteSettlementEntity(
                     projectId = projectId, periodStart = preview.from, periodEnd = preview.to,
@@ -448,6 +483,10 @@ class SiteRepository @Inject constructor(
             advanceDao.lockRange(projectId, preview.from, preview.to, settlementId)
             // 部分结算单已并入结清实付（net = 应结 − 已借支 − 部分结算），清零扣减防重复
             settlementDao.deletePartials(projectId)
+            }
+        } catch (e: IllegalStateException) {
+            // 乐观校验失败（区间已变化）：让用户刷新预览，而非崩溃或带病落单
+            return Failure(AppError.InvalidMessage(e.message ?: "区间数据已变化，请刷新后重试"))
         }
         settings.touch()
         return Success(settlementId)

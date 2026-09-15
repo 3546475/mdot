@@ -3,6 +3,7 @@
     <!-- 工资设定（feature/payroll） -->
     <string name="payroll_title">工资设定</string>
     <string name="payroll_save">保存</string>
+    <string name="payroll_saved_cd">已保存</string>
     <string name="payroll_mode_title">计薪模式</string>
     <!-- 工地记工 SITE 形态（v0.6.1） -->
     <string name="payroll_site_hint_title">工地记工</string>

@@ -299,7 +299,7 @@ class ComprehensivePayrollStrategyTest {
     }
 
     @Test
-    fun `breakdown按日期升序`() {
+    fun `breakdown按日期倒序`() {
         val out = summarize(
             records = listOf(
                 work("2026-09-09", 60),
@@ -307,8 +307,9 @@ class ComprehensivePayrollStrategyTest {
                 leave("2026-09-05", 60, LeaveType.SICK),
             ),
         )
+        // 明细口径：最新在前（三种策略一致，与工地明细同款）
         assertEquals(
-            listOf("2026-09-02", "2026-09-05", "2026-09-09"),
+            listOf("2026-09-09", "2026-09-05", "2026-09-02"),
             out.breakdowns.map { it.record.date.toString() },
         )
     }

@@ -64,6 +64,16 @@ object SitePayCalculator {
 
     // ---------- 链 2：区间汇总 ----------
 
+    /** 毫工换算（13 文档 B4-02/B6-07 统一口径）：minutes ÷ baseMinutes × 1000，HALF_UP 到整数毫工。
+     *  引擎汇总与日历格展示同源，避免 Long 整除截断（441/480 = 918.75 → 919 而非 918）。 */
+    fun worksMilliOf(minutes: Int, baseMinutes: Int): Long {
+        if (minutes <= 0 || baseMinutes <= 0) return 0L
+        return BigDecimal(minutes)
+            .multiply(BigDecimal(1000))
+            .divide(BigDecimal(baseMinutes), 0, RoundingMode.HALF_UP)
+            .toLong()
+    }
+
     /** 区间输入（金额已快照的记录 + 包工 + 借支） */
     data class Input(
         val attendance: List<com.mdot.app.domain.model.SiteAttendance>,
@@ -104,7 +114,7 @@ object SitePayCalculator {
             }
             if (att.workMinutes > 0) {
                 daysWork += 1
-                totalWorksMilli += att.workMinutes.toLong() * 1000 / att.baseMinutes.coerceAtLeast(1)
+                totalWorksMilli += worksMilliOf(att.workMinutes, att.baseMinutes)
             }
             otMinutes += att.otMinutes
             workPay += att.workPayCents + att.otPayCents

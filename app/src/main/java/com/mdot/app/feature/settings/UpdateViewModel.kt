@@ -39,6 +39,18 @@ class UpdateViewModel @Inject constructor(
     private val _notice = MutableStateFlow<String?>(null)
     val notice: StateFlow<String?> = _notice.asStateFlow()
 
+    init {
+        // 下载已下沉 Repository 应用级作用域（13 文档 B5-01）：页面重建/离开再回来，
+        // 订阅全局进度流恢复"下载中"UI 态，下载本体不随 VM 销毁而中断
+        viewModelScope.launch {
+            updateRepo.downloadProgressFlow.collect { p ->
+                if (p != null && p < 100 && _state.value !is UpdateState.Downloading) {
+                    _state.value = UpdateState.Downloading(p)
+                }
+            }
+        }
+    }
+
     /** 拉取 update.json 并比对版本。 */
     fun check() = viewModelScope.launch {
         _state.value = UpdateState.Checking

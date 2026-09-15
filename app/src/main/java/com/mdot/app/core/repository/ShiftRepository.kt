@@ -5,6 +5,7 @@ import com.mdot.app.core.database.ShiftEntity
 import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.core.util.AppError
 import com.mdot.app.core.util.AppResult
+import com.mdot.app.core.util.rethrowIfCancellation
 import com.mdot.app.core.util.AppResult.Failure
 import com.mdot.app.core.util.AppResult.Success
 import com.mdot.app.domain.model.Shift
@@ -67,6 +68,7 @@ class ShiftRepository @Inject constructor(
         settings.touch()
         Success(Unit)
     } catch (e: Exception) {
+            e.rethrowIfCancellation()
         Failure(AppError.Storage(e.message ?: "排序失败"))
     }
 }

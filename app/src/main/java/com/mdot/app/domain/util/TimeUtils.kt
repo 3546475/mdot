@@ -1,27 +1,18 @@
 package com.mdot.app.domain.util
 
 import java.time.LocalDate
-import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /** 时间与时长展示工具（03 文档 §9：时长 <1h 用分钟，≥1h 一位小数） */
 object TimeUtils {
 
-    private val ISO = DateTimeFormatter.ISO_LOCAL_DATE
     private val MD = DateTimeFormatter.ofPattern("M/d")
     private val MD_CN = DateTimeFormatter.ofPattern("M月d日")
-    private val YM_CN = DateTimeFormatter.ofPattern("yyyy年M月")
-
-    fun isoDate(date: LocalDate): String = date.format(ISO)
-
-    fun parseIsoDate(text: String): LocalDate? = runCatching { LocalDate.parse(text) }.getOrNull()
 
     fun md(date: LocalDate): String = date.format(MD)
 
     fun mdCn(date: LocalDate): String = date.format(MD_CN)
-
-    fun ymCn(month: YearMonth): String = month.format(YM_CN)
 
     private val WEEKDAY_NAMES =
         arrayOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
@@ -59,7 +50,4 @@ object TimeUtils {
         val m = minutes % 60
         return if (m == 0) h.toString() else String.format(Locale.US, "%.1f", minutes / 60.0)
     }
-
-    /** 分钟数 → 0.5 步进的合法值（截断到 30 分钟） */
-    fun snapToHalfHour(minutes: Int): Int = (minutes / 30) * 30
 }

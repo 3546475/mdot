@@ -23,13 +23,15 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-/** 网盘凭据（永不出备份包）；旧密文 JSON 缺 trustSelfSigned 字段时按默认 false 解码 */
+/** 网盘凭据（永不出备份包）；旧密文 JSON 缺 trustSelfSigned/certSha256 字段时按默认解密 */
 @Serializable
 data class WebDavCreds(
     val baseUrl: String = "",
     val username: String = "",
     val password: String = "",
     val trustSelfSigned: Boolean = false,
+    /** 自签证书 SHA-256 指纹（13 文档 B2-02 TOFU 首连记录；空=未记录 */
+    val certSha256: String? = null,
 )
 
 @Serializable
@@ -41,6 +43,8 @@ data class S3Creds(
     val secretAccessKey: String = "",
     val pathPrefix: String = "mdot/backup/",
     val trustSelfSigned: Boolean = false,
+    /** 自签证书 SHA-256 指纹（13 文档 B2-02 TOFU 首连记录；空=未记录 */
+    val certSha256: String? = null,
 )
 
 /** 一个 WebDAV 存储源（v0.5fix 多存储源模型） */
@@ -121,12 +125,6 @@ class CredentialVault @Inject constructor(
     suspend fun saveSources(sources: StorageSources) {
         encryptDto(SOURCES_KEY, StorageSources.serializer(), sources)
     }
-
-    // ---- 旧单源读取（仅供迁移与兼容检查） ----
-
-    suspend fun loadWebDav(): WebDavCreds? = decryptDto(WEBDAV_KEY, WebDavCreds.serializer())
-
-    suspend fun loadS3(): S3Creds? = decryptDto(S3_KEY, S3Creds.serializer())
 
     // ---- 通用加解密 ----
 

@@ -21,6 +21,5 @@
     <string name="appearance_drag_reorder">拖动排序</string>
 
     <!-- 首页卡片配置页（v0.6.0） -->
-    <string name="home_cards_title">首页卡片</string>
     <string name="home_cards_desc">控制首页各卡片的显示与排列顺序，至少保留一张</string>
 </resources>

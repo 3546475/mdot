@@ -30,6 +30,15 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import com.mdot.app.core.designsystem.component.GLASS_AMBIENT_PERIOD_MS
+import com.mdot.app.core.designsystem.component.GlassCard
+import com.mdot.app.core.designsystem.component.StarBand
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -139,8 +148,23 @@ fun DataSourceScreen(
 }
 
 
+/**
+ * hero 版本卡外观样式。
+ *
+ * [Classic]（当前启用）= 原 primaryContainer 纯色底 + SectionCard 圆角卡；
+ * [Glass]（保留备用）= 渐变玻璃底 + 上边彩虹跑马灯 + 星光带（与致谢卡同款视觉语言）。
+ *
+ * 两套样式共用同一内容体 [UpdateHeroContent]，切换只影响外壳与标题装饰——
+ * 避免复制两份内容代码导致日后漂移（改字段要改两处）。
+ * 启用 Glass：把 [UPDATE_HERO_STYLE] 改为 [UpdateHeroStyle.Glass] 即可。
+ */
+enum class UpdateHeroStyle { Classic, Glass }
+
+/** 当前生效的 hero 卡样式（改这一行即可切换） */
+private val UPDATE_HERO_STYLE = UpdateHeroStyle.Classic
+
 /** hero 版本卡：当前版本大字 + 检查更新 + 花体 from 当前源胶囊（点开弹窗选择/添加/删除更新源）。
- *  更新与数据源页与关于页共用 */
+ *  更新与数据源页与关于页共用；样式见 [UpdateHeroStyle] */
 @Composable
 internal fun UpdateHeroCard(
     updateVm: UpdateViewModel,
@@ -158,69 +182,58 @@ internal fun UpdateHeroCard(
         }.getOrDefault("-")
     }
     var showSourcePicker by remember { mutableStateOf(false) }
-    SectionCard(containerColor = MaterialTheme.colorScheme.primaryContainer) {
-        Column(Modifier.fillMaxWidth()) {
-            Text(
-                stringResource(R.string.datasource_current_version),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+
+    when (UPDATE_HERO_STYLE) {
+        UpdateHeroStyle.Classic -> SectionCard(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ) {
+            UpdateHeroContent(
+                versionText = versionText,
+                updateUrls = updateUrls,
+                updateUrl = updateUrl,
+                updateNotice = updateNotice,
+                onCheck = updateVm::check,
+                onPickSource = { showSourcePicker = true },
+                onNoticeShown = updateVm::clearNotice,
             )
-            Text(
-                versionText,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+        }
+
+        UpdateHeroStyle.Glass -> {
+            // 玻璃版：星光带相位（周期与致谢卡共用常量）
+            val ambient = rememberInfiniteTransition(label = "updateHeroAmbient")
+            val starShift by ambient.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = GLASS_AMBIENT_PERIOD_MS, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart,
+                ),
+                label = "updateHeroStarShift",
             )
-            Spacer(Modifier.height(Spacing.s))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Button(
-                    onClick = updateVm::check,
-                    shape = RoundedCornerShape(Radius.pill),
-                    contentPadding = PaddingValues(horizontal = Spacing.l, vertical = 8.dp),
-                ) {
-                    Text(stringResource(R.string.datasource_check_update))
-                }
-                if (updateUrls.isNotEmpty()) {
-                    Spacer(Modifier.width(Spacing.s))
-                    Text(
-                        stringResource(R.string.datasource_update_from),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontFamily = FontFamily.Cursive,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
-                    )
-                    Spacer(Modifier.width(Spacing.xs))
-                    Button(
-                        onClick = { showSourcePicker = true },
-                        shape = RoundedCornerShape(Radius.pill),
-                        contentPadding = PaddingValues(horizontal = Spacing.m, vertical = 4.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f),
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        ),
-                    ) {
-                        Text(
-                            sourceDisplayName(updateUrl),
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+            GlassCard {
+                UpdateHeroContent(
+                    versionText = versionText,
+                    updateUrls = updateUrls,
+                    updateUrl = updateUrl,
+                    updateNotice = updateNotice,
+                    onCheck = updateVm::check,
+                    onPickSource = { showSourcePicker = true },
+                    onNoticeShown = updateVm::clearNotice,
+                    // 标题装饰：星光带（仅玻璃版提供）
+                    titleTrailing = {
+                        Spacer(Modifier.width(Spacing.s))
+                        StarBand(
+                            shift = starShift,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            accent = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.weight(1f),
                         )
-                    }
-                }
-            }
-            updateNotice?.let { msg ->
-                LaunchedEffect(msg) {
-                    kotlinx.coroutines.delay(3000)
-                    updateVm.clearNotice()
-                }
-                Text(
-                    msg,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.padding(top = Spacing.xs),
+                    },
                 )
             }
         }
     }
+
     if (showSourcePicker) {
         UpdateSourcePickerDialog(
             urls = updateUrls,
@@ -233,6 +246,89 @@ internal fun UpdateHeroCard(
             onRemove = dsVm::removeUpdateUrl,
             onDismiss = { showSourcePicker = false },
         )
+    }
+}
+
+/**
+ * hero 卡内容体（两套样式共用）：当前版本标签 + 版本大字 + 检查更新按钮 + from 源胶囊 + 状态提示。
+ * 外观差异通过 [titleTrailing]（标题尾随装饰，仅玻璃版有星光带）注入，其余完全一致。
+ * 前景色统一用 onPrimaryContainer——Classic 的 primaryContainer 底与 Glass 的磨砂底都适配。
+ */
+@Composable
+private fun UpdateHeroContent(
+    versionText: String,
+    updateUrls: List<String>,
+    updateUrl: String,
+    updateNotice: String?,
+    onCheck: () -> Unit,
+    onPickSource: () -> Unit,
+    onNoticeShown: () -> Unit,
+    titleTrailing: (@Composable androidx.compose.foundation.layout.RowScope.() -> Unit)? = null,
+) {
+    val onContainer = MaterialTheme.colorScheme.onPrimaryContainer
+    Column(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.datasource_current_version),
+                style = MaterialTheme.typography.labelSmall,
+                color = onContainer.copy(alpha = 0.8f),
+            )
+            titleTrailing?.invoke(this)
+        }
+        Text(
+            versionText,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = onContainer,
+        )
+        Spacer(Modifier.height(Spacing.s))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Button(
+                onClick = onCheck,
+                shape = RoundedCornerShape(Radius.pill),
+                contentPadding = PaddingValues(horizontal = Spacing.l, vertical = 8.dp),
+            ) {
+                Text(stringResource(R.string.datasource_check_update))
+            }
+            if (updateUrls.isNotEmpty()) {
+                Spacer(Modifier.width(Spacing.s))
+                Text(
+                    stringResource(R.string.datasource_update_from),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontFamily = FontFamily.Cursive,
+                    color = onContainer.copy(alpha = 0.75f),
+                )
+                Spacer(Modifier.width(Spacing.xs))
+                Button(
+                    onClick = onPickSource,
+                    shape = RoundedCornerShape(Radius.pill),
+                    contentPadding = PaddingValues(horizontal = Spacing.m, vertical = 4.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = onContainer.copy(alpha = 0.12f),
+                        contentColor = onContainer,
+                    ),
+                ) {
+                    Text(
+                        sourceDisplayName(updateUrl),
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        updateNotice?.let { msg ->
+            LaunchedEffect(msg) {
+                kotlinx.coroutines.delay(3000)
+                onNoticeShown()
+            }
+            Text(
+                msg,
+                style = MaterialTheme.typography.labelMedium,
+                color = onContainer,
+                modifier = Modifier.padding(top = Spacing.xs),
+            )
+        }
     }
 }
 

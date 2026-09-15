@@ -6,9 +6,12 @@
     <!-- PackageInstaller Session API 安装自更新 APK 必需；未声明时 createSession/commit 抛 SecurityException（曾于 v0.5.7 误删致「无法调起安装器」） -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- allowBackup 必须 false：系统备份会带走 DataStore（含 KeyStore 包裹的库密钥密文）与 SQLCipher 库文件，
+         但 AndroidKeyStore 主密钥设备绑定、不随备份迁移——云恢复后密文必解不开，曾致启动崩溃死循环
+         （13 文档 B2-01；DbKeyManager 有换钥+旧库隔离兜底，但数据视同丢失）。应用内自有 WebDAV/S3 备份体系。 -->
     <application
         android:name=".JiabanApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"

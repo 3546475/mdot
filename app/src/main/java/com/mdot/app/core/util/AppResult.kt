@@ -40,3 +40,21 @@ inline fun <T> AppResult<T>.onFailure(block: (AppError) -> Unit): AppResult<T> {
     if (this is AppResult.Failure) block(error)
     return this
 }
+
+/**
+ * runCatching 的挂起安全版（13 文档 B3-06）：CancellationException 穿透——协程取消不得被吞成 Failure。
+ * 旧模式（runCatching / catch(Exception) 包挂起调用）会在取消时跳过锚点写入等后续步骤，
+ * 曾致 WebDAV If-Match 412 死锁。lambda 内含挂起调用的一律用本函数。
+ */
+suspend fun <T> runCatchingSuspend(block: suspend () -> T): Result<T> = try {
+    Result.success(block())
+} catch (c: kotlin.coroutines.cancellation.CancellationException) {
+    throw c
+} catch (t: Throwable) {
+    Result.failure(t)
+}
+
+/** 在 catch(Exception) 块内调用：若是协程取消则重新抛出（语义同 [runCatchingSuspend]，用于不便改结构的 try/catch） */
+fun Exception.rethrowIfCancellation() {
+    if (this is kotlin.coroutines.cancellation.CancellationException) throw this
+}

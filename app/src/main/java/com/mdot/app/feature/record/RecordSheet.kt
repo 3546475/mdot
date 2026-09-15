@@ -52,6 +52,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -99,9 +100,9 @@ fun RecordSheet(
     val shifts by vm.visibleShifts.collectAsStateWithLifecycle()
 
     // 两段式：简洁面板（类型+时长）⇄ 完整面板；点箭头或上拉展开
-    var expanded by remember { mutableStateOf(false) }
-    var showDatePicker by remember { mutableStateOf(false) }
-    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
+    var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(request.token) {
         expanded = false
@@ -109,9 +110,12 @@ fun RecordSheet(
     }
 
     // 自实现底部弹层（M3 ModalBottomSheet 在内容高度变化时锚点会误判滑出，故弃用）
-    var dismissRequested by remember { mutableStateOf(false) }
+    var dismissRequested by rememberSaveable { mutableStateOf(false) }
     val visibleState = remember { MutableTransitionState(false) }
     visibleState.targetState = true
+    // B6-02：弹层进出场接入 motionScheme（原 tween(Duration.*) 绕过动效体系）
+    val sheetEnterSpec = MaterialTheme.motionScheme.slowSpatialSpec<androidx.compose.ui.unit.IntOffset>()
+    val sheetFadeSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
 
     fun requestDismiss() {
         dismissRequested = true
@@ -130,8 +134,8 @@ fun RecordSheet(
     if (!dismissRequested || !visibleState.isIdle) {
         AnimatedVisibility(
             visibleState = visibleState,
-            enter = slideInVertically(tween(Duration.slow)) { it },
-            exit = slideOutVertically(tween(Duration.normal)) { it } + fadeOut(tween(Duration.normal)),
+            enter = slideInVertically(sheetEnterSpec) { it },
+            exit = slideOutVertically(sheetEnterSpec) { it } + fadeOut(sheetFadeSpec),
         ) {
             Box(Modifier.fillMaxSize()) {
                 // 遮罩
@@ -166,11 +170,18 @@ fun RecordSheet(
                             .fillMaxWidth()
                             .clickable { expanded = !expanded }
                             .pointerInput(Unit) {
-                                detectVerticalDragGestures { change, dragAmount ->
-                                    change.consume()
-                                    if (dragAmount < -24) expanded = true
-                                    else if (dragAmount > 24 && expanded) expanded = false
-                                }
+                                // B6-05：原按单事件增量判定——快甩有效、慢拖永不触发；改累计位移
+                                var acc = 0f
+                                detectVerticalDragGestures(
+                                    onDragStart = { acc = 0f },
+                                    onDragEnd = { acc = 0f },
+                                    onVerticalDrag = { change, dragAmount ->
+                                        change.consume()
+                                        acc += dragAmount
+                                        if (acc < -24f) { expanded = true; acc = 0f }
+                                        else if (acc > 24f && expanded) { expanded = false; acc = 0f }
+                                    },
+                                )
                             }
                             .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center,

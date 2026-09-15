@@ -9,6 +9,7 @@ import com.mdot.app.core.holiday.HolidayRepository
 import com.mdot.app.core.repository.RecordRepository
 import com.mdot.app.domain.toCalcLite
 import com.mdot.app.core.util.CsvWriter
+import com.mdot.app.core.util.rethrowIfCancellation
 import com.mdot.app.domain.util.Money
 import com.mdot.app.domain.util.TimeUtils
 import com.mdot.app.core.util.PayslipRenderer
@@ -165,6 +166,7 @@ class ExportViewModel @Inject constructor(
                 file.writeText(csv, Charsets.UTF_8)
                 extra.update { it.copy(busy = false, preview = PreviewArtifact.Csv(file)) }
             } catch (e: Exception) {
+            e.rethrowIfCancellation()
                 extra.update { it.copy(busy = false, errorText = e.message ?: "生成失败") }
             }
         }
@@ -244,6 +246,7 @@ class ExportViewModel @Inject constructor(
                 val file = PayslipRenderer.savePng(bitmap, context, fileName)
                 extra.update { it.copy(busy = false, preview = PreviewArtifact.Payslip(file)) }
             } catch (e: Exception) {
+            e.rethrowIfCancellation()
                 extra.update { it.copy(busy = false, errorText = e.message ?: "生成失败") }
             }
         }

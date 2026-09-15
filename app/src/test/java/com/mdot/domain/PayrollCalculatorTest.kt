@@ -132,8 +132,9 @@ class PayrollCalculatorTest {
             )
         )
         assertEquals(4138L + 2069L, out.otPayCents)
-        assertEquals(RateTier.STATUTORY, out.breakdowns[0].tier)
-        assertEquals(RateTier.WEEKDAY, out.breakdowns[1].tier)
+        // 明细倒序：08-11（自动平时）在前，08-10（手动法定）在后
+        assertEquals(RateTier.WEEKDAY, out.breakdowns[0].tier)
+        assertEquals(RateTier.STATUTORY, out.breakdowns[1].tier)
     }
 
     @Test
@@ -157,14 +158,50 @@ class PayrollCalculatorTest {
     }
 
     @Test
-    fun `明细按日期升序`() {
+    fun `明细按日期倒序（最新在前）`() {
         val out = PayrollCalculator.summarize(
             PayrollCalculator.Input(
                 salary = base2400,
-                records = listOf(ot("2026-08-12", 60), ot("2026-08-10", 60)),
+                records = listOf(ot("2026-08-10", 60), ot("2026-08-12", 60)),
                 tierOf = weekdayOf,
             )
         )
-        assertEquals(LocalDate.parse("2026-08-10"), out.breakdowns[0].record.date)
+        // 明细页口径：最新日期在最上（输入顺序无关，均按日期倒序）
+        assertEquals(LocalDate.parse("2026-08-12"), out.breakdowns[0].record.date)
+        assertEquals(LocalDate.parse("2026-08-10"), out.breakdowns[1].record.date)
+    }
+
+    @Test
+    fun `明细倒序对三种策略一致`() {
+        val records = listOf(ot("2026-08-10", 60), ot("2026-08-12", 60))
+        val standard = PayrollCalculator.summarize(
+            PayrollCalculator.Input(salary = base2400, records = records, tierOf = weekdayOf)
+        )
+        val hourly = PayrollCalculator.summarize(
+            PayrollCalculator.Input(
+                salary = com.mdot.app.domain.model.SalaryConfig(
+                    mode = com.mdot.app.domain.model.SalaryMode.MANUAL,
+                    workSystem = com.mdot.app.domain.model.WorkSystem.HOURLY,
+                    hourlyRatesCents = mapOf(com.mdot.app.domain.model.RateTier.WEEKDAY to 2500L),
+                ),
+                records = records,
+                tierOf = weekdayOf,
+            )
+        )
+        val comprehensive = PayrollCalculator.summarize(
+            PayrollCalculator.Input(
+                salary = com.mdot.app.domain.model.SalaryConfig(
+                    mode = com.mdot.app.domain.model.SalaryMode.BASE,
+                    workSystem = com.mdot.app.domain.model.WorkSystem.COMPREHENSIVE,
+                    baseSalaryCents = 240000L,
+                ),
+                records = records,
+                tierOf = weekdayOf,
+                standardMinutes = 60,
+            )
+        )
+        listOf(standard, hourly, comprehensive).forEach { out ->
+            assertEquals(LocalDate.parse("2026-08-12"), out.breakdowns.first().record.date)
+        }
     }
 }

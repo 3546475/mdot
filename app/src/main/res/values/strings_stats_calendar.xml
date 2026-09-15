@@ -60,16 +60,10 @@
     <string name="stats_empty_hint">去记一笔加班，统计马上就有内容</string>
     <string name="stats_empty_action">记一笔</string>
     <string name="stats_ot">加班</string>
-    <string name="stats_ot_hourly">工作</string>
-    <string name="stats_ot_comp">上班</string>
     <string name="stats_income_hourly">工作收入</string>
     <string name="stats_ot_pay">加班费</string>
-    <string name="stats_summary_net_income">净收入</string>
     <string name="stats_leave">请假</string>
     <string name="stats_leave_deduct">扣款</string>
-    <string name="stats_period_total">周期总工时</string>
-    <string name="stats_period_standard">周期标准</string>
-    <string name="stats_overtime">超时</string>
     <string name="stats_bar_selected">%1$s · %2$s</string>
     <string name="stats_pie_empty">暂无加班数据</string>
     <string name="stats_pie_empty_hourly">暂无工作数据</string>
@@ -83,9 +77,7 @@
     <string name="stats_site_detail_rest">休息</string>
     <string name="stats_site_detail_piece">包工 · %1$s</string>
     <string name="stats_site_detail_advance">借支 · %1$s</string>
-    <string name="stats_detail_ot_line">%1$s %2$s · %3$s</string>
     <string name="stats_detail_ot_comp">" · 转调休%1$s"</string>
-    <string name="stats_detail_leave">请假 %1$s · %2$s</string>
     <string name="calendar_title">日历</string>
     <string name="calendar_prev_month">上个月</string>
     <string name="calendar_next_month">下个月</string>
@@ -136,10 +128,7 @@
     <string name="stats_site_empty_hint">这个区间还没有工地记录，去记一笔工</string>
     <string name="site_stat_works">工数合计</string>
     <string name="site_stat_ot">加班</string>
-    <string name="site_stat_days">出勤天数</string>
     <string name="site_stat_work_pay">点工工资</string>
-    <string name="stats_month_title_site">每日工数</string>
-    <string name="stats_month_title_ot">加班时长</string>
     <string name="stats_month_best">%1$d日最多 · %2$s</string>
     <string name="stats_ot_duration_line">加班 %1$s</string>
     <string name="stats_leave_deduct_line">请假扣款 %1$s</string>

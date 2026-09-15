@@ -1,9 +1,17 @@
 ﻿import java.util.Properties
 
-// 绛惧悕淇℃伅锛坘eystore/keystore.properties锛屼笉鍏ュ簱锛涚己澶辨椂 release 涓嶇鍚嶏級
+// 签名信息（keystore/keystore.properties，不入库；缺失时 release 不签名）
 val keystoreProps = Properties().apply {
     val f = rootProject.file("keystore/keystore.properties")
     if (f.exists()) f.inputStream().use { load(it) }
+}
+// B1-05：文件存在但键残缺时报明确的缺失键名，而非后续 as String 的 ClassCastException
+if (keystoreProps.isNotEmpty()) {
+    listOf("storeFile", "storePassword", "keyAlias", "keyPassword").forEach { k ->
+        require(keystoreProps.getProperty(k) != null) {
+            "keystore/keystore.properties 缺少键：$k（四项 storeFile/storePassword/keyAlias/keyPassword 必须齐全）"
+        }
+    }
 }
 
 plugins {
@@ -23,8 +31,8 @@ android {
         applicationId = "com.mdot.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 40
-        versionName = "0.6.12"
+        versionCode = 41
+        versionName = "0.6.13"
     }
 
     signingConfigs {
@@ -41,7 +49,7 @@ android {
     buildTypes {
         debug {
             ndk {
-                // x86_64 渚涙ā鎷熷櫒锛況elease 浠呭嚭 arm 鍙屾灦鏋勶紙02 鏂囨。 搂7锛?
+                // x86_64 供模拟器；release 仅出 arm 双架构（02 文档 §7）
                 abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
             }
         }
@@ -60,8 +68,8 @@ android {
             } else null
         }
     }
-    // ABI 鎷嗗垎锛歳elease 鍑?v7a/v8a 鍗曟灦鏋勫寘 + universal锛堝弻鏋舵瀯鍚堝苟锛夊寘锛?
-    // 鍙戝竷鍛藉悕绾﹀畾锛歁DOT-RELEASE-<鐗堟湰鍙?-v8a.apk / -v7a.apk锛堝崟鏋舵瀯锛夈€丮DOT-RELEASE-<鐗堟湰鍙?.apk锛堝弻鏋舵瀯锛?
+    // ABI 拆分：release 出 v7a/v8a 单架构包 + universal（双架构合并）包
+    // 发布命名约定：MDOT-RELEASE-<版本号>-v8a.apk / -v7a.apk（单架构）、MDOT-RELEASE-<版本号>-dual.apk（双架构）
     splits {
         abi {
             isEnable = true
@@ -80,6 +88,10 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+    // B1-09：仅保留中英资源——Compose/M3/AppCompat/cropper 等库携带数十种语言，全量打入无谓增大
+    androidResources {
+        localeFilters += listOf("zh", "en")
     }
 }
 
@@ -100,7 +112,6 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.icons.extended)
     debugImplementation(libs.compose.ui.tooling)
-    debugImplementation(libs.compose.ui.test.manifest)
 
     implementation(libs.navigation.compose)
 
@@ -119,18 +130,11 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.okhttp)
 
-    // 澶村儚瑁佸壀锛圕anHub Android-Image-Cropper锛屾垚鐔?uCrop 鍒嗘敮锛涢渶涓哄叾 Activity 琛?AppCompat 涓婚锛?
+    // 头像裁剪（CanHub Android-Image-Cropper，成熟 uCrop 分支；需为其 Activity 补 AppCompat 主题）
     implementation("com.vanniktech:android-image-cropper:4.7.0")
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
-    testImplementation(libs.turbine)
     testImplementation(libs.coroutines.test)
-    testImplementation(libs.room.testing)
     testImplementation(libs.androidx.junit)
-
-    androidTestImplementation(platform(libs.compose.bom))
-    androidTestImplementation(libs.compose.ui.test.junit4)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.espresso.core)
 }

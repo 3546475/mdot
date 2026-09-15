@@ -48,7 +48,9 @@ class BackupCodec @Inject constructor(
     // ---- 导出：库 → ZIP ----
 
     suspend fun export(manifestBase: ManifestBase): BackupPackage {
-        val data = buildDataJson()
+        // 整库快照事务（13 文档 B3-07）：导出期间用户写入会使各表读取时刻不同——
+        // 备份包内引用关系撕裂（出勤读到新行、结算单读到旧状态）。Room 事务 = SQLite 快照隔离
+        val data = db.withTransaction { buildDataJson() }
         // 条件 bump（12 文档 §3.4）：含工地数据的包标 v2——旧版 App 恢复会静默丢 site 数据，
         // 靠 manifest.formatVersion 拒绝；纯旧制度包保持 v1，旧版可继续恢复
         val formatVersion = if (data.hasSiteData()) FORMAT_VERSION_V2 else FORMAT_VERSION
@@ -157,11 +159,23 @@ class BackupCodec @Inject constructor(
 
     /** 解包并校验结构（不动库），返回 data.json 与 manifest 供确认/预览 */
     fun unzip(bytes: ByteArray): ParsedBackup {
+        // 资源护栏（13 文档 B2-05）：防 zip bomb OOM——条目数与单条目字节数上限；
+        // 用户自选文件属半可信输入，超限转可读错误而非崩溃
+        if (bytes.size > MAX_PACKAGE_BYTES) {
+            throw IllegalArgumentException("备份包过大（${bytes.size / 1024 / 1024}MB，上限 ${MAX_PACKAGE_BYTES / 1024 / 1024}MB），疑似非本应用备份文件")
+        }
         val entries = LinkedHashMap<String, String>()
         ZipInputStream(ByteArrayInputStream(bytes)).use { zin ->
             var entry: ZipEntry? = zin.nextEntry
             while (entry != null) {
-                entries[entry.name] = zin.readBytes().decodeToString()
+                if (entries.size >= MAX_ENTRY_COUNT) {
+                    throw IllegalArgumentException("备份包条目数异常（上限 $MAX_ENTRY_COUNT），疑似损坏或恶意文件")
+                }
+                val entryBytes = zin.readBytes()
+                if (entryBytes.size > MAX_ENTRY_BYTES) {
+                    throw IllegalArgumentException("备份包内 ${entry.name} 过大，疑似损坏文件")
+                }
+                entries[entry.name] = entryBytes.decodeToString()
                 entry = zin.nextEntry
             }
         }
@@ -177,6 +191,7 @@ class BackupCodec @Inject constructor(
         }
         val data = json.decodeFromString(BackupFile.serializer(), dataText)
         validateBackupWorkSystems(data)
+        validateBackupInvariants(data)
         return ParsedBackup(manifest, data)
     }
 
@@ -350,6 +365,10 @@ class BackupCodec @Inject constructor(
         const val SCHEMA_VERSION = 1
         const val MANIFEST_ENTRY = "manifest.json"
         const val DATA_ENTRY = "data.json"
+        /** 解包护栏（13 文档 B2-05）：正常包 <10MB；32MB/64MB/16 条目已是异常包的数量级 */
+        const val MAX_PACKAGE_BYTES = 64 * 1024 * 1024
+        const val MAX_ENTRY_BYTES = 32 * 1024 * 1024
+        const val MAX_ENTRY_COUNT = 16
         private val DateTimeFormatter_ISO_OFFSET = java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME
     }
 }
@@ -386,6 +405,43 @@ internal fun validateBackupWorkSystems(data: BackupFile) {
         throw IllegalArgumentException(
             "备份包含当前版本不支持的工时制度数据（${unknown.joinToString("、")}），请升级 App 到最新版本后再恢复"
         )
+    }
+}
+
+/**
+ * 备份包业务不变量校验（13 文档 B4-03）：导入是第二个数据入口，必须与 save 侧同款校验，
+ * 防畸形/恶意包绕过录入期不变量直插入库（REST 带工时会被汇总静默丢弃、toComp 超界算负费、
+ * 非法时长溢出日界）。拒绝并提示，复用恢复的"可读错误"通道。
+ */
+internal fun validateBackupInvariants(data: BackupFile) {
+    data.records.forEach { r ->
+        if (r.durationMinutes !in 1..1440) {
+            throw IllegalArgumentException("备份包含非法时长的记录（${r.date}：${r.durationMinutes} 分钟，须在 1–1440）")
+        }
+        if (r.toCompMinutes !in 0..r.durationMinutes) {
+            throw IllegalArgumentException("备份包含转调休超界的记录（${r.date}：转调休 ${r.toCompMinutes} 分钟大于加班时长）")
+        }
+    }
+    data.siteAttendance.forEach { a ->
+        if (a.workMinutes !in 0..1440 || a.otMinutes !in 0..1440) {
+            throw IllegalArgumentException("备份包含非法工时的出勤记录（${a.date}，须在 0–1440 分钟）")
+        }
+        if (a.dayStatus == "REST" && (a.workMinutes > 0 || a.otMinutes > 0)) {
+            throw IllegalArgumentException("备份包含带工时的休息日记录（${a.date}：休息日不能有出勤/加班分钟）")
+        }
+        if (a.dayStatus != "REST" && a.dayStatus != "WORK") {
+            throw IllegalArgumentException("备份包含未知出勤状态（${a.date}：${a.dayStatus}）")
+        }
+    }
+    data.siteAdvances.forEach { a ->
+        if (a.amountCents <= 0) {
+            throw IllegalArgumentException("备份包含非正数的借支金额（${a.date}）")
+        }
+    }
+    data.sitePieceWorks.forEach { p ->
+        if (p.amountCents < 0 || p.quantityMilli < 0 || p.unitPriceCents < 0) {
+            throw IllegalArgumentException("备份包含负数的包工记录（${p.date}）")
+        }
     }
 }
 

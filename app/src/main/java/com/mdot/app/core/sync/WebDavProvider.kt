@@ -1,7 +1,7 @@
 package com.mdot.app.core.sync
 
+import com.mdot.app.core.network.CertPin
 import com.mdot.app.core.network.executeWithBackoff
-import com.mdot.app.core.network.withTrustAllCerts
 
 import android.util.Base64
 import kotlinx.coroutines.CoroutineDispatcher
@@ -11,6 +11,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.time.Instant
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
@@ -31,16 +32,24 @@ class WebDavProvider @Inject constructor(
 
     private lateinit var config: WebDavConfig
 
+    /** 指纹校验模式的自签信任 client（trustSelfSigned 开启时；13 文档 B2-02 替代信任一切） */
     @Volatile
-    private var trustAllClient: OkHttpClient? = null
+    private var pinnedClient: OkHttpClient? = null
 
     fun configure(config: WebDavConfig): WebDavProvider {
         this.config = config
-        trustAllClient = if (config.trustSelfSigned) client.withTrustAllCerts() else null
+        pinnedClient = if (config.trustSelfSigned) {
+            CertPin.clientWith(
+                CertPin.trustManager(config.certSha256) { fp ->
+                    // TLS 握手线程内同步回调：实现方（SyncEngine）自行 runBlocking/切线程落库
+                    config.onCertPinned?.invoke(fp)
+                }
+            )
+        } else null
         return this
     }
 
-    private fun httpClient(): OkHttpClient = trustAllClient ?: client
+    private fun httpClient(): OkHttpClient = pinnedClient ?: client
 
     private fun requireConfig(): WebDavConfig =
         if (::config.isInitialized) config else throw IOException("WebDAV 未配置")
@@ -140,8 +149,13 @@ class WebDavProvider @Inject constructor(
                 .put(bytes.toRequestBody("application/zip".toMediaType()))
                 .header("Authorization", authHeader())
             ifMatch?.let { builder.header("If-Match", it) }
-            val (code, resp) = exec(builder.build())
-            PutResult(etag = resp.header("ETag"))
+            // B3-10：上传（最需重试的写操作）此前未走退避重试——统一与读路径一致
+            httpClient().executeWithBackoff(builder.build(), ioDispatcher).use { resp ->
+                if (!resp.isSuccessful && resp.code != 207) {
+                    throw mapError(resp.code, resp.body?.string())
+                }
+                PutResult(etag = resp.header("ETag"))
+            }
         }
 
     override suspend fun get(path: String): Result<ByteArray?> = runCatching {
@@ -154,6 +168,21 @@ class WebDavProvider @Inject constructor(
             when {
                 resp.code == 404 -> null
                 resp.isSuccessful -> resp.body?.bytes()
+                else -> throw mapError(resp.code, resp.body?.string())
+            }
+        }
+    }
+
+    override suspend fun getWithEtag(path: String): Result<Pair<ByteArray?, String?>> = runCatching {
+        val req = Request.Builder()
+            .url(url(path))
+            .get()
+            .header("Authorization", authHeader())
+            .build()
+        httpClient().executeWithBackoff(req, ioDispatcher).use { resp ->
+            when {
+                resp.code == 404 -> null to resp.header("ETag")
+                resp.isSuccessful -> resp.body?.bytes() to resp.header("ETag")
                 else -> throw mapError(resp.code, resp.body?.string())
             }
         }
@@ -173,7 +202,7 @@ class WebDavProvider @Inject constructor(
                     size = resp.header("Content-Length")?.toLongOrNull() ?: 0,
                     lastModified = resp.header("Last-Modified")
                         ?.let { runCatching { ZonedDateTime.parse(it, httpDate).toInstant() }.getOrNull() }
-                        ?: Instant_now(),
+                        ?: Instant.now(),
                     etag = resp.header("ETag"),
                 )
                 else -> throw mapError(resp.code, resp.body?.string())
@@ -233,7 +262,7 @@ class WebDavProvider @Inject constructor(
             val size = sizeRegex.find(chunk)?.groupValues?.get(1)?.toLongOrNull() ?: 0
             val modified = modifiedRegex.find(chunk)?.groupValues?.get(1)
                 ?.let { runCatching { ZonedDateTime.parse(it, httpDate).toInstant() }.getOrNull() }
-                ?: Instant_now()
+                ?: java.time.Instant.now()
             val etag = etagRegex.find(chunk)?.groupValues?.get(2)
                 ?: etagRegex.find(chunk)?.groupValues?.get(1)
             result += RemoteFileMeta(decoded, size, modified, etag)
@@ -244,7 +273,5 @@ class WebDavProvider @Inject constructor(
     companion object {
         private val httpDate: DateTimeFormatter =
             DateTimeFormatter.RFC_1123_DATE_TIME
-
-        fun Instant_now(): java.time.Instant = java.time.Instant.now()
     }
 }

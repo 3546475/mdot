@@ -21,6 +21,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -259,7 +260,7 @@ fun AboutScreen(
             beyondViewportPageCount = 1,
         ) { page ->
             when (page) {
-                0 -> AboutPane(updateVm = updateVm, dsVm = dsVm)
+                0 -> AboutPane(updateVm = updateVm, dsVm = dsVm, hub = hub)
                 else -> SettingsHubPane(hub = hub, onOpen = onOpen)
             }
         }
@@ -272,6 +273,7 @@ fun AboutScreen(
 private fun AboutPane(
     updateVm: UpdateViewModel,
     dsVm: DataSourceViewModel,
+    hub: SettingsHubViewModel,
 ) {
     val context = LocalContext.current
     Column(
@@ -308,6 +310,9 @@ private fun AboutPane(
                 )
             }
         }
+        Spacer(Modifier.height(Spacing.m))
+        // 致谢名单（开源许可下方）：名单在 strings 的 settings_ack_names 维护
+        AcknowledgementCard()
         Spacer(Modifier.height(Spacing.m))
         // 项目开源地址（公开仓 3546475/mdot），点击跳转 GitHub（置于开源许可之后）
         SectionCard {

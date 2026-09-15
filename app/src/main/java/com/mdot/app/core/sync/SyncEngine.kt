@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import java.io.File
@@ -61,6 +62,7 @@ class SyncEngine @Inject constructor(
     private val s3Provider: S3Provider,
     private val dataRevision: com.mdot.app.core.repository.DataRevision,
     private val client: OkHttpClient,
+    private val cleartextGate: com.mdot.app.core.network.CleartextGate,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     @ApplicationScope private val appScope: CoroutineScope,
 ) {
@@ -85,6 +87,9 @@ class SyncEngine @Inject constructor(
         val sources = vault.loadSources()
         val webDav = sources.selectedWebDav()
         val s3 = sources.selectedS3()
+        // 明文守门（13 文档 B2-04）：把用户显式配置的源 host 登记进 CleartextGate，
+        // 拦截器只放行这些 host 的 http 请求——其余明文一律拒绝
+        listOfNotNull(webDav?.creds?.baseUrl, s3?.creds?.endpoint).forEach { cleartextGate.allowUrl(it) }
         provider = when {
             webDav != null -> webDavProvider.configure(
                 WebDavConfig(
@@ -92,6 +97,9 @@ class SyncEngine @Inject constructor(
                     username = webDav.creds.username,
                     password = webDav.creds.password,
                     trustSelfSigned = webDav.creds.trustSelfSigned,
+                    certSha256 = webDav.creds.certSha256,
+                    // TOFU 首连指纹落库（13 文档 B2-02）：TLS 握手线程同步回调，runBlocking 一次可接受
+                    onCertPinned = { fp -> persistWebDavPin(webDav.id, fp) },
                 )
             )
 
@@ -103,6 +111,8 @@ class SyncEngine @Inject constructor(
                     secretAccessKey = s3.creds.secretAccessKey,
                     pathPrefix = s3.creds.pathPrefix,
                     trustSelfSigned = s3.creds.trustSelfSigned,
+                    certSha256 = s3.creds.certSha256,
+                    onCertPinned = { fp -> persistS3Pin(s3.id, fp) },
                 )
             )
 
@@ -246,6 +256,11 @@ class SyncEngine @Inject constructor(
         val sources = vault.loadSources()
         val candidate = sources.webdav.firstOrNull { it.id == id } ?: sources.s3.firstOrNull { it.id == id }
             ?: return Failure(AppError.Storage("存储源不存在"))
+        // 临时测试的源也可能是明文 http（用户正在新增/编辑）——同样登记
+        when (candidate) {
+            is WebDavSource -> cleartextGate.allowUrl(candidate.creds.baseUrl)
+            is S3Source -> cleartextGate.allowUrl(candidate.creds.endpoint)
+        }
         val p = when (candidate) {
             is WebDavSource -> tempWebDavProvider(candidate)
             else -> tempS3Provider(candidate as S3Source)
@@ -260,6 +275,9 @@ class SyncEngine @Inject constructor(
                 username = source.creds.username,
                 password = source.creds.password,
                 trustSelfSigned = source.creds.trustSelfSigned,
+                certSha256 = source.creds.certSha256,
+                // 临时测试连接：TOFU 指纹只校验不落库（正式保存走 updateWebDavSource 的重载链路）
+                onCertPinned = null,
             )
         )
 
@@ -272,8 +290,37 @@ class SyncEngine @Inject constructor(
                 secretAccessKey = source.creds.secretAccessKey,
                 pathPrefix = source.creds.pathPrefix,
                 trustSelfSigned = source.creds.trustSelfSigned,
+                certSha256 = source.creds.certSha256,
+                onCertPinned = null,
             )
         )
+
+    /** TOFU 指纹持久化（13 文档 B2-02）：写回该存储源的凭据密文。TLS 握手线程回调内 runBlocking（一次性） */
+    private fun persistWebDavPin(id: String, fp: String) {
+        runCatching {
+            kotlinx.coroutines.runBlocking {
+                val sources = vault.loadSources()
+                val idx = sources.webdav.indexOfFirst { it.id == id }
+                if (idx >= 0) {
+                    val updated = sources.webdav[idx].let { it.copy(creds = it.creds.copy(certSha256 = fp)) }
+                    vault.saveSources(sources.copy(webdav = sources.webdav.toMutableList().also { it[idx] = updated }))
+                }
+            }
+        }
+    }
+
+    private fun persistS3Pin(id: String, fp: String) {
+        runCatching {
+            kotlinx.coroutines.runBlocking {
+                val sources = vault.loadSources()
+                val idx = sources.s3.indexOfFirst { it.id == id }
+                if (idx >= 0) {
+                    val updated = sources.s3[idx].let { it.copy(creds = it.creds.copy(certSha256 = fp)) }
+                    vault.saveSources(sources.copy(s3 = sources.s3.toMutableList().also { it[idx] = updated }))
+                }
+            }
+        }
+    }
 
     /** 连接测试 = 建根目录 + 目录可达（与备份前置步骤一致）；异常归类为可读文案 */
     private suspend fun testProvider(p: StorageProvider): AppResult<Unit> = try {
@@ -346,6 +393,8 @@ class SyncEngine @Inject constructor(
                 )
             }
             Success(Unit)
+        } catch (c: kotlinx.coroutines.CancellationException) {
+            throw c // 取消穿透（13 文档 B3-06）：被吞会跳过锚点写入，致下次 If-Match 412 死锁
         } catch (e: Exception) {
             fail(e.message ?: "备份失败")
             Failure(AppError.Storage(e.message ?: "备份失败"))
@@ -365,15 +414,31 @@ class SyncEngine @Inject constructor(
 
     // ---- 恢复 ----
 
-    /** 拉取远端摘要（恢复前确认卡用；下载整包解出 manifest） */
+    /** 拉取远端摘要（恢复前确认卡用；下载整包解出 manifest）。
+     *  快速路径（13 文档 B3-04②）：远端 ETag 与本地锚点一致 → 内容必同于上次已知，
+     *  直接复用已存的 createdAt 摘要，免去整包下载（自动备份每次触发都调这里，大库慢 NAS 上分钟级）。 */
     suspend fun fetchRemoteSummary(): AppResult<RemoteSummary?> {
         val p = provider ?: return Failure(AppError.Storage("请先配置存储源"))
         return try {
-            val zipBytes = p.get(currentZip()).getOrThrow()
+            val lastEtag = settings.lastEtagFlow.first()
+            if (lastEtag != null) {
+                val meta = p.head(currentZip()).getOrThrow()
+                if (meta != null && meta.etag == lastEtag) {
+                    val cached = settings.lastSyncedRemoteCreatedAtFlow.first()?.let {
+                        RemoteSummary(it, -1, "", "")
+                    }
+                    if (cached != null) {
+                        _status.update { it.copy(remoteSummary = cached) }
+                        return Success(cached)
+                    }
+                }
+            }
+            val (zipBytes, etag) = p.getWithEtag(currentZip()).getOrThrow()
             if (zipBytes == null) {
                 _status.update { it.copy(remoteSummary = null) }
                 Success(null)
             } else {
+                if (etag != null) settings.setLastEtag(etag) // 顺带对齐锚点（B3-04①）
                 val manifest = codec.unzip(zipBytes).manifest
                 val summary = RemoteSummary(
                     createdAt = manifest.createdAt,
@@ -394,28 +459,34 @@ class SyncEngine @Inject constructor(
         val p = provider ?: return Failure(AppError.Storage("请先配置存储源"))
         _status.update { it.copy(phase = SyncPhase.RESTORING, busy = true, lastError = null) }
         return try {
-            // 1. 恢复前本地快照（兜底可反悔）
+            // 1. 恢复前本地快照（兜底可反悔；仅保留最近 1 份，13 文档 B3-12）
             runStep("生成本地快照") {
                 val manifestBase = ManifestBase(
                     appVersionName(), appVersionCode(), Build.MODEL ?: "Unknown",
                 )
                 val pkg = codec.export(manifestBase)
                 val dir = File(context.cacheDir, "backup").apply { mkdirs() }
+                dir.listFiles { f -> f.name.startsWith("pre-restore-") }
+                    ?.sortedByDescending { it.name }
+                    ?.drop(1)
+                    ?.forEach { runCatching { it.delete() } }
                 File(dir, "pre-restore-${System.currentTimeMillis()}.zip")
                     .writeBytes(pkg.zipBytes)
             }
-            // 2. 下载整包
-            val zipBytes = runStep("下载备份包") {
-                p.get(currentZip()).getOrThrow()
+            // 2. 下载整包（回带 ETag）
+            val (zipBytes, etag) = runStep("下载备份包") {
+                p.getWithEtag(currentZip()).getOrThrow()
                     ?: throw IllegalArgumentException("云端没有备份包")
             }
             // 3. 校验结构（manifest 在包内）+ 4. 事务导入
-            val parsed = runStep("校验结构") { codec.unzip(zipBytes) }
+            val parsed = runStep("校验结构") { codec.unzip(zipBytes!!) }
             runStep("导入数据") {
                 codec.import(parsed.data)
             }
-            // 5. 锚点同步
+            // 5. 锚点同步（13 文档 B3-04①：createdAt 与 ETag 两个锚点都要跟上，
+            //    否则恢复后首次 WebDAV 备份 If-Match 412 且无自愈入口）
             settings.setLastSyncedRemoteCreatedAt(parsed.manifest.createdAt)
+            if (etag != null) settings.setLastEtag(etag)
             // 6. 显式全量重算：首页/统计等订阅 DataRevision 的界面立即重算（import 内的
             //    touch() 只负责"本地已脏"标记，不驱动 UI 重算）
             dataRevision.bump()
@@ -423,6 +494,8 @@ class SyncEngine @Inject constructor(
                 it.copy(phase = SyncPhase.IDLE, busy = false, lastBackupAt = System.currentTimeMillis())
             }
             Success(Unit)
+        } catch (c: kotlinx.coroutines.CancellationException) {
+            throw c
         } catch (e: Exception) {
             fail(e.message ?: "恢复失败")
             Failure(AppError.Storage(e.message ?: "恢复失败"))
@@ -436,7 +509,14 @@ class SyncEngine @Inject constructor(
             .collect {
                 val p = provider ?: return@collect
                 if (!settings.autoBackupEnabledFlow.first()) return@collect
-                if (_status.value.busy) return@collect
+                // busy 排队而非丢弃（13 文档 B3-05）：手动备份/恢复进行中到达的变更触发
+                // 若被消费丢弃，之后无新变更则永不自动备份——改为等待当前操作结束后补一轮
+                var waits = 0
+                while (_status.value.busy && waits < BUSY_WAIT_MAX_POLLS) {
+                    delay(BUSY_WAIT_POLL_MS)
+                    waits++
+                }
+                if (_status.value.busy) return@collect // 超时放弃，等下一次变更触发兜底
 
                 // 三态判定：远端有新包且本地也脏 → 冲突，阻断自动上传（06 文档 §4）
                 val summary = when (val r = fetchRemoteSummary()) {
@@ -478,7 +558,9 @@ class SyncEngine @Inject constructor(
         }.getOrDefault(1)
 
     companion object {
-        const val MAX_HISTORY = 5
         const val AUTO_BACKUP_DEBOUNCE_MS = 30_000L
+        /** busy 排队轮询（13 文档 B3-05）：2s 一次，最多等 5 分钟（大库恢复的量级），超时留给下次触发兜底 */
+        const val BUSY_WAIT_POLL_MS = 2_000L
+        const val BUSY_WAIT_MAX_POLLS = 150
     }
 }

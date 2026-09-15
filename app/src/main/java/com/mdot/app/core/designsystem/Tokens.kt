@@ -23,6 +23,36 @@ object SiteMoneyColors {
     val PendingOrange = Color(0xFFE8930C)
 }
 
+/**
+ * 彩虹色板（致谢卡跑马灯边框用）：固定的七色顺序，不随主题变化——
+ * 彩虹的语义就是色彩本身，取中高饱和度并在深浅主题下均可辨（alpha 由使用方控制）。
+ */
+object RainbowColors {
+    /**
+     * 低饱和七色光谱（HSV 饱和 ×0.50、明度上限 0.88）——柔和不刺眼，
+     * 保留色相辨识度但不喧宾夺主（用户反馈原方案过于鲜艳）。
+     * 彩虹的语义就是色彩本身，故不随主题变化；alpha 由调用方控制。
+     */
+    val spectrum = listOf(
+        Color(0xFFE08A85), // 红
+        Color(0xFFE0B270), // 橙
+        Color(0xFFE0CA70), // 黄
+        Color(0xFF7EC790), // 绿
+        Color(0xFF89C5E0), // 青
+        Color(0xFF9796D6), // 蓝
+        Color(0xFFC798DE), // 紫
+    )
+
+    /** 取色环上 [t]（0..1，自动回绕）处的颜色（线性插值，用于生成平滑跑马灯） */
+    fun sample(t: Float): Color {
+        val n = spectrum.size
+        val pos = ((t % 1f) + 1f) % 1f * n
+        val i = pos.toInt() % n
+        val j = (i + 1) % n
+        return androidx.compose.ui.graphics.lerp(spectrum[i], spectrum[j], pos - pos.toInt())
+    }
+}
+
 object Radius {
     val xs = 8.dp
     val small = 12.dp
