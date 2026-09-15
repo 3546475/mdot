@@ -115,7 +115,11 @@ jobs:
           git fetch --depth=1 origin main
           git checkout -B main origin/main
           cp "${{ runner.temp }}/update.json" update.json
-          git add update.json
+          # 节假日库同步（13 文档四-3b 部署缺口修复）：App 默认源指向本仓根目录 holidays.json，
+          # 但该文件此前未随分支发布（线上 404，只剩 assets 内置兜底）。权威源 = app assets，
+          # 每次发版顺带同步到根目录，dataVersion 比对可保证客户端只在真更新时才拉取。
+          cp app/src/main/assets/holidays.json holidays.json
+          git add update.json holidays.json
           if git diff --cached --quiet; then
             echo "update.json unchanged"
           else
