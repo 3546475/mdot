@@ -1,15 +1,20 @@
 version: 2
-# 依赖漏洞持续监控（13 文档 B1-08）：gradle 依赖 + GitHub Actions
+# 依赖安全监控（仅告警，不自动开 PR）。
+#
+# ⚠️ 历史教训：本文件早期默认配置（open-pull-requests-limit: 3 / 未设 0）导致
+# dependabot 一启用就批量开了 6 个升级 PR（KSP 跨大版本、actions/checkout v7 等），
+# 与本项目「依赖升级一律人工评估」的原则冲突——多处版本与 AGP/SQLCipher 锁定有明确
+# 缘由（见 AGENTS.md 技术栈章节）。现统一改为 open-pull-requests-limit: 0：
+# 不开任何升级 PR；安全漏洞仍会出现在 GitHub Security → Dependabot alerts，
+# 需要时人工评估再改版本。切勿改回正数，否则会重新产生大量待人工关闭的 PR。
 updates:
   - package-ecosystem: gradle
     directory: "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 3
-    labels:
-      - dependencies
-    # 版本升级需人工评估兼容性（AGENTS.md 记载多处版本锁定缘由），故只做安全告警更迭
+    open-pull-requests-limit: 0
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: monthly
+    open-pull-requests-limit: 0
