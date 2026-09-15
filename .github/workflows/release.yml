@@ -15,7 +15,7 @@ jobs:
   build-and-release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # 防再犯 v0.6.3/v0.6.4 事故：tag 打在未 bump 版本号的提交上（当时 build.gradle.kts
       # 被 master 的 0.5.10 覆盖），CI 会按错误 versionName 命名 APK/写 update.json。
