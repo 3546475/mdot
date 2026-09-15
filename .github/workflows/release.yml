@@ -94,31 +94,17 @@ jobs:
             MDOT-RELEASE-${{ env.VER }}-v7a.apk
             MDOT-RELEASE-${{ env.VER }}-dual.apk
 
-      - name: Generate update.json (with apk sha256)
-        # 13 文档 B2-03：update.json 携带三包 sha256，App 端下载后强校验——
-        # 阻断 MITM 换包（同签名旧版降级/换 ABI 包）的端到端完整性
+      - name: "Generate update.json (sha256 + CHANGELOG notes)"
+        # 13 文档 B2-03（三包 sha256，App 端强校验）+ B8-04（releaseNotes 用 CHANGELOG 实际内容）。
+        # 生成逻辑在 scripts/gen_update_json.py（可本地跑；避免 YAML heredoc 缩进/转义地雷）。
+        env:
+          OUT_JSON: ${{ runner.temp }}/update.json
+          APK_BASE_URL: https://github.com/${{ github.repository }}/releases/download/v${{ env.VER }}/MDOT-RELEASE-${{ env.VER }}
         run: |
-          SHA_V8A=$(sha256sum "MDOT-RELEASE-${VER}-v8a.apk" | cut -d' ' -f1)
-          SHA_V7A=$(sha256sum "MDOT-RELEASE-${VER}-v7a.apk" | cut -d' ' -f1)
-          SHA_DUAL=$(sha256sum "MDOT-RELEASE-${VER}-dual.apk" | cut -d' ' -f1)
-          cat > "$RUNNER_TEMP/update.json" <<EOF
-          {
-            "versionName": "${{ env.VER }}",
-            "versionCode": ${{ env.VC }},
-            "tag": "v${{ env.VER }}",
-            "releaseNotes": "马的加班 v${{ env.VER }} 已发布。",
-            "apkUrl": {
-              "arm64-v8a": "https://github.com/${{ github.repository }}/releases/download/v${{ env.VER }}/MDOT-RELEASE-${{ env.VER }}-v8a.apk",
-              "armeabi-v7a": "https://github.com/${{ github.repository }}/releases/download/v${{ env.VER }}/MDOT-RELEASE-${{ env.VER }}-v7a.apk",
-              "universal": "https://github.com/${{ github.repository }}/releases/download/v${{ env.VER }}/MDOT-RELEASE-${{ env.VER }}-dual.apk"
-            },
-            "apkSha256": {
-              "arm64-v8a": "$SHA_V8A",
-              "armeabi-v7a": "$SHA_V7A",
-              "universal": "$SHA_DUAL"
-            }
-          }
-          EOF
+          export SHA_V8A=$(sha256sum "MDOT-RELEASE-${VER}-v8a.apk" | cut -d' ' -f1)
+          export SHA_V7A=$(sha256sum "MDOT-RELEASE-${VER}-v7a.apk" | cut -d' ' -f1)
+          export SHA_DUAL=$(sha256sum "MDOT-RELEASE-${VER}-dual.apk" | cut -d' ' -f1)
+          python3 scripts/gen_update_json.py --notes-file release_notes.md
 
       - name: Publish update.json to main (GitHub Pages)
         env:
@@ -128,7 +114,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git fetch --depth=1 origin main
           git checkout -B main origin/main
-          cp "$RUNNER_TEMP/update.json" update.json
+          cp "${{ runner.temp }}/update.json" update.json
           git add update.json
           if git diff --cached --quiet; then
             echo "update.json unchanged"

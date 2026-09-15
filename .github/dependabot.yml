@@ -1,0 +1,15 @@
+version: 2
+# 依赖漏洞持续监控（13 文档 B1-08）：gradle 依赖 + GitHub Actions
+updates:
+  - package-ecosystem: gradle
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+    # 版本升级需人工评估兼容性（AGENTS.md 记载多处版本锁定缘由），故只做安全告警更迭
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
