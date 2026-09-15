@@ -2,15 +2,15 @@
   "versionName": "0.6.13",
   "versionCode": 41,
   "tag": "v0.6.13",
-  "releaseNotes": "## 更新内容\n\n系统要求：Android 10（API 29）及以上。",
+  "releaseNotes": "## 更新内容\n\n- 修复系统备份恢复后无法启动的问题（含换机迁移场景）；应用内原有的备份/恢复不受影响\n- 加固数据安全：备份包增加完整性校验，自签证书改用指纹校验（防中间人），备份文件损坏时不再崩溃\n- 修复工地记工结算相关的几处记账问题：已结算的记录不能再改、借支与包工不能再记到已结算的日期\n- 关于页新增「致谢」名单卡：渐变色玻璃卡片，带上边流动彩虹与星光装饰，可左右滑动查看\n- 工资设置页保存后按钮显示 ✓ 提示，明确告知保存成功\n- 明细页改为最新记录在前\n\n---\n\n\n系统要求：Android 10（API 29）及以上。",
   "apkUrl": {
     "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.6.13/MDOT-RELEASE-0.6.13-v8a.apk",
     "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.6.13/MDOT-RELEASE-0.6.13-v7a.apk",
     "universal": "https://github.com/3546475/mdot/releases/download/v0.6.13/MDOT-RELEASE-0.6.13-dual.apk"
   },
   "apkSha256": {
-    "arm64-v8a": "eeb7ff8a41d34f78fc6327ebbfd45224e6b381c49736a0d6bf84852467f7d290",
-    "armeabi-v7a": "35bb9d58d815fc2ab442ae814c607ea72426bc0c8a267ee5dd073718321f3d37",
-    "universal": "b0759155a2730a29772025257ac3bb59353004960c2bd053c369eaec3acb9215"
+    "arm64-v8a": "b12ae223231b3ee9e1316ce2b360440cfcff7a554bed44e7e2ddb122dd2bbcd3",
+    "armeabi-v7a": "bf9aeb0459a63d43ea2a717630794a127a88190b27b465d39e0347072221eee2",
+    "universal": "673550b00266e8e1095473377b241d002033e655598e031a9168fce450849048"
   }
 }
