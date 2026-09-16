@@ -1,16 +1,16 @@
 {
-  "versionName": "0.6.13",
-  "versionCode": 41,
-  "tag": "v0.6.13",
-  "releaseNotes": "## 更新内容\n\n- 修复系统备份恢复后无法启动的问题（含换机迁移场景）；应用内原有的备份/恢复不受影响\n- 加固数据安全：备份包增加完整性校验，自签证书改用指纹校验（防中间人），备份文件损坏时不再崩溃\n- 修复工地记工结算相关的几处记账问题：已结算的记录不能再改、借支与包工不能再记到已结算的日期\n- 关于页新增「致谢」名单卡：渐变色玻璃卡片，带上边流动彩虹与星光装饰，可左右滑动查看\n- 工资设置页保存后按钮显示 ✓ 提示，明确告知保存成功\n- 明细页改为最新记录在前\n\n---\n\n\n系统要求：Android 10（API 29）及以上。",
+  "versionName": "0.6.17",
+  "versionCode": 42,
+  "tag": "v0.6.17",
+  "releaseNotes": "## 更新内容\n\n- 统计页图表可点化：点击周柱/月柱/热力图的任意一天，弹出该日日期与时长/工数浮窗（2 秒后自动消失）；长按可直接打开该日记工弹窗，补记更顺手\n- 切换主题/配色时颜色平滑过渡，不再瞬变\n- CSV 导入完成后提示可点「查看记录」，直达统计页明细查看导入结果\n- 全 App 数字变化统一滚动动画：金额、时长、工时数等数字变化时沿增减方向滑动切换，不再生硬跳变\n- 记加班/记工弹窗动效优化：遮罩改为原地淡入淡出（不再从下往上推），关闭时面板下滑淡出，不再突兀消失\n- 调休余额手动调整时不再显示「将增加/扣减 xx 小时」预览提示，界面更清爽\n\n---\n\n\n系统要求：Android 10（API 29）及以上。",
   "apkUrl": {
-    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.6.13/MDOT-RELEASE-0.6.13-v8a.apk",
-    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.6.13/MDOT-RELEASE-0.6.13-v7a.apk",
-    "universal": "https://github.com/3546475/mdot/releases/download/v0.6.13/MDOT-RELEASE-0.6.13-dual.apk"
+    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.6.17/MDOT-RELEASE-0.6.17-v8a.apk",
+    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.6.17/MDOT-RELEASE-0.6.17-v7a.apk",
+    "universal": "https://github.com/3546475/mdot/releases/download/v0.6.17/MDOT-RELEASE-0.6.17-dual.apk"
   },
   "apkSha256": {
-    "arm64-v8a": "b12ae223231b3ee9e1316ce2b360440cfcff7a554bed44e7e2ddb122dd2bbcd3",
-    "armeabi-v7a": "bf9aeb0459a63d43ea2a717630794a127a88190b27b465d39e0347072221eee2",
-    "universal": "673550b00266e8e1095473377b241d002033e655598e031a9168fce450849048"
+    "arm64-v8a": "a6ebcb94fe10c787f0c36dbc9cb490031183fdce93961c0fa22c1f0c77e8b873",
+    "armeabi-v7a": "55db5e6aa0343f492e82caa7ae2361ae7ea81fa2ea40b77c909d680b493eb803",
+    "universal": "ec54a371ab6f50e4823a60e755512a88478951ccb4d866bad1beca534fc715b8"
   }
 }
