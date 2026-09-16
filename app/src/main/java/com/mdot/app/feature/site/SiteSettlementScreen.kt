@@ -20,12 +20,15 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -185,6 +188,36 @@ class SiteSettlementViewModel @Inject constructor(
         }.onSuccess { refresh() }
     }
 
+    /** #21：撤销删除包工记录（无确认删除 + Snackbar 撤销；重插为未结算新行） */
+    fun restorePieceWork(piece: SitePieceWork) = viewModelScope.launch {
+        siteRepo.savePieceWork(
+            projectId = piece.projectId,
+            date = LocalDate.parse(piece.date),
+            itemName = piece.itemName,
+            unit = piece.unit,
+            quantityMilli = piece.quantityMilli,
+            unitPriceCents = piece.unitPriceCents,
+            directAmountCents = piece.amountCents,
+            note = piece.note,
+        ).onFailure { e ->
+            _state.update { it.copy(message = e.toSiteText()) }
+        }.onSuccess { refresh() }
+    }
+
+    /** #21：撤销删除借支（无确认删除 + Snackbar 撤销；重插为未结算新行） */
+    fun restoreAdvance(adv: SiteAdvance) = viewModelScope.launch {
+        siteRepo.saveAdvance(
+            projectId = adv.projectId,
+            date = LocalDate.parse(adv.date),
+            amountCents = adv.amountCents,
+            purpose = AdvancePurpose.valueOf(adv.purpose),
+            note = adv.note,
+            photos = adv.photos,
+        ).onFailure { e ->
+            _state.update { it.copy(message = e.toSiteText()) }
+        }.onSuccess { refresh() }
+    }
+
     fun revertSettlement(id: Long) = viewModelScope.launch {
         siteRepo.revertSettlement(id).onFailure { e ->
             _state.update { it.copy(message = e.toSiteText()) }
@@ -243,12 +276,44 @@ fun SiteSettlementPane(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     var confirmRevertId by remember { mutableStateOf<Long?>(null) }
-    // T2-1：删件/删借支先确认再删（文案 site_delete 已有，确认后触觉 LongPress）
-    var confirmDeletePiece by remember { mutableStateOf<SitePieceWork?>(null) }
-    var confirmDeleteAdvance by remember { mutableStateOf<SiteAdvance?>(null) }
+    // #21：删件/删借支无确认删除 + Snackbar 撤销（T2-1 的确认弹窗已由撤销条取代）；结算流水撤销保留确认
     val saveHaptic = rememberSaveWithHaptic()
+    val scope = rememberCoroutineScope()
 
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // #21 文案（Composable 体内求值后供局部 fun 使用）
+    val pieceDeletedMsg = stringResource(R.string.site_piece_deleted)
+    val advanceDeletedMsg = stringResource(R.string.site_advance_deleted)
+    val undoLabel = stringResource(R.string.site_undo)
+
+    // #21：删除包工 → 立即删除 + Snackbar 撤销（3 秒）
+    fun deletePieceWithUndo(piece: SitePieceWork) {
+        saveHaptic()
+        vm.deletePiece(piece.id)
+        scope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = pieceDeletedMsg,
+                actionLabel = undoLabel,
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) vm.restorePieceWork(piece)
+        }
+    }
+
+    // #21：删除借支 → 立即删除 + Snackbar 撤销（3 秒）
+    fun deleteAdvanceWithUndo(adv: SiteAdvance) {
+        saveHaptic()
+        vm.deleteAdvance(adv.id)
+        scope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = advanceDeletedMsg,
+                actionLabel = undoLabel,
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) vm.restoreAdvance(adv)
+        }
+    }
 
     // 写操作失败提示：悬浮页底（与项目管理页同范式；T0-1 前 VM 各处 message 均无渲染点）
     state.message?.let { msg ->
@@ -365,7 +430,7 @@ fun SiteSettlementPane(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
-                                    TextButton(onClick = { confirmDeletePiece = piece }) {
+                                    TextButton(onClick = { deletePieceWithUndo(piece) }) {
                                         Text(stringResource(R.string.site_delete), color = MaterialTheme.colorScheme.error)
                                     }
                                 }
@@ -401,7 +466,7 @@ fun SiteSettlementPane(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
-                                    TextButton(onClick = { confirmDeleteAdvance = adv }) {
+                                    TextButton(onClick = { deleteAdvanceWithUndo(adv) }) {
                                         Text(stringResource(R.string.site_delete), color = MaterialTheme.colorScheme.error)
                                     }
                                 }
@@ -550,69 +615,6 @@ fun SiteSettlementPane(
             },
             dismissButton = {
                 TextButton(onClick = { confirmRevertId = null }) { Text(stringResource(R.string.site_dialog_cancel)) }
-            },
-        )
-    }
-
-    confirmDeletePiece?.let { piece ->
-        AlertDialog(
-            onDismissRequest = { confirmDeletePiece = null },
-            title = { Text(stringResource(R.string.site_settlement_delete_piece_title)) },
-            text = {
-                Column {
-                    Text(
-                        piece.date + " · " + (piece.itemName.ifEmpty { stringResource(R.string.site_piece_unnamed) }) +
-                            " · " + Money.yuanWithSign(piece.amountCents),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        stringResource(R.string.site_settlement_delete_body_hint),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmDeletePiece = null
-                    saveHaptic()
-                    vm.deletePiece(piece.id)
-                }) { Text(stringResource(R.string.site_delete), color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmDeletePiece = null }) { Text(stringResource(R.string.site_dialog_cancel)) }
-            },
-        )
-    }
-
-    confirmDeleteAdvance?.let { adv ->
-        AlertDialog(
-            onDismissRequest = { confirmDeleteAdvance = null },
-            title = { Text(stringResource(R.string.site_settlement_delete_advance_title)) },
-            text = {
-                Column {
-                    Text(
-                        adv.date + " · " + purposeLabel(adv.purpose) + " · " + Money.yuanWithSign(adv.amountCents),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        stringResource(R.string.site_settlement_delete_body_hint),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmDeleteAdvance = null
-                    saveHaptic()
-                    vm.deleteAdvance(adv.id)
-                }) { Text(stringResource(R.string.site_delete), color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmDeleteAdvance = null }) { Text(stringResource(R.string.site_dialog_cancel)) }
             },
         )
     }

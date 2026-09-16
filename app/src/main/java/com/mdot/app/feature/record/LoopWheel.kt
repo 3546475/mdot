@@ -25,6 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -85,11 +87,16 @@ fun LoopWheel(
         }
     }
 
-    // 停止滚动时把中心格换算成取值回调
+    // 停止滚动时把中心格换算成取值回调；#9：每次用户滚动定档触发一次轻触觉
+    // （snapshotFlow 降沿一次性；首次 collect 的初始化定位不振动）
+    val haptic = LocalHapticFeedback.current
+    var firstIdle by remember { mutableStateOf(true) }
     LaunchedEffect(listState) {
         snapshotFlowIsIdle(listState) {
             val v = ((centerIndex % itemCount) + itemCount) % itemCount
             if (v != safeValue) onValueChange(v)
+            if (firstIdle) firstIdle = false
+            else haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         }
     }
 

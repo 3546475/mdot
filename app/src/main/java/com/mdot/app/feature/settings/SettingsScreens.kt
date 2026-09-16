@@ -2,6 +2,14 @@ package com.mdot.app.feature.settings
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -33,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
@@ -174,22 +184,32 @@ private fun SystemCard(
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
-    Surface(
-        shape = RoundedCornerShape(Radius.card),
-        color = when {
+    // #14：选中态过渡——容器色/border 色/描边宽动画 + 勾选角标 scaleIn（motionScheme defaultSpatial）
+    val containerColor by animateColorAsState(
+        targetValue = when {
             isSelected -> MaterialTheme.colorScheme.primaryContainer
             enabled -> MaterialTheme.colorScheme.surfaceContainer
             else -> MaterialTheme.colorScheme.surfaceContainerLow
         },
+        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
+        label = "systemCardContainer",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
+        label = "systemCardBorder",
+    )
+    val borderWidth by animateDpAsState(
+        targetValue = if (isSelected) 2.dp else 0.dp,
+        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+        label = "systemCardBorderWidth",
+    )
+    Surface(
+        shape = RoundedCornerShape(Radius.card),
+        color = containerColor,
+        border = BorderStroke(borderWidth, borderColor),
         modifier = Modifier
             .fillMaxWidth()
-            .then(
-                if (isSelected) Modifier.border(
-                    2.dp,
-                    MaterialTheme.colorScheme.primary,
-                    RoundedCornerShape(Radius.card),
-                ) else Modifier
-            )
             .clickable(enabled = enabled, onClick = onClick),
     ) {
         Column(Modifier.padding(Spacing.l)) {
@@ -201,6 +221,25 @@ private fun SystemCard(
                     else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.weight(1f))
+                // 选中勾选角标（scaleIn）
+                AnimatedVisibility(
+                    visible = isSelected,
+                    enter = scaleIn(
+                        initialScale = 0f,
+                        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                    ) + fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
+                    exit = scaleOut(
+                        targetScale = 0f,
+                        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                    ) + fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec()),
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_ms_check),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(end = 6.dp),
+                    )
+                }
                 when {
                     isSelected -> Text(
                         stringResource(R.string.settings_in_use),

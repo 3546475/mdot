@@ -1,5 +1,18 @@
 package com.mdot.app.feature.onboarding
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,6 +28,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -28,8 +42,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -125,7 +142,23 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
         )
         Spacer(Modifier.height(48.dp))
 
-        when (step) {
+        // #15：步骤切换方向感动画——前进右进左出、上一步反向（方向判定照日历月标题）
+        // 注意：AnimatedContent 过渡容器为堆叠布局，内容必须用 Column 线性包裹（否则多子项重叠只显末项）
+        val stepSpatial: FiniteAnimationSpec<IntOffset> = MaterialTheme.motionScheme.defaultSpatialSpec()
+        val stepEffects: FiniteAnimationSpec<Float> = MaterialTheme.motionScheme.defaultEffectsSpec()
+        AnimatedContent(
+            targetState = step,
+            transitionSpec = {
+                val forward = targetState > initialState
+                (slideInHorizontally(stepSpatial) { if (forward) it else -it } +
+                    fadeIn(stepEffects)) togetherWith
+                    (slideOutHorizontally(stepSpatial) { if (forward) -it else it } +
+                        fadeOut(stepEffects))
+            },
+            label = "onboardingStep",
+        ) { s ->
+            Column {
+                when (s) {
             0 -> {
                 Text(stringResource(R.string.onboarding_step_work_system), style = MaterialTheme.typography.headlineMedium)
                 Spacer(Modifier.height(16.dp))
@@ -136,108 +169,36 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
                 )
                 Spacer(Modifier.height(24.dp))
                 // 标准工时（原「记加班」）
-                Surface(
-                    shape = RoundedCornerShape(Radius.card),
-                    color = if (selectedSystem == WorkSystem.STANDARD)
-                        MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceContainer,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { selectedSystem = WorkSystem.STANDARD }
-                        .then(
-                            if (selectedSystem == WorkSystem.STANDARD) Modifier.border(
-                                2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(Radius.card),
-                            ) else Modifier
-                        ),
-                ) {
-                    Column(Modifier.padding(20.dp)) {
-                        Text(stringResource(R.string.onboarding_ws_standard), style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            stringResource(R.string.onboarding_ws_standard_desc),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+                OnboardingSystemCard(
+                    title = stringResource(R.string.onboarding_ws_standard),
+                    desc = stringResource(R.string.onboarding_ws_standard_desc),
+                    selected = selectedSystem == WorkSystem.STANDARD,
+                    onClick = { selectedSystem = WorkSystem.STANDARD },
+                )
                 Spacer(Modifier.height(12.dp))
                 // 小时工
-                Surface(
-                    shape = RoundedCornerShape(Radius.card),
-                    color = if (selectedSystem == WorkSystem.HOURLY)
-                        MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceContainer,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { selectedSystem = WorkSystem.HOURLY }
-                        .then(
-                            if (selectedSystem == WorkSystem.HOURLY) Modifier.border(
-                                2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(Radius.card),
-                            ) else Modifier
-                        ),
-                ) {
-                    Column(Modifier.padding(20.dp)) {
-                        Text(stringResource(R.string.onboarding_ws_hourly), style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            stringResource(R.string.onboarding_ws_hourly_desc),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+                OnboardingSystemCard(
+                    title = stringResource(R.string.onboarding_ws_hourly),
+                    desc = stringResource(R.string.onboarding_ws_hourly_desc),
+                    selected = selectedSystem == WorkSystem.HOURLY,
+                    onClick = { selectedSystem = WorkSystem.HOURLY },
+                )
                 Spacer(Modifier.height(12.dp))
                 // 工地记工（12 文档 F-S1：四卡全可选）
-                Surface(
-                    shape = RoundedCornerShape(Radius.card),
-                    color = if (selectedSystem == WorkSystem.SITE)
-                        MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceContainer,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { selectedSystem = WorkSystem.SITE }
-                        .then(
-                            if (selectedSystem == WorkSystem.SITE) Modifier.border(
-                                2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(Radius.card),
-                            ) else Modifier
-                        ),
-                ) {
-                    Column(Modifier.padding(20.dp)) {
-                        Text(stringResource(R.string.onboarding_ws_site), style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            stringResource(R.string.onboarding_ws_site_desc),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+                OnboardingSystemCard(
+                    title = stringResource(R.string.onboarding_ws_site),
+                    desc = stringResource(R.string.onboarding_ws_site_desc),
+                    selected = selectedSystem == WorkSystem.SITE,
+                    onClick = { selectedSystem = WorkSystem.SITE },
+                )
                 Spacer(Modifier.height(12.dp))
                 // 综合工时（10 文档 F-Z1）
-                Surface(
-                    shape = RoundedCornerShape(Radius.card),
-                    color = if (selectedSystem == WorkSystem.COMPREHENSIVE)
-                        MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceContainer,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { selectedSystem = WorkSystem.COMPREHENSIVE }
-                        .then(
-                            if (selectedSystem == WorkSystem.COMPREHENSIVE) Modifier.border(
-                                2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(Radius.card),
-                            ) else Modifier
-                        ),
-                ) {
-                    Column(Modifier.padding(20.dp)) {
-                        Text(stringResource(R.string.onboarding_ws_comprehensive), style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            stringResource(R.string.onboarding_ws_comprehensive_desc),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+                OnboardingSystemCard(
+                    title = stringResource(R.string.onboarding_ws_comprehensive),
+                    desc = stringResource(R.string.onboarding_ws_comprehensive_desc),
+                    selected = selectedSystem == WorkSystem.COMPREHENSIVE,
+                    onClick = { selectedSystem = WorkSystem.COMPREHENSIVE },
+                )
             }
 
             1 -> {
@@ -354,6 +315,8 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
                     }
                 }
             }
+            }
+        }
         }
 
         Spacer(Modifier.height(32.dp))
@@ -402,4 +365,72 @@ private fun androidx.compose.foundation.layout.RowScope.MultField(
         singleLine = true,
         modifier = Modifier.weight(1f),
     )
+}
+
+/** #14：引导页工时制度选中卡——容器色/border 色/描边宽过渡 + 勾选角标 scaleIn（motionScheme defaultSpatial） */
+@Composable
+private fun OnboardingSystemCard(
+    title: String,
+    desc: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val containerColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
+        else MaterialTheme.colorScheme.surfaceContainer,
+        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
+        label = "onbCardContainer",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
+        label = "onbCardBorder",
+    )
+    val borderWidth by animateDpAsState(
+        targetValue = if (selected) 2.dp else 0.dp,
+        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+        label = "onbCardBorderWidth",
+    )
+    Surface(
+        shape = RoundedCornerShape(Radius.card),
+        color = containerColor,
+        border = BorderStroke(borderWidth, borderColor),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+    ) {
+        Column(Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                // 选中勾选角标（scaleIn）
+                AnimatedVisibility(
+                    visible = selected,
+                    enter = scaleIn(
+                        initialScale = 0f,
+                        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                    ) + fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
+                    exit = scaleOut(
+                        targetScale = 0f,
+                        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                    ) + fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec()),
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_ms_check),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                desc,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
