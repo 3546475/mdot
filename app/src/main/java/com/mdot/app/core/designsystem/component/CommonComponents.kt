@@ -264,6 +264,7 @@ fun KeyValue(
     valueColor: Color = MaterialTheme.colorScheme.onSurface,
     modifier: Modifier = Modifier,
     alignment: Alignment.Horizontal = Alignment.Start,
+    animatedCents: Long? = null,
 ) {
     Column(modifier = modifier, horizontalAlignment = alignment) {
         Text(
@@ -272,10 +273,19 @@ fun KeyValue(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(2.dp))
-        Text(
-            value,
-            style = MaterialTheme.typography.titleMedium,
-            color = valueColor,
-        )
+        if (animatedCents != null) {
+            AnimatedMoneyText(
+                animatedCents,
+                style = MaterialTheme.typography.titleMedium,
+                color = valueColor,
+                label = "keyValue",
+            )
+        } else {
+            Text(
+                value,
+                style = MaterialTheme.typography.titleMedium,
+                color = valueColor,
+            )
+        }
     }
 }

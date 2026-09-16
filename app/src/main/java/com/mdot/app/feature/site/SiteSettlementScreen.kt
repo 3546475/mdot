@@ -1,6 +1,7 @@
 package com.mdot.app.feature.site
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,6 +18,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,6 +44,7 @@ import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.SiteMoneyColors
 import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.component.AnimatedMoneyText
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.SettingRow
 import com.mdot.app.core.designsystem.component.SectionCard
@@ -50,6 +54,8 @@ import com.mdot.app.core.util.onFailure
 import com.mdot.app.core.util.onSuccess
 import com.mdot.app.domain.SitePayCalculator
 import com.mdot.app.domain.model.AdvancePurpose
+import com.mdot.app.domain.model.SitePieceWork
+import com.mdot.app.feature.record.rememberSaveWithHaptic
 import com.mdot.app.domain.model.SiteAdvance
 import com.mdot.app.domain.model.WorkSystem
 import com.mdot.app.domain.util.Money
@@ -154,10 +160,15 @@ class SiteSettlementViewModel @Inject constructor(
 
     fun confirmSettlement() = viewModelScope.launch {
         val preview = _state.value.preview ?: return@launch
-        siteRepo.confirmSettlement(preview, note = null).onSuccess {
-            _state.update { it.copy(preview = null) }
-            refresh()
-        }
+        siteRepo.confirmSettlement(preview, note = null)
+            .onFailure { e ->
+                // 乐观校验失败（区间已变化）：旧预览已作废，关窗并经 message 提示重新发起（T0-1：此前此处静默）
+                _state.update { it.copy(preview = null, message = e.toSiteText()) }
+            }
+            .onSuccess {
+                _state.update { it.copy(preview = null) }
+                refresh()
+            }
     }
 
     fun dismissPreview() = _state.update { it.copy(preview = null) }
@@ -232,197 +243,244 @@ fun SiteSettlementPane(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     var confirmRevertId by remember { mutableStateOf<Long?>(null) }
+    // T2-1：删件/删借支先确认再删（文案 site_delete 已有，确认后触觉 LongPress）
+    var confirmDeletePiece by remember { mutableStateOf<SitePieceWork?>(null) }
+    var confirmDeleteAdvance by remember { mutableStateOf<SiteAdvance?>(null) }
+    val saveHaptic = rememberSaveWithHaptic()
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(horizontal = Spacing.page),
-    ) {
-        Spacer(Modifier.height(Spacing.s))
+    val snackbarHostState = remember { SnackbarHostState() }
 
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(Spacing.m),
+    // 写操作失败提示：悬浮页底（与项目管理页同范式；T0-1 前 VM 各处 message 均无渲染点）
+    state.message?.let { msg ->
+        LaunchedEffect(msg) {
+            snackbarHostState.showSnackbar(msg)
+            vm.clearMessage()
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = Spacing.page),
         ) {
-            item {
-                SectionCard {
-                    Column(Modifier.padding(Spacing.l)) {
-                        if (state.loading) {
-                            Text(stringResource(R.string.site_settlement_loading), style = MaterialTheme.typography.bodyMedium)
-                        } else {
-                            val summary = state.summary
-                            if (summary == null) {
-                                Text(stringResource(R.string.site_settlement_empty), style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(Spacing.s))
+
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(Spacing.m),
+            ) {
+                item {
+                    SectionCard {
+                        Column(Modifier.padding(Spacing.l)) {
+                            if (state.loading) {
+                                Text(stringResource(R.string.site_settlement_loading), style = MaterialTheme.typography.bodyMedium)
                             } else {
-                                Text(
-                                    stringResource(R.string.site_settlement_pending_title, state.projectName),
-                                    style = MaterialTheme.typography.titleSmall,
-                                )
-                                Spacer(Modifier.height(Spacing.s))
-                                SummaryLine(
-                                    stringResource(R.string.site_settlement_works),
-                                    stringResource(
-                                        R.string.site_settlement_works_value,
-                                        summary.totalWorksMilli / 1000.0,
-                                        TimeUtils.hoursDecimal(summary.otMinutes),
-                                    ),
-                                )
-                                SummaryLine(
-                                    stringResource(R.string.site_settlement_receivable),
-                                    Money.yuanWithSign(summary.receivableCents),
-                                    valueColor = MaterialTheme.colorScheme.primary,
-                                )
-                                SummaryLine(
-                                    stringResource(R.string.site_settlement_advanced),
-                                    Money.yuanWithSign(summary.advanceTotalCents),
-                                    valueColor = SiteMoneyColors.ReceivedGreen,
-                                )
-                                HorizontalDivider(Modifier.padding(vertical = 6.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                val summary = state.summary
+                                if (summary == null) {
+                                    Text(stringResource(R.string.site_settlement_empty), style = MaterialTheme.typography.bodyMedium)
+                                } else {
                                     Text(
-                                        stringResource(R.string.site_settlement_net),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        modifier = Modifier.weight(1f),
+                                        stringResource(R.string.site_settlement_pending_title, state.projectName),
+                                        style = MaterialTheme.typography.titleSmall,
                                     )
-                                    Text(
-                                        Money.yuanWithSign(summary.pendingCents),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (summary.pendingCents < 0) MaterialTheme.colorScheme.error
-                                        else SiteMoneyColors.PendingOrange,
+                                    Spacer(Modifier.height(Spacing.s))
+                                    SummaryLine(
+                                        stringResource(R.string.site_settlement_works),
+                                        stringResource(
+                                            R.string.site_settlement_works_value,
+                                            summary.totalWorksMilli / 1000.0,
+                                            TimeUtils.hoursDecimal(summary.otMinutes),
+                                        ),
                                     )
-                                }
-                                Spacer(Modifier.height(Spacing.s))
-                                OutlinedButton(
-                                    onClick = { vm.buildPreview() },
-                                    enabled = summary.pendingCents != 0L,
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) { Text(stringResource(R.string.site_settlement_settle_all_action)) }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (state.pieces.isNotEmpty()) {
-                item {
-                    Text(stringResource(R.string.site_settlement_pieces), style = MaterialTheme.typography.titleSmall)
-                }
-                items(state.pieces, key = { "piece_${it.id}" }) { piece ->
-                    SectionCard {
-                        Column(Modifier.padding(horizontal = Spacing.l, vertical = Spacing.m)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(
-                                        Money.yuanWithSign(piece.amountCents),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = MaterialTheme.colorScheme.primary,
+                                    SummaryLine(
+                                        stringResource(R.string.site_settlement_receivable),
+                                        Money.yuanWithSign(summary.receivableCents),
+                                        valueColor = MaterialTheme.colorScheme.primary,
+                                        animatedCents = summary.receivableCents,
                                     )
-                                    val qty = piece.quantityMilli / 1000.0
-                                    val qtyText = if (piece.quantityMilli > 0)
-                                        (if (qty % 1.0 == 0.0) "${qty.toInt()}" else String.format(java.util.Locale.US, "%.3f", qty).trimEnd('0').trimEnd('.')) + piece.unit + " × "
-                                    else ""
-                                    Text(
-                                        piece.date + " · " + (piece.itemName.ifEmpty { stringResource(R.string.site_piece_unnamed) }) +
-                                            " · " + qtyText + Money.yuanText(piece.unitPriceCents).replace(",", "") + "元",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    SummaryLine(
+                                        stringResource(R.string.site_settlement_advanced),
+                                        Money.yuanWithSign(summary.advanceTotalCents),
+                                        valueColor = SiteMoneyColors.ReceivedGreen,
+                                        animatedCents = summary.advanceTotalCents,
                                     )
-                                }
-                                TextButton(onClick = { vm.deletePiece(piece.id) }) {
-                                    Text(stringResource(R.string.site_delete), color = MaterialTheme.colorScheme.error)
+                                    HorizontalDivider(Modifier.padding(vertical = 6.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            stringResource(R.string.site_settlement_net),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        AnimatedMoneyText(
+                                            summary.pendingCents,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = if (summary.pendingCents < 0) MaterialTheme.colorScheme.error
+                                            else SiteMoneyColors.PendingOrange,
+                                            fontWeight = FontWeight.Bold,
+                                            label = "settlementNet",
+                                        )
+                                    }
+                                    Spacer(Modifier.height(Spacing.s))
+                                    OutlinedButton(
+                                        onClick = { vm.buildPreview() },
+                                        enabled = summary.pendingCents != 0L,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) { Text(stringResource(R.string.site_settlement_settle_all_action)) }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            if (state.advances.isNotEmpty()) {
-                item {
-                    Text(stringResource(R.string.site_settlement_advances), style = MaterialTheme.typography.titleSmall)
-                }
-                items(state.advances, key = { "advance_${it.id}" }) { adv ->
-                    SectionCard {
-                        Column(Modifier.padding(horizontal = Spacing.l, vertical = Spacing.m)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(
-                                        Money.yuanWithSign(adv.amountCents),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = SiteMoneyColors.ReceivedGreen,
-                                    )
-                                    Text(
-                                        adv.date + " · " + purposeLabel(adv.purpose) + (adv.note?.let { " · " + it } ?: ""),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                TextButton(onClick = { vm.deleteAdvance(adv.id) }) {
-                                    Text(stringResource(R.string.site_delete), color = MaterialTheme.colorScheme.error)
-                                }
-                            }
-                        }
+                if (state.pieces.isNotEmpty()) {
+                    item {
+                        Text(stringResource(R.string.site_settlement_pieces), style = MaterialTheme.typography.titleSmall)
                     }
-                }
-            }
-
-            if (state.settlements.isNotEmpty()) {
-                item {
-                    Text(stringResource(R.string.site_settlement_history), style = MaterialTheme.typography.titleSmall)
-                }
-                items(state.settlements, key = { "settle_${it.id}" }) { row ->
-                    SectionCard {
-                        if (row.isPartial) {
-                            // 部分结算（本次结算金额）：到手流水，绿色；撤销即删除
+                    items(state.pieces, key = { "piece_${it.id}" }) { piece ->
+                        SectionCard(
+                            Modifier.animateItem(
+                                fadeInSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+                                placementSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                                fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+                            ),
+                        ) {
                             Column(Modifier.padding(horizontal = Spacing.l, vertical = Spacing.m)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
-                                        Text(stringResource(R.string.site_settlement_partial_row), style = MaterialTheme.typography.titleMedium)
+                                        AnimatedMoneyText(
+                                            piece.amountCents,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            label = "settlementPiece",
+                                        )
+                                        val qty = piece.quantityMilli / 1000.0
+                                        val qtyText = if (piece.quantityMilli > 0)
+                                            (if (qty % 1.0 == 0.0) "${qty.toInt()}" else String.format(java.util.Locale.US, "%.3f", qty).trimEnd('0').trimEnd('.')) + piece.unit + " × "
+                                        else ""
                                         Text(
-                                            row.periodLabel,
+                                            piece.date + " · " + (piece.itemName.ifEmpty { stringResource(R.string.site_piece_unnamed) }) +
+                                                " · " + qtyText + Money.yuanText(piece.unitPriceCents).replace(",", "") + "元",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
-                                    Text(
-                                        Money.yuanWithSign(row.netCents),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = SiteMoneyColors.ReceivedGreen,
-                                    )
-                                }
-                                TextButton(onClick = { confirmRevertId = row.id }) {
-                                    Text(stringResource(R.string.site_settlement_revert), color = MaterialTheme.colorScheme.error)
+                                    TextButton(onClick = { confirmDeletePiece = piece }) {
+                                        Text(stringResource(R.string.site_delete), color = MaterialTheme.colorScheme.error)
+                                    }
                                 }
                             }
-                        } else {
+                        }
+                    }
+                }
+
+                if (state.advances.isNotEmpty()) {
+                    item {
+                        Text(stringResource(R.string.site_settlement_advances), style = MaterialTheme.typography.titleSmall)
+                    }
+                    items(state.advances, key = { "advance_${it.id}" }) { adv ->
+                        SectionCard(
+                            Modifier.animateItem(
+                                fadeInSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+                                placementSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                                fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+                            ),
+                        ) {
                             Column(Modifier.padding(horizontal = Spacing.l, vertical = Spacing.m)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
-                                        Text(row.periodLabel, style = MaterialTheme.typography.titleMedium)
+                                        AnimatedMoneyText(
+                                            adv.amountCents,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = SiteMoneyColors.ReceivedGreen,
+                                            label = "settlementAdvance",
+                                        )
                                         Text(
-                                            stringResource(R.string.site_settlement_row_detail, row.workYuan, row.advanceYuan, row.netYuan),
+                                            adv.date + " · " + purposeLabel(adv.purpose) + (adv.note?.let { " · " + it } ?: ""),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
-                                    Text(
-                                        Money.yuanWithSign(row.netCents),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = MaterialTheme.colorScheme.primary,
-                                    )
+                                    TextButton(onClick = { confirmDeleteAdvance = adv }) {
+                                        Text(stringResource(R.string.site_delete), color = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (state.settlements.isNotEmpty()) {
+                    item {
+                        Text(stringResource(R.string.site_settlement_history), style = MaterialTheme.typography.titleSmall)
+                    }
+                    items(state.settlements, key = { "settle_${it.id}" }) { row ->
+                        SectionCard(
+                            Modifier.animateItem(
+                                fadeInSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+                                placementSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                                fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+                            ),
+                        ) {
+                            if (row.isPartial) {
+                                // 部分结算（本次结算金额）：到手流水，绿色；撤销即删除
+                                Column(Modifier.padding(horizontal = Spacing.l, vertical = Spacing.m)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(stringResource(R.string.site_settlement_partial_row), style = MaterialTheme.typography.titleMedium)
+                                            Text(
+                                                row.periodLabel,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        Text(
+                                            Money.yuanWithSign(row.netCents),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = SiteMoneyColors.ReceivedGreen,
+                                        )
+                                    }
                                     TextButton(onClick = { confirmRevertId = row.id }) {
                                         Text(stringResource(R.string.site_settlement_revert), color = MaterialTheme.colorScheme.error)
                                     }
                                 }
+                            } else {
+                                Column(Modifier.padding(horizontal = Spacing.l, vertical = Spacing.m)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(row.periodLabel, style = MaterialTheme.typography.titleMedium)
+                                            Text(
+                                                stringResource(R.string.site_settlement_row_detail, row.workYuan, row.advanceYuan, row.netYuan),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        Text(
+                                            Money.yuanWithSign(row.netCents),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                        TextButton(onClick = { confirmRevertId = row.id }) {
+                                            Text(stringResource(R.string.site_settlement_revert), color = MaterialTheme.colorScheme.error)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            item { Spacer(Modifier.height(Spacing.xl)) }
+                item { Spacer(Modifier.height(Spacing.xl)) }
+            }
         }
+
+        // 结果提示：悬浮在页面底部（而非内联在列表流里）
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = Spacing.l),
+        )
     }
 
     state.preview?.let { p ->
@@ -495,6 +553,69 @@ fun SiteSettlementPane(
             },
         )
     }
+
+    confirmDeletePiece?.let { piece ->
+        AlertDialog(
+            onDismissRequest = { confirmDeletePiece = null },
+            title = { Text(stringResource(R.string.site_settlement_delete_piece_title)) },
+            text = {
+                Column {
+                    Text(
+                        piece.date + " · " + (piece.itemName.ifEmpty { stringResource(R.string.site_piece_unnamed) }) +
+                            " · " + Money.yuanWithSign(piece.amountCents),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        stringResource(R.string.site_settlement_delete_body_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDeletePiece = null
+                    saveHaptic()
+                    vm.deletePiece(piece.id)
+                }) { Text(stringResource(R.string.site_delete), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDeletePiece = null }) { Text(stringResource(R.string.site_dialog_cancel)) }
+            },
+        )
+    }
+
+    confirmDeleteAdvance?.let { adv ->
+        AlertDialog(
+            onDismissRequest = { confirmDeleteAdvance = null },
+            title = { Text(stringResource(R.string.site_settlement_delete_advance_title)) },
+            text = {
+                Column {
+                    Text(
+                        adv.date + " · " + purposeLabel(adv.purpose) + " · " + Money.yuanWithSign(adv.amountCents),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        stringResource(R.string.site_settlement_delete_body_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDeleteAdvance = null
+                    saveHaptic()
+                    vm.deleteAdvance(adv.id)
+                }) { Text(stringResource(R.string.site_delete), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDeleteAdvance = null }) { Text(stringResource(R.string.site_dialog_cancel)) }
+            },
+        )
+    }
 }
 
 @Composable
@@ -502,6 +623,7 @@ private fun SummaryLine(
     label: String,
     value: String,
     valueColor: Color = MaterialTheme.colorScheme.onSurface,
+    animatedCents: Long? = null,
 ) {
     Row(
         Modifier
@@ -510,7 +632,17 @@ private fun SummaryLine(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = valueColor)
+        if (animatedCents != null) {
+            AnimatedMoneyText(
+                animatedCents,
+                style = MaterialTheme.typography.bodyMedium,
+                color = valueColor,
+                fontWeight = FontWeight.Medium,
+                label = "settlementLine",
+            )
+        } else {
+            Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = valueColor)
+        }
     }
 }
 

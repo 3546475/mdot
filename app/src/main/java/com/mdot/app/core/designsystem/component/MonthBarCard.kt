@@ -2,6 +2,8 @@ package com.mdot.app.core.designsystem.component
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,7 +19,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -48,11 +58,25 @@ fun MonthBarCard(
     from: LocalDate,
     workSystem: WorkSystem,
     modifier: Modifier = Modifier,
+    /** 长按柱 → 记工弹窗等（docs/15 T6 #19；null 不启用长按） */
+    onDayLongPress: ((LocalDate) -> Unit)? = null,
+    /** 浮窗文本（日期+时长/工数）；返回 null 则不显示浮窗 */
+    hintValueText: @Composable (LocalDate, Float) -> String? = { _, _ -> null },
 ) {
     val days = values.size
     if (days < 2) return
     val maxV = values.maxOrNull() ?: 0f
     val bestIdx = values.indices.maxByOrNull { values[it] } ?: 0
+    val hint = rememberChartHint()
+    var tapEvent by remember { mutableStateOf<ChartEvent?>(null) }
+    // 选中柱（点击切换；仅内部状态，周柱由外部 selectedLabel 驱动）
+    var selectedIdx by remember { mutableStateOf<Int?>(null) }
+    val haptic = LocalHapticFeedback.current
+    // 手势只写事件；文本在组合上下文计算（手势回调非 @Composable）
+    tapEvent?.let { ev ->
+        hintValueText(ev.date, ev.value)?.let { hint.value = ChartHint(ev.column, ev.date, it) }
+        tapEvent = null
+    }
 
     // 自绘容器：底距比统一卡片更紧（最多日文字贴近下缘）
     Surface(
@@ -60,6 +84,7 @@ fun MonthBarCard(
         shape = RoundedCornerShape(Radius.card),
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
+        ChartHintBox(hint = hint.value, columns = days) {
         Column(Modifier.padding(start = Spacing.l, end = Spacing.l, top = Spacing.l, bottom = Spacing.s)) {
             Row(verticalAlignment = Alignment.Bottom) {
                 Column(Modifier.weight(1f)) {
@@ -91,22 +116,60 @@ fun MonthBarCard(
                                 .fillMaxSize(),
                             verticalAlignment = Alignment.Bottom,
                         ) {
-                            values.forEachIndexed { _, v ->
+                            values.forEachIndexed { idx, v ->
+                                val date = from.plusDays(idx.toLong())
                                 Box(
                                     Modifier
                                         .weight(1f)
-                                        .fillMaxHeight(),
+                                        .fillMaxHeight()
+                                        .pointerInput(date) {
+                                            detectTapGestures(
+                                                onTap = {
+                                                    tapEvent = ChartEvent(idx, date, v)
+                                                    selectedIdx = if (selectedIdx == idx) null else idx
+                                                },
+                                                onLongPress = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    onDayLongPress?.invoke(date)
+                                                },
+                                            )
+                                        },
                                     contentAlignment = Alignment.BottomCenter,
                                 ) {
+                                    val selected = selectedIdx == idx
                                     if (v > 0f) {
                                         Box(
                                             Modifier
                                                 .fillMaxHeight(
                                                     (v / maxV.coerceAtLeast(1f)).coerceIn(0.03f, 1f)
                                                 )
-                                                .width(5.dp)
+                                                .width(if (selected) 7.dp else 5.dp)
                                                 .background(
-                                                    Brush.verticalGradient(listOf(barTopColor, barBottomColor)),
+                                                    // 选中柱满饱和（区分于未选中渐变）
+                                                    if (selected) Brush.verticalGradient(
+                                                        listOf(barTopColor, barTopColor.copy(alpha = 0.75f)),
+                                                    ) else Brush.verticalGradient(
+                                                        listOf(barTopColor, barBottomColor),
+                                                    ),
+                                                    RoundedCornerShape(3.dp),
+                                                )
+                                                .then(
+                                                    if (selected) Modifier.border(
+                                                        1.5.dp,
+                                                        MaterialTheme.colorScheme.onPrimary,
+                                                        RoundedCornerShape(3.dp),
+                                                    ) else Modifier
+                                                ),
+                                        )
+                                    } else if (selected) {
+                                        // 空柱选中：底部占位框
+                                        Box(
+                                            Modifier
+                                                .width(8.dp)
+                                                .height(10.dp)
+                                                .border(
+                                                    1.5.dp,
+                                                    MaterialTheme.colorScheme.onPrimary,
                                                     RoundedCornerShape(3.dp),
                                                 ),
                                         )
@@ -179,6 +242,7 @@ fun MonthBarCard(
                     textAlign = TextAlign.Center,
                 )
             }
+        }
         }
     }
 }

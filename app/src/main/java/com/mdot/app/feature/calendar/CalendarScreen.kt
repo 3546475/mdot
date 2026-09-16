@@ -35,6 +35,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -62,6 +64,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.wrapContentWidth
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.AdaptiveSpecs
+import com.mdot.app.core.util.AppResult
+import com.mdot.app.feature.record.rememberSaveWithHaptic
 import com.mdot.app.core.designsystem.Duration
 import com.mdot.app.core.designsystem.LocalWindowSpec
 import com.mdot.app.core.designsystem.Radius
@@ -165,6 +169,13 @@ class CalendarViewModel @Inject constructor(
     val isBatchSelecting: StateFlow<Boolean> = batchSelecting
     val batchSelection: StateFlow<Set<LocalDate>> = batchSelected
 
+    // T1-2：批量保存结果反馈（docs/15；文案按硬规则 10 例外走 VM 消息硬编码）
+    private val message = MutableStateFlow<String?>(null)
+    val messageFlow: StateFlow<String?> = message
+    fun clearMessage() {
+        message.value = null
+    }
+
     /** 长按进入多选：以该日期为首项（工地制度/未来日期不进入） */
     fun startBatchSelect(date: LocalDate) {
         if (uiState.value.workSystem == com.mdot.app.domain.model.WorkSystem.SITE) return
@@ -194,8 +205,9 @@ class CalendarViewModel @Inject constructor(
         viewModelScope.launch {
             val workdays = settings.workdaysFlow.first()
             val shift = shiftRepo.getAll().firstOrNull { !it.hidden }
+            var success = 0
             dates.forEach { date ->
-                recordRepo.saveOt(
+                val r = recordRepo.saveOt(
                     OtDraft(
                         date = date,
                         shiftId = shift?.id,
@@ -205,7 +217,11 @@ class CalendarViewModel @Inject constructor(
                         tierSource = TierSource.AUTO,
                     )
                 )
+                if (r is AppResult.Success) success++
             }
+            message.value =
+                if (success == dates.size) "已为 $success 天记录加班"
+                else "已为 $success/${dates.size} 天记录加班"
             exitBatchSelect()
         }
     }
@@ -396,6 +412,17 @@ fun CalendarScreen(
     var showBatchDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     // 已有加班记录的选中天数（弹层/操作条覆盖提示）
     val overwriteCount = batchSelected.count { d -> state.cells.any { it.date == d && it.otMinutes > 0 } }
+    // T1-2：批量保存结果 Snackbar（docs/15）
+    val snackbarHostState = remember { SnackbarHostState() }
+    val batchMessage by vm.messageFlow.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(batchMessage) {
+        batchMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            vm.clearMessage()
+        }
+    }
+    // T1-1：批量保存触觉（LongPress）
+    val saveHaptic = rememberSaveWithHaptic()
     // 多选模式下系统返回先退出多选，不退出日历页
     androidx.activity.compose.BackHandler(enabled = batchSelecting) { vm.exitBatchSelect() }
     val colorScheme = MaterialTheme.colorScheme
@@ -409,29 +436,59 @@ fun CalendarScreen(
         }
     }
 
-    if (twoPane) {
-        Row(
-            Modifier
-                .fillMaxSize()
-                .wrapContentWidth(Alignment.CenterHorizontally)
-                .contentBottomPadding(showBottomBar = !canBack)
-                .padding(horizontal = Spacing.page)
-                .widthIn(max = AdaptiveSpecs.twoPaneMaxWidth),
-        ) {
-            // 左栏：月历（月份行 + 星期行 + 网格）
-            Column(Modifier.weight(1f)) {
+    Box(Modifier.fillMaxSize()) {
+        if (twoPane) {
+            Row(
+                Modifier
+                    .fillMaxSize()
+                    .wrapContentWidth(Alignment.CenterHorizontally)
+                    .contentBottomPadding(showBottomBar = !canBack)
+                    .padding(horizontal = Spacing.page)
+                    .widthIn(max = AdaptiveSpecs.twoPaneMaxWidth),
+            ) {
+                // 左栏：月历（月份行 + 星期行 + 网格）
+                Column(Modifier.weight(1f)) {
+                    topBar()
+                    MonthHeaderRow(vm)
+                    Spacer(Modifier.height(Spacing.s))
+                    WeekdayHeaderRow()
+                    Spacer(Modifier.height(Spacing.xs))
+                    MonthGrid(state, vm)
+                }
+                Spacer(Modifier.width(Spacing.l))
+                // 右栏：小结卡（多选时替换为批量操作条）
+                Column(Modifier.weight(1f)) {
+                    topBar()
+                    Spacer(Modifier.height(Spacing.xs))
+                    if (batchSelecting) {
+                        BatchActionBar(
+                            selectedCount = batchSelected.size,
+                            overwriteCount = overwriteCount,
+                            onSelectConfirm = { showBatchDialog = true },
+                            onCancel = { vm.exitBatchSelect() },
+                        )
+                    } else {
+                        SummaryCards(state, colorScheme)
+                    }
+                }
+            }
+        } else {
+            // ---- 手机：单列（原布局） ----
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .wrapContentWidth(Alignment.CenterHorizontally)
+                    .contentBottomPadding(showBottomBar = !canBack)
+                    .widthIn(max = AdaptiveSpecs.contentMaxWidth)
+                    .padding(horizontal = Spacing.page),
+            ) {
                 topBar()
                 MonthHeaderRow(vm)
                 Spacer(Modifier.height(Spacing.s))
                 WeekdayHeaderRow()
                 Spacer(Modifier.height(Spacing.xs))
                 MonthGrid(state, vm)
-            }
-            Spacer(Modifier.width(Spacing.l))
-            // 右栏：小结卡（多选时替换为批量操作条）
-            Column(Modifier.weight(1f)) {
-                topBar()
-                Spacer(Modifier.height(Spacing.xs))
+                Spacer(Modifier.height(Spacing.m))
                 if (batchSelecting) {
                     BatchActionBar(
                         selectedCount = batchSelected.size,
@@ -444,41 +501,15 @@ fun CalendarScreen(
                 }
             }
         }
-    } else {
-        // ---- 手机：单列（原布局） ----
-        Column(
-            Modifier
-                .fillMaxSize()
-                .wrapContentWidth(Alignment.CenterHorizontally)
-                .contentBottomPadding(showBottomBar = !canBack)
-                .widthIn(max = AdaptiveSpecs.contentMaxWidth)
-                .padding(horizontal = Spacing.page),
-        ) {
-            topBar()
-            MonthHeaderRow(vm)
-            Spacer(Modifier.height(Spacing.s))
-            WeekdayHeaderRow()
-            Spacer(Modifier.height(Spacing.xs))
-            MonthGrid(state, vm)
-            Spacer(Modifier.height(Spacing.m))
-            if (batchSelecting) {
-                BatchActionBar(
-                    selectedCount = batchSelected.size,
-                    overwriteCount = overwriteCount,
-                    onSelectConfirm = { showBatchDialog = true },
-                    onCancel = { vm.exitBatchSelect() },
-                )
-            } else {
-                SummaryCards(state, colorScheme)
-            }
-        }
-    }
 
+        SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter))
+    }
     if (showBatchDialog) {
         BatchOtDialog(
             selectedCount = batchSelected.size,
             overwriteCount = overwriteCount,
             onConfirm = { minutes ->
+                saveHaptic()
                 showBatchDialog = false
                 vm.saveBatch(minutes)
             },
@@ -650,6 +681,7 @@ private fun SummaryCards(
                     com.mdot.app.core.designsystem.component.KeyValue(
                         stringResource(R.string.calendar_ot_pay), state.selectedOtPayCents?.let { Money.yuanWithSign(it) } ?: "-",
                         modifier = Modifier.weight(1f),
+                        animatedCents = state.selectedOtPayCents,
                     )
                 }
             }
@@ -704,6 +736,7 @@ private fun SummaryCards(
                     com.mdot.app.core.designsystem.component.KeyValue(
                         stringResource(R.string.calendar_ot_pay), state.monthOtPayCents?.let { Money.yuanWithSign(it) } ?: "-",
                         modifier = Modifier.weight(1f),
+                        animatedCents = state.monthOtPayCents,
                     )
                 }
             }

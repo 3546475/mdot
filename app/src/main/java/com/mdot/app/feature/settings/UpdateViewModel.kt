@@ -113,6 +113,14 @@ class UpdateViewModel @Inject constructor(
         }
     }
 
+    /** 点击进度标志：重新打开下载进度弹窗（T3-2） */
+    fun reopenProgress() {
+        val cur = _state.value
+        if (cur is UpdateState.BackgroundDownloading) {
+            _state.value = UpdateState.Downloading(cur.progress)
+        }
+    }
+
     /** 后台下载完成后的安装确认：直接调系统安装器。 */
     fun installDownloaded() {
         val d = (_state.value as? UpdateState.Downloaded) ?: return

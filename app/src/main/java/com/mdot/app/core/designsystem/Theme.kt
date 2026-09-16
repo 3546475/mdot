@@ -1,5 +1,9 @@
 package com.mdot.app.core.designsystem
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.material3.ColorScheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
 import com.mdot.app.R
 import android.os.Build
@@ -314,6 +318,57 @@ val JiabanTypography: Typography = run {
 
 // ---- 主题唯一入口（04 文档 §4.1） ----
 
+/**
+ * 主题切换跨淡（docs/15 T6 #20）：palette / 明暗 / 动态色变化时，
+ * 用逐色动画包装目标 ColorScheme——单棵组合树内颜色平滑过渡（无 Crossfade 双树复制的状态风险）。
+ * 首次组合 target 即初始值，无入场动画；target 变化时逐色过渡（motionScheme defaultEffects）。
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun rememberAnimatedColorScheme(target: ColorScheme): ColorScheme {
+    val motion = remember { MotionScheme.expressive() }
+    val spec = remember { motion.defaultEffectsSpec<Color>() }
+    @Composable fun anim(c: Color): Color = animateColorAsState(c, spec, label = "schemeColor").value
+    return ColorScheme(
+        primary = anim(target.primary),
+        onPrimary = anim(target.onPrimary),
+        primaryContainer = anim(target.primaryContainer),
+        onPrimaryContainer = anim(target.onPrimaryContainer),
+        inversePrimary = anim(target.inversePrimary),
+        secondary = anim(target.secondary),
+        onSecondary = anim(target.onSecondary),
+        secondaryContainer = anim(target.secondaryContainer),
+        onSecondaryContainer = anim(target.onSecondaryContainer),
+        tertiary = anim(target.tertiary),
+        onTertiary = anim(target.onTertiary),
+        tertiaryContainer = anim(target.tertiaryContainer),
+        onTertiaryContainer = anim(target.onTertiaryContainer),
+        background = anim(target.background),
+        onBackground = anim(target.onBackground),
+        surface = anim(target.surface),
+        onSurface = anim(target.onSurface),
+        surfaceVariant = anim(target.surfaceVariant),
+        onSurfaceVariant = anim(target.onSurfaceVariant),
+        surfaceTint = anim(target.surfaceTint),
+        inverseSurface = anim(target.inverseSurface),
+        inverseOnSurface = anim(target.inverseOnSurface),
+        error = anim(target.error),
+        onError = anim(target.onError),
+        errorContainer = anim(target.errorContainer),
+        onErrorContainer = anim(target.onErrorContainer),
+        outline = anim(target.outline),
+        outlineVariant = anim(target.outlineVariant),
+        scrim = anim(target.scrim),
+        surfaceBright = anim(target.surfaceBright),
+        surfaceDim = anim(target.surfaceDim),
+        surfaceContainer = anim(target.surfaceContainer),
+        surfaceContainerHigh = anim(target.surfaceContainerHigh),
+        surfaceContainerHighest = anim(target.surfaceContainerHighest),
+        surfaceContainerLow = anim(target.surfaceContainerLow),
+        surfaceContainerLowest = anim(target.surfaceContainerLowest),
+    )
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun JiabanTheme(
@@ -334,7 +389,7 @@ fun JiabanTheme(
         else -> paletteOf(appearance.paletteId).light
     }
     MaterialExpressiveTheme(
-        colorScheme = colorScheme,
+        colorScheme = rememberAnimatedColorScheme(colorScheme),
         motionScheme = MotionScheme.expressive(),
         typography = JiabanTypography,
         shapes = ExpressiveShapes,

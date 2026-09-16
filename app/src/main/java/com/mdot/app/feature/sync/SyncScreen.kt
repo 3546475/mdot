@@ -42,6 +42,8 @@ import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.SegmentBar
 import com.mdot.app.core.designsystem.component.SectionCard
+import com.mdot.app.core.designsystem.component.MessageSnackbarHost
+import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.core.sync.SyncPhase
 import com.mdot.app.domain.util.TimeUtils
@@ -192,6 +194,12 @@ fun SyncScreen(
                     )
                 }
 
+        val (snackbarHostState, snackbarIsError) = rememberMessageSnackbar(
+            message = state.message,
+            onClear = vm::clearMessage,
+            isError = state.isError,
+        )
+        MessageSnackbarHost(snackbarHostState, snackbarIsError, Modifier.align(Alignment.BottomCenter))
     }
 }
 
@@ -332,19 +340,6 @@ private fun SyncTabPage(
                     }
                 }
 
-                state.message?.let { msg ->
-                    LaunchedEffect(msg) {
-                        kotlinx.coroutines.delay(3000)
-                        vm.clearMessage()
-                    }
-                    Text(
-                        msg,
-                        color = if (state.isError) MaterialTheme.colorScheme.error
-                        else MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(top = Spacing.m),
-                    )
-                }
             } else {
                 // ---- 存储源页签 ----
                 SyncStoragePane(state = state, vm = vm)

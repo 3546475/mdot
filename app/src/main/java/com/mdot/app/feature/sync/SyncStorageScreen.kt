@@ -169,19 +169,6 @@ fun SyncStoragePane(
             ) { Text(stringResource(R.string.sync_storage_disconnect)) }
         }
 
-        state.message?.let { msg ->
-            LaunchedEffect(msg) {
-                kotlinx.coroutines.delay(3000)
-                vm.clearMessage()
-            }
-            Text(
-                msg,
-                color = if (state.isError) MaterialTheme.colorScheme.error
-                else MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(top = Spacing.m),
-            )
-        }
 
         Text(
             stringResource(R.string.sync_storage_tip),

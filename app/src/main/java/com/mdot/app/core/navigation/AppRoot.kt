@@ -378,7 +378,11 @@ private fun AppRootContent(
             composable(Routes.EXPORT) {
                 SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.EXPORT, onNavigate = { navTo(navController, it, slots) }) {
                     AdaptiveContainer {
-                        ExportScreen(canBack = !inBar("export"), onBack = { navController.popBackStack() })
+                        ExportScreen(
+                            canBack = !inBar("export"),
+                            onBack = { navController.popBackStack() },
+                            onViewRecords = { navTo(navController, Routes.stats(if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) 1 else 2), slots) },
+                        )
                     }
                 }
             }

@@ -87,6 +87,7 @@ class ExportViewModel @Inject constructor(
     fun onCustomTo(d: LocalDate) = extra.update { it.copy(customTo = d) }
 
     fun dismissPreview() = extra.update { it.copy(preview = null) }
+    fun clearResult() = extra.update { it.copy(doneText = null, errorText = null) }
 
     /** 从 CSV 文件导入记录（本 App 导出的明细）：解析后逐条入库 */
     fun importCsv(uri: android.net.Uri) {

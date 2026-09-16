@@ -80,6 +80,7 @@ import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.domain.model.WorkSystem
 import com.mdot.app.domain.util.Money
 import com.mdot.app.domain.util.TimeUtils
+import com.mdot.app.feature.record.rememberSaveWithHaptic
 import com.mdot.app.feature.settings.SettingsHubViewModel
 import com.mdot.app.feature.settings.appearanceSummary
 import kotlinx.coroutines.launch
@@ -106,6 +107,8 @@ fun ProfileScreen(
     val context = LocalContext.current
 
     var avatarMenu by remember { mutableStateOf(false) }
+    // T2-2：长按重置头像触觉（docs/15）
+    val saveHaptic = rememberSaveWithHaptic()
     var editingName by remember { mutableStateOf(false) }
     var nameText by remember { mutableStateOf("") }
     var nameOverLimit by remember { mutableStateOf(false) }
@@ -161,7 +164,10 @@ fun ProfileScreen(
                             .combinedClickable(
                                 onClick = { avatarMenu = true },
                                 onLongClick = {
-                                    if (avatarPath != null) vm.resetAvatar()
+                                    if (avatarPath != null) {
+                                        saveHaptic()
+                                        vm.resetAvatar()
+                                    }
                                 },
                             ),
                     ) {

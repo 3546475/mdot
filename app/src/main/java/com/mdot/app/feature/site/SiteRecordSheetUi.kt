@@ -40,10 +40,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
-import androidx.compose.ui.platform.LocalHapticFeedback
+import com.mdot.app.feature.record.rememberSaveWithHaptic
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -93,7 +92,7 @@ fun SiteRecordScreen(
     var showMultiDate by remember { mutableStateOf(false) }
     // 保存打勾反馈：点保存后按钮短暂变 ✓ 再执行保存（成功后经 saved 状态返回）
     var saveFlash by remember { mutableStateOf(false) }
-    val haptic = LocalHapticFeedback.current
+    val saveHaptic = rememberSaveWithHaptic()
     val scope = rememberCoroutineScope()
     LaunchedEffect(state.error) { if (state.error != null) saveFlash = false }
     // motionScheme 仅 composable 可调用：先取 spec 再传入 transitionSpec（非 Composable 上下文）
@@ -118,7 +117,7 @@ fun SiteRecordScreen(
 
     /** 保存 + 触觉/打勾反馈：延迟极短一拍展示 ✓，再真正执行保存 */
     fun saveWithFeedback(keepOpen: Boolean, onDone: () -> Unit = {}) {
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        saveHaptic()
         if (keepOpen) {
             saveCurrent(keepOpen = true)
         } else {

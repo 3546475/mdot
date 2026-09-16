@@ -40,8 +40,7 @@ import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
+import com.mdot.app.feature.record.rememberSaveWithHaptic
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,8 +60,10 @@ import com.mdot.app.R
 import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.component.AnimatedNumberText
 import com.mdot.app.core.designsystem.component.FloatingLabelTextField
 import com.mdot.app.core.designsystem.component.SectionCard
+import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.designsystem.component.SettingRow
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.domain.CycleCalculator
@@ -253,7 +254,7 @@ fun PayrollPane(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     // 保存反馈：触觉 + 按钮变身 ✓（与工地记工表单同一套反馈语言）
-    val haptic = LocalHapticFeedback.current
+    val saveHaptic = rememberSaveWithHaptic()
     val scope = rememberCoroutineScope()
     var saveFlash by remember { mutableStateOf(false) }
     val flashSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
@@ -274,7 +275,7 @@ fun PayrollPane(
     }
 
     fun saveWithFeedback() {
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        saveHaptic()
         saveFlash = true
         vm.save(onDone = onSaved)
     }
@@ -398,11 +399,13 @@ private fun StandardPayrollContent(state: PayrollUiState, vm: PayrollViewModel) 
                             modifier = Modifier.fillMaxWidth(),
                         )
                         val perHour = StandardPayrollStrategy.overtimeCents(previewSalary, tier, 60)
-                        Text(
-                            Money.yuanText(perHour),
+                        AnimatedNumberText(
+                            value = perHour,
+                            text = { Money.yuanText(it) },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp).align(Alignment.CenterHorizontally),
+                            label = "perHourPreview",
                         )
                     }
                 }
@@ -651,11 +654,13 @@ private fun ComprehensivePayrollContent(state: PayrollUiState, vm: PayrollViewMo
                             modifier = Modifier.fillMaxWidth(),
                         )
                         val perHour = StandardPayrollStrategy.overtimeCents(previewSalary, tier, 60)
-                        Text(
-                            Money.yuanText(perHour),
+                        AnimatedNumberText(
+                            value = perHour,
+                            text = { Money.yuanText(it) },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp).align(Alignment.CenterHorizontally),
+                            label = "perHourPreview",
                         )
                     }
                 }
@@ -683,13 +688,15 @@ private fun ExpandableCard(
     content: @Composable () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(defaultExpand) }
+    val expandInteraction = remember { MutableInteractionSource() }
     SectionCard {
         Column {
             Row(
                 Modifier
                     .fillMaxWidth()
+                    .pressScale(expandInteraction, pressedScale = 0.98f)
                     .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
+                        interactionSource = expandInteraction,
                         indication = null,
                     ) { expanded = !expanded },
                 horizontalArrangement = Arrangement.SpaceBetween,

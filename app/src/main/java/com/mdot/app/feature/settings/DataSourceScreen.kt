@@ -3,6 +3,7 @@ package com.mdot.app.feature.settings
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -18,6 +19,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -65,6 +68,8 @@ import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.SettingRow
+import com.mdot.app.core.designsystem.component.MessageSnackbarHost
+import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import com.mdot.app.core.navigation.contentBottomPadding
 
 /** 更新与数据源（F7-9 / F8-1）：hero 版本卡（检查更新 + from 源选择胶囊，弹窗内选择/添加更新源）+ 节假日库卡，与首页/统计 hero 同视觉体系 */
@@ -80,6 +85,7 @@ fun DataSourceScreen(
     val message by vm.message.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
 
+    Box(Modifier.fillMaxSize()) {
     Column(
         Modifier
             .fillMaxSize()
@@ -111,6 +117,14 @@ fun DataSourceScreen(
                         shape = RoundedCornerShape(Radius.pill),
                         contentPadding = PaddingValues(horizontal = Spacing.l, vertical = 8.dp),
                     ) {
+                        if (busy) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = LocalContentColor.current,
+                            )
+                            Spacer(Modifier.width(Spacing.s))
+                        }
                         Text(stringResource(R.string.datasource_refresh_now))
                     }
                 }
@@ -131,18 +145,12 @@ fun DataSourceScreen(
             }
         }
 
-        message?.let { msg ->
-            LaunchedEffect(msg) {
-                kotlinx.coroutines.delay(2500)
-                vm.clearMessage()
-            }
-            Text(
-                msg,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = Spacing.m),
-            )
-        }
+    }
+        val (snackbarHostState, snackbarIsError) = rememberMessageSnackbar(
+            message = message,
+            onClear = vm::clearMessage,
+        )
+        MessageSnackbarHost(snackbarHostState, snackbarIsError, Modifier.align(Alignment.BottomCenter))
     }
     UpdateFlow(updateVm)
 }
@@ -173,6 +181,8 @@ internal fun UpdateHeroCard(
     val updateUrl by dsVm.updateUrl.collectAsStateWithLifecycle()
     val updateUrls by dsVm.updateUrls.collectAsStateWithLifecycle()
     val updateNotice by updateVm.notice.collectAsStateWithLifecycle()
+    val updateState by updateVm.state.collectAsStateWithLifecycle()
+    val downloadProgress = (updateState as? UpdateState.BackgroundDownloading)?.progress
     val context = LocalContext.current
     val versionText = remember {
         runCatching {
@@ -195,6 +205,8 @@ internal fun UpdateHeroCard(
                 onCheck = updateVm::check,
                 onPickSource = { showSourcePicker = true },
                 onNoticeShown = updateVm::clearNotice,
+                downloadProgress = downloadProgress,
+                onReopenProgress = updateVm::reopenProgress,
             )
         }
 
@@ -219,6 +231,8 @@ internal fun UpdateHeroCard(
                     onCheck = updateVm::check,
                     onPickSource = { showSourcePicker = true },
                     onNoticeShown = updateVm::clearNotice,
+                    downloadProgress = downloadProgress,
+                    onReopenProgress = updateVm::reopenProgress,
                     // 标题装饰：星光带（仅玻璃版提供）
                     titleTrailing = {
                         Spacer(Modifier.width(Spacing.s))
@@ -263,6 +277,8 @@ private fun UpdateHeroContent(
     onCheck: () -> Unit,
     onPickSource: () -> Unit,
     onNoticeShown: () -> Unit,
+    downloadProgress: Int? = null,
+    onReopenProgress: () -> Unit = {},
     titleTrailing: (@Composable androidx.compose.foundation.layout.RowScope.() -> Unit)? = null,
 ) {
     val onContainer = MaterialTheme.colorScheme.onPrimaryContainer
@@ -275,12 +291,36 @@ private fun UpdateHeroContent(
             )
             titleTrailing?.invoke(this)
         }
-        Text(
-            versionText,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = onContainer,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                versionText,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = onContainer,
+            )
+            if (downloadProgress != null) {
+                Spacer(Modifier.width(Spacing.m))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(Radius.pill))
+                        .clickable(onClick = onReopenProgress)
+                        .padding(horizontal = Spacing.s, vertical = Spacing.xs),
+                ) {
+                    CircularProgressIndicator(
+                        progress = { downloadProgress / 100f },
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(Modifier.width(Spacing.xs))
+                    Text(
+                        stringResource(R.string.update_background_progress, downloadProgress),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = onContainer,
+                    )
+                }
+            }
+        }
         Spacer(Modifier.height(Spacing.s))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Button(

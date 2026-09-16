@@ -441,6 +441,7 @@ fun SiteProjectsPane(
             if (archived.isNotEmpty()) {
                 Spacer(Modifier.height(Spacing.m))
                 var archivedExpanded by remember { mutableStateOf(false) }
+                val archivedExpandInteraction = remember { MutableInteractionSource() }
                 val expandSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
                 val rotation by animateFloatAsState(
                     targetValue = if (archivedExpanded) 180f else 0f,
@@ -453,9 +454,10 @@ fun SiteProjectsPane(
                         Row(
                             Modifier
                                 .fillMaxWidth()
+                                .pressScale(archivedExpandInteraction, pressedScale = 0.98f)
                                 .clip(RoundedCornerShape(Radius.small))
                                 .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
+                                    interactionSource = archivedExpandInteraction,
                                     indication = null,
                                 ) { archivedExpanded = !archivedExpanded }
                                 .padding(vertical = Spacing.s),

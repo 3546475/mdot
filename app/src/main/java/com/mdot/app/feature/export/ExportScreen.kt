@@ -54,6 +54,8 @@ import com.mdot.app.R
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.DatePick
 import com.mdot.app.core.designsystem.component.SectionCard
+import com.mdot.app.core.designsystem.component.MessageSnackbarHost
+import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.core.util.PayslipRenderer
@@ -62,7 +64,13 @@ import java.time.LocalDate
 
 /** 导出页：先生成预览，预览弹窗内可「保存」（系统选择位置）或「分享」 */
 @Composable
-fun ExportScreen(canBack: Boolean = false, onBack: () -> Unit = {}, vm: ExportViewModel = hiltViewModel()) {
+fun ExportScreen(
+    canBack: Boolean = false,
+    onBack: () -> Unit = {},
+    /** 导入成功后 Snackbar「查看记录」动作（docs/15 T6 #22） */
+    onViewRecords: () -> Unit = {},
+    vm: ExportViewModel = hiltViewModel(),
+) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var picking by remember { mutableStateOf<String?>(null) } // "from" | "to"
@@ -81,6 +89,7 @@ fun ExportScreen(canBack: Boolean = false, onBack: () -> Unit = {}, vm: ExportVi
         ActivityResultContracts.OpenDocument()
     ) { uri -> uri?.let(vm::importCsv) }
 
+    Box(Modifier.fillMaxSize()) {
     Column(
         Modifier
             .fillMaxSize()
@@ -157,16 +166,19 @@ fun ExportScreen(canBack: Boolean = false, onBack: () -> Unit = {}, vm: ExportVi
                         CircularProgressIndicator(Modifier.padding(8.dp))
                     }
                 }
-                state.doneText?.let {
-                    Text(it, color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.labelMedium)
-                }
-                state.errorText?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.labelMedium)
-                }
             }
         }
+    }
+
+        val resultText = state.doneText ?: state.errorText
+        val (snackbarHostState, snackbarIsError) = rememberMessageSnackbar(
+            message = resultText,
+            onClear = vm::clearResult,
+            isError = state.errorText != null,
+            actionLabel = if (state.doneText != null) stringResource(R.string.export_view_records) else null,
+            onAction = onViewRecords,
+        )
+        MessageSnackbarHost(snackbarHostState, snackbarIsError, Modifier.align(Alignment.BottomCenter))
     }
 
     // 预览弹窗

@@ -3,7 +3,7 @@ package com.mdot.app.feature.site
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -41,7 +41,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.mdot.app.core.designsystem.AdaptiveSpecs
-import com.mdot.app.core.designsystem.Duration
 import com.mdot.app.core.designsystem.LocalWindowSpec
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
@@ -74,28 +73,40 @@ internal fun SiteBottomSheet(
     }
     BackHandler(onBack = { requestDismiss() })
 
-    if (!dismissRequested || !visibleState.isIdle) {
-        Dialog(
-            onDismissRequest = { requestDismiss() },
-            // decorFitsSystemWindows=false：IME insets 走 Compose 侧，imePadding 精准避让，
-            // 否则弹窗窗口被系统 pan/双重补偿，输入法弹出后输入框与键盘间留大片空白
-            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    // 遮罩与面板拆成两个 AnimatedVisibility（共享同一 visibleState）：遮罩原地淡入淡出、
+    // 面板自下而上滑入/下滑淡出——避免遮罩跟随上推，且保证退出动画完整播放
+    // （原外层 if 会在 dismiss 同帧移除组合，吞掉 exit 动画，导致弹层突兀消失）
+    val sheetSlideSpec = MaterialTheme.motionScheme.slowSpatialSpec<androidx.compose.ui.unit.IntOffset>()
+    val sheetFadeSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    Dialog(
+        onDismissRequest = { requestDismiss() },
+        // decorFitsSystemWindows=false：IME insets 走 Compose 侧，imePadding 精准避让，
+        // 否则弹窗窗口被系统 pan/双重补偿，输入法弹出后输入框与键盘间留大片空白
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        // 遮罩：原地淡入淡出
+        AnimatedVisibility(
+            visibleState = visibleState,
+            enter = fadeIn(sheetFadeSpec),
+            exit = fadeOut(sheetFadeSpec),
         ) {
-            AnimatedVisibility(
-                visibleState = visibleState,
-                enter = slideInVertically(tween(Duration.slow)) { it },
-                exit = slideOutVertically(tween(Duration.normal)) { it } + fadeOut(tween(Duration.normal)),
-            ) {
-                Box(Modifier.fillMaxSize()) {
-                    // 遮罩
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.4f))
-                            .pointerInput(Unit) { detectTapGestures { requestDismiss() } }
-                    )
-                    // 面板：宽屏四角全圆 + 底部留边（悬浮形态）；窄屏全宽贴底
-                    val wide = LocalWindowSpec.current == WindowSpec.EXPANDED
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .pointerInput(Unit) { detectTapGestures { requestDismiss() } }
+            )
+        }
+        // 面板：自下而上滑入 / 下滑淡出
+        AnimatedVisibility(
+            visibleState = visibleState,
+            enter = slideInVertically(sheetSlideSpec) { it },
+            exit = slideOutVertically(sheetSlideSpec) { it } + fadeOut(sheetFadeSpec),
+        ) {
+            // 面板（Box 提供 BottomCenter 对齐作用域）
+            Box(Modifier.fillMaxSize()) {
+            // 面板：宽屏四角全圆 + 底部留边（悬浮形态）；窄屏全宽贴底
+            val wide = LocalWindowSpec.current == WindowSpec.EXPANDED
                     Column(
                         Modifier
                             .align(Alignment.BottomCenter)
@@ -116,7 +127,6 @@ internal fun SiteBottomSheet(
                         Text(title, style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(Spacing.m))
                         content()
-                    }
                 }
             }
         }

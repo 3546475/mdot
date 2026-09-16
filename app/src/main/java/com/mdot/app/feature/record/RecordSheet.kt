@@ -103,6 +103,8 @@ fun RecordSheet(
     var expanded by rememberSaveable { mutableStateOf(false) }
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
     var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
+    // T1-1：保存类重动作统一 LongPress 触觉（docs/15，共享扩展）
+    val saveHaptic = rememberSaveWithHaptic()
 
     LaunchedEffect(request.token) {
         expanded = false
@@ -131,22 +133,29 @@ fun RecordSheet(
 
     BackHandler(onBack = { requestDismiss() })
 
-    if (!dismissRequested || !visibleState.isIdle) {
-        AnimatedVisibility(
-            visibleState = visibleState,
-            enter = slideInVertically(sheetEnterSpec) { it },
-            exit = slideOutVertically(sheetEnterSpec) { it } + fadeOut(sheetFadeSpec),
-        ) {
-            Box(Modifier.fillMaxSize()) {
-                // 遮罩
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.4f))
-                        .pointerInput(Unit) { detectTapGestures { requestDismiss() } }
-                )
-                // 面板
-                val wide = LocalWindowSpec.current == WindowSpec.EXPANDED
+    // 遮罩与面板拆成两个 AnimatedVisibility（共享同一 visibleState）：遮罩原地淡入淡出、
+    // 面板自下而上滑入/下滑淡出——避免遮罩跟随上推，且保证退出动画完整播放
+    // （原外层 if 会在 dismiss 同帧移除组合，吞掉 exit 动画，导致弹层突兀消失）
+    AnimatedVisibility(
+        visibleState = visibleState,
+        enter = fadeIn(sheetFadeSpec),
+        exit = fadeOut(sheetFadeSpec),
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.4f))
+                .pointerInput(Unit) { detectTapGestures { requestDismiss() } }
+        )
+    }
+    AnimatedVisibility(
+        visibleState = visibleState,
+        enter = slideInVertically(sheetEnterSpec) { it },
+        exit = slideOutVertically(sheetEnterSpec) { it } + fadeOut(sheetFadeSpec),
+    ) {
+        // 面板（Box 提供 BottomCenter 对齐作用域）
+        Box(Modifier.fillMaxSize()) {
+        val wide = LocalWindowSpec.current == WindowSpec.EXPANDED
                 Column(
                     Modifier
                         .align(Alignment.BottomCenter)
@@ -469,7 +478,10 @@ fun RecordSheet(
                                 modifier = Modifier.weight(1f),
                             ) { Text(stringResource(R.string.record_cancel)) }
                             Button(
-                                onClick = vm::save,
+                                onClick = {
+                                    saveHaptic()
+                                    vm.save()
+                                },
                                 enabled = state.durationMinutes() > 0,
                                 modifier = Modifier.weight(1.6f),
                             ) { Text(stringResource(R.string.record_save)) }
@@ -477,7 +489,6 @@ fun RecordSheet(
                     }
                 }
             }
-        }
     }
 
     if (showDatePicker) {

@@ -36,6 +36,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -58,6 +60,7 @@ import com.mdot.app.R
 import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.component.AnimatedNumberText
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.domain.model.PayGroup
 import com.mdot.app.domain.model.PayMonthItem
@@ -77,78 +80,90 @@ fun PayMonthContent(vm: PayMonthViewModel = hiltViewModel()) {
     var adding by remember { mutableStateOf<PayGroup?>(null) }
     var importing by remember { mutableStateOf(false) }
     var syncing by remember { mutableStateOf(false) }
-
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .wrapContentWidth(Alignment.CenterHorizontally)
-            .widthIn(max = AdaptiveSpecs.contentMaxWidth)
-            .padding(horizontal = Spacing.page),
-    ) {
-        Spacer(Modifier.height(Spacing.m))
-
-        // ---- 月份导航 ----
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = vm::prevMonth) {
-                Icon(Icons.Filled.KeyboardArrowLeft, stringResource(R.string.paymonth_prev_cd))
-            }
-            Text(
-                stringResource(R.string.paymonth_month, month.year, month.monthValue),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.widthIn(min = 120.dp),
-            )
-            IconButton(onClick = vm::nextMonth) {
-                Icon(Icons.Filled.KeyboardArrowRight, stringResource(R.string.paymonth_next_cd))
-            }
+    // T1-3：同步/导入结果 Snackbar（docs/15）
+    val snackbarHostState = remember { SnackbarHostState() }
+    val opMessage by vm.messageFlow.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(opMessage) {
+        opMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            vm.clearMessage()
         }
-        Spacer(Modifier.height(Spacing.s))
-
-        PayGroupCard(
-            PayGroup.BASIC, sheet.basic,
-            onEdit = { editing = PayGroup.BASIC to it },
-            extraAction = if (!isSite) {
-                {
-                    TextButton(onClick = { syncing = true }, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.paymonth_sync))
-                    }
-                }
-            } else null,
-        )
-        Spacer(Modifier.height(Spacing.m))
-        PayGroupCard(
-            PayGroup.SUBSIDY, sheet.subsidy,
-            onEdit = { editing = PayGroup.SUBSIDY to it },
-            onAdd = { adding = PayGroup.SUBSIDY },
-        )
-        Spacer(Modifier.height(Spacing.m))
-        PayGroupCard(
-            PayGroup.DEDUCTION, sheet.deduction,
-            onEdit = { editing = PayGroup.DEDUCTION to it },
-            onAdd = { adding = PayGroup.DEDUCTION },
-        )
-        Spacer(Modifier.height(Spacing.m))
-        PayGroupCard(PayGroup.OTHER, sheet.other, onEdit = { editing = PayGroup.OTHER to it })
-        Spacer(Modifier.height(Spacing.l))
-
-        Button(
-            onClick = { importing = true },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            shape = RoundedCornerShape(Radius.pill),
-        ) {
-            Text(stringResource(R.string.paymonth_import_prev))
-        }
-        Spacer(Modifier.height(Spacing.l))
     }
 
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .wrapContentWidth(Alignment.CenterHorizontally)
+                .widthIn(max = AdaptiveSpecs.contentMaxWidth)
+                .padding(horizontal = Spacing.page),
+        ) {
+            Spacer(Modifier.height(Spacing.m))
+
+            // ---- 月份导航 ----
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = vm::prevMonth) {
+                    Icon(Icons.Filled.KeyboardArrowLeft, stringResource(R.string.paymonth_prev_cd))
+                }
+                Text(
+                    stringResource(R.string.paymonth_month, month.year, month.monthValue),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.widthIn(min = 120.dp),
+                )
+                IconButton(onClick = vm::nextMonth) {
+                    Icon(Icons.Filled.KeyboardArrowRight, stringResource(R.string.paymonth_next_cd))
+                }
+            }
+            Spacer(Modifier.height(Spacing.s))
+
+            PayGroupCard(
+                PayGroup.BASIC, sheet.basic,
+                onEdit = { editing = PayGroup.BASIC to it },
+                extraAction = if (!isSite) {
+                    {
+                        TextButton(onClick = { syncing = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.paymonth_sync))
+                        }
+                    }
+                } else null,
+            )
+            Spacer(Modifier.height(Spacing.m))
+            PayGroupCard(
+                PayGroup.SUBSIDY, sheet.subsidy,
+                onEdit = { editing = PayGroup.SUBSIDY to it },
+                onAdd = { adding = PayGroup.SUBSIDY },
+            )
+            Spacer(Modifier.height(Spacing.m))
+            PayGroupCard(
+                PayGroup.DEDUCTION, sheet.deduction,
+                onEdit = { editing = PayGroup.DEDUCTION to it },
+                onAdd = { adding = PayGroup.DEDUCTION },
+            )
+            Spacer(Modifier.height(Spacing.m))
+            PayGroupCard(PayGroup.OTHER, sheet.other, onEdit = { editing = PayGroup.OTHER to it })
+            Spacer(Modifier.height(Spacing.l))
+
+            Button(
+                onClick = { importing = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(Radius.pill),
+            ) {
+                Text(stringResource(R.string.paymonth_import_prev))
+            }
+            Spacer(Modifier.height(Spacing.l))
+        }
+
+        SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter))
+    }
     editing?.let { (group, item) ->
         EditItemDialog(
             item = item,
@@ -280,10 +295,13 @@ private fun PayGroupCard(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
-                Text(
-                    if (negative) "-${Money.yuanTrimText(total)}" else Money.yuanTrimText(total),
+                AnimatedNumberText(
+                    value = total,
+                    text = { cents -> if (negative) "-${Money.yuanTrimText(cents)}" else Money.yuanTrimText(cents) },
                     style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
+                    label = "payGroupTotal",
                 )
                 Spacer(Modifier.width(Spacing.s))
                 Icon(

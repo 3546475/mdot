@@ -86,4 +86,5 @@
     <string name="export_action_save">保存</string>
     <string name="export_action_close">关闭</string>
     <string name="export_action_share">分享</string>
+    <string name="export_view_records">查看记录</string>
 </resources>

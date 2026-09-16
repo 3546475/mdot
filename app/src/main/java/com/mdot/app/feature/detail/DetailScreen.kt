@@ -39,6 +39,7 @@ import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.SiteMoneyColors
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.pressScale
+import com.mdot.app.core.designsystem.component.AnimatedMoneyText
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.navigation.contentPaddingValues
 import com.mdot.app.core.repository.DataRevision
@@ -290,11 +291,12 @@ private fun DetailSummary(state: DetailUiState) {
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                     )
-                    Text(
-                        Money.yuanWithSign(out.receivableCents),
+                    AnimatedMoneyText(
+                        out.receivableCents,
                         style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontWeight = FontWeight.Bold,
+                        label = "detailReceivable",
                     )
                     Spacer(Modifier.height(Spacing.xs))
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
@@ -303,18 +305,21 @@ private fun DetailSummary(state: DetailUiState) {
                             Money.yuanWithSign(out.advanceTotalCents),
                             SiteMoneyColors.ReceivedGreen,
                             modifier = Modifier.weight(1f),
+                            animatedCents = out.advanceTotalCents,
                         )
                         MiniStat(
                             stringResource(R.string.site_settlement_partial_row),
                             Money.yuanWithSign(state.sitePartialCents),
                             SiteMoneyColors.ReceivedGreen,
                             modifier = Modifier.weight(1f),
+                            animatedCents = state.sitePartialCents,
                         )
                         MiniStat(
                             stringResource(R.string.site_stat_pending),
                             Money.yuanWithSign(out.pendingCents),
                             if (out.pendingCents < 0) MaterialTheme.colorScheme.error else SiteMoneyColors.PendingOrange,
                             modifier = Modifier.weight(1f),
+                            animatedCents = out.pendingCents,
                         )
                     }
                 }
@@ -329,11 +334,12 @@ private fun DetailSummary(state: DetailUiState) {
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                     )
-                    Text(
-                        Money.yuanWithSign(out.incomeCents),
+                    AnimatedMoneyText(
+                        out.incomeCents,
                         style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontWeight = FontWeight.Bold,
+                        label = "detailIncome",
                     )
                     Spacer(Modifier.height(Spacing.xs))
                     if (state.workSystem == WorkSystem.HOURLY) {
@@ -367,19 +373,35 @@ private fun DetailSummary(state: DetailUiState) {
 }
 
 @Composable
-internal fun MiniStat(label: String, value: String, valueColor: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
+internal fun MiniStat(
+    label: String,
+    value: String,
+    valueColor: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+    animatedCents: Long? = null,
+) {
     Column(modifier) {
         Text(
             label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
         )
-        Text(
-            value,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = valueColor,
-        )
+        if (animatedCents != null) {
+            AnimatedMoneyText(
+                animatedCents,
+                style = MaterialTheme.typography.titleMedium,
+                color = valueColor,
+                fontWeight = FontWeight.SemiBold,
+                label = "miniStat",
+            )
+        } else {
+            Text(
+                value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = valueColor,
+            )
+        }
     }
 }
 
@@ -402,11 +424,18 @@ internal fun TierChip(tier: RateTier, out: PayrollCalculator.Output, modifier: M
             )
             Spacer(Modifier.width(4.dp))
             Text(
-                tier.displayName + " " + Money.yuanWithSign(cents),
+                tier.displayName,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 maxLines = 1,
-                softWrap = false,
+            )
+            Spacer(Modifier.width(4.dp))
+            AnimatedMoneyText(
+                cents,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                maxLines = 1,
+                label = "tierChip",
             )
         }
     }

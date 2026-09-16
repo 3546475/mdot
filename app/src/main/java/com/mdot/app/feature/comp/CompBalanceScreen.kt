@@ -3,6 +3,7 @@ package com.mdot.app.feature.comp
 import androidx.compose.ui.res.stringResource
 import com.mdot.app.R
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -39,7 +40,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.component.AnimatedNumberText
 import com.mdot.app.core.designsystem.component.ConfirmDialog
+import com.mdot.app.core.designsystem.component.MessageSnackbarHost
+import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.core.repository.RecordRepository
@@ -104,7 +108,10 @@ class CompBalanceViewModel @Inject constructor(
 
     fun delete(id: Long) {
         viewModelScope.launch {
-            recordRepo.deleteAdjustment(id)
+            when (val r = recordRepo.deleteAdjustment(id)) {
+                is AppResult.Success -> message.value = Message("已删除调整记录")
+                is AppResult.Failure -> message.value = Message(r.error.toText(), isError = true)
+            }
         }
     }
 }
@@ -122,13 +129,7 @@ fun CompBalancePane(
     var note by remember { mutableStateOf("") }
     var deleting by remember { mutableStateOf<CompAdjustment?>(null) }
 
-    msg?.let { m ->
-        LaunchedEffect(m) {
-            delay(3000)
-            vm.clearMessage()
-        }
-    }
-
+    Box(Modifier.fillMaxSize()) {
     Column(
         Modifier
             .fillMaxSize()
@@ -148,13 +149,17 @@ fun CompBalancePane(
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Text(
-                            if (state.balanceMinutes < 0) "-${TimeUtils.prettyDuration(-state.balanceMinutes)}"
-                            else TimeUtils.prettyDuration(state.balanceMinutes),
+                        AnimatedNumberText(
+                            value = state.balanceMinutes,
+                            text = { m ->
+                                if (m < 0) "-${TimeUtils.prettyDuration(-m)}"
+                                else TimeUtils.prettyDuration(m)
+                            },
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             color = if (state.balanceMinutes < 0) MaterialTheme.colorScheme.error
                             else MaterialTheme.colorScheme.tertiary,
+                            label = "compBalance",
                         )
                     }
                 }
@@ -192,15 +197,6 @@ fun CompBalancePane(
                         text.toDoubleOrNull()?.takeIf { it > 0 }?.let { hours = it }
                     },
                 )
-                hours?.let { h ->
-                    Text(
-                        if (add) stringResource(R.string.comp_preview_add, TimeUtils.prettyDuration(kotlin.math.round(h * 60).toInt()))
-                        else stringResource(R.string.comp_preview_deduct, TimeUtils.prettyDuration(kotlin.math.round(h * 60).toInt())),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (add) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.error,
-                    )
-                }
                 OutlinedTextField(
                 shape = RoundedCornerShape(Radius.textField),
                     value = note,
@@ -218,14 +214,6 @@ fun CompBalancePane(
                     enabled = hours != null && (hours ?: 0.0) > 0,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(if (add) R.string.comp_btn_add else R.string.comp_btn_deduct)) }
-                msg?.let {
-                    Text(
-                        it.text,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (it.isError) MaterialTheme.colorScheme.error
-                        else MaterialTheme.colorScheme.primary,
-                    )
-                }
             }
         }
 
@@ -308,5 +296,13 @@ fun CompBalancePane(
             },
             onDismiss = { deleting = null },
         )
+    }
+
+    val (snackbarHostState, snackbarIsError) = rememberMessageSnackbar(
+        message = msg?.text,
+        onClear = vm::clearMessage,
+        isError = msg?.isError == true,
+    )
+    MessageSnackbarHost(snackbarHostState, snackbarIsError, Modifier.align(Alignment.BottomCenter))
     }
 }

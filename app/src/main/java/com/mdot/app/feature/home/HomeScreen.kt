@@ -1,16 +1,14 @@
 package com.mdot.app.feature.home
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
@@ -65,6 +63,8 @@ import com.mdot.app.core.designsystem.SiteMoneyColors
 import com.mdot.app.feature.stats.pieColor
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.WindowSpec
+import com.mdot.app.core.designsystem.component.AnimatedMoneyText
+import com.mdot.app.core.designsystem.component.AnimatedNumberText
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.WorkHeatmap
 import com.mdot.app.core.designsystem.component.TopBarHeight
@@ -306,29 +306,22 @@ private fun DataSection(state: HomeUiState, onOpenStats: () -> Unit, onOpenRecor
                 )
             }
             Spacer(Modifier.height(6.dp))
-            // 数值变化时轻微缩放淡入
-            AnimatedContent(
-                targetState = state.cycleOtMinutes,
-                transitionSpec = {
-                    (fadeIn(spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium)) + scaleIn(animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium), initialScale = 0.92f)) togetherWith
-                        fadeOut(spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium))
-                },
-                label = "otBigNumber",
-            ) { minutes ->
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        TimeUtils.hoursDecimal(minutes),
-                        style = MaterialTheme.typography.displayLarge,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                    )
-                    Text(
-                        stringResource(R.string.detail_worked_hours_unit),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 8.dp, start = 4.dp),
-                    )
-                }
+            // 数值变化时滚动滑入（与工地记工工钱同款滑动动画，docs/15 统一数字反馈）
+            Row(verticalAlignment = Alignment.Bottom) {
+                AnimatedNumberText(
+                    value = state.cycleOtMinutes,
+                    text = { TimeUtils.hoursDecimal(it) },
+                    style = MaterialTheme.typography.displayLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    label = "otBigNumber",
+                )
+                Text(
+                    stringResource(R.string.detail_worked_hours_unit),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp, start = 4.dp),
+                )
             }
             // 综合工时副行：超时部分 primary 强调（10 文档 F-Z5；月中为预演值）
             if (state.salary.workSystem == WorkSystem.COMPREHENSIVE && state.cycleOtMinutes > 0) {
@@ -368,32 +361,45 @@ private fun DataSection(state: HomeUiState, onOpenStats: () -> Unit, onOpenRecor
 /** 今日胶囊两态：已记（primaryContainer 填充「今日 Xh/N 工」）/ 未记（描边「今日还没记」，点击直达记加班/记工） */
 @Composable
 private fun TodayPill(text: String, filled: Boolean, onRecord: () -> Unit) {
-    if (filled) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier
-                .padding(top = 6.dp)
-                .clip(RoundedCornerShape(Radius.pill))
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .padding(horizontal = 10.dp, vertical = 3.dp),
-        )
-    } else {
-        val interaction = remember { MutableInteractionSource() }
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier
-                .padding(top = 6.dp)
-                .clip(RoundedCornerShape(Radius.pill))
-                .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(Radius.pill))
-                .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onRecord)
-                .padding(horizontal = 10.dp, vertical = 3.dp),
-        )
+    // 记一笔后「今日还没记」→「今日 Xh」切换：新状态从上方淡入下滑（T4-2b，motionScheme specs）
+    val pillFade = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val pillSlide = MaterialTheme.motionScheme.fastSpatialSpec<androidx.compose.ui.unit.IntOffset>()
+    AnimatedContent(
+        targetState = text,
+        transitionSpec = {
+            (fadeIn(pillFade) + slideInVertically(pillSlide) { -it / 2 })
+                .togetherWith(fadeOut(pillFade))
+        },
+        label = "todayPill",
+    ) { t ->
+        if (filled) {
+            Text(
+                text = t,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .padding(top = 6.dp)
+                    .clip(RoundedCornerShape(Radius.pill))
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .padding(horizontal = 10.dp, vertical = 3.dp),
+            )
+        } else {
+            val interaction = remember { MutableInteractionSource() }
+            Text(
+                text = t,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .padding(top = 6.dp)
+                    .pressScale(interaction, pressedScale = 0.93f)
+                    .clip(RoundedCornerShape(Radius.pill))
+                    .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(Radius.pill))
+                    .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onRecord)
+                    .padding(horizontal = 10.dp, vertical = 3.dp),
+            )
+        }
     }
 }
 
@@ -517,11 +523,16 @@ private fun IncomeCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                 )
-                Text(
-                    cycleOtPay?.let { Money.yuanWithSign(it) } ?: "-",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
+                if (cycleOtPay != null) {
+                    AnimatedMoneyText(
+                        cycleOtPay,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        label = "incomeCyclePay",
+                    )
+                } else {
+                    Text("-", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
             }
             Column(Modifier.weight(1.2f)) {
                 Text(
@@ -529,11 +540,16 @@ private fun IncomeCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                 )
-                Text(
-                    monthIncome?.let { Money.yuanWithSign(it) } ?: "-",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
+                if (monthIncome != null) {
+                    AnimatedMoneyText(
+                        monthIncome,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        label = "incomeMonth",
+                    )
+                } else {
+                    Text("-", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
             }
             // 「工资 ›」小字：只有这一小块进入工资设定
             val interaction = remember { MutableInteractionSource() }
@@ -577,31 +593,26 @@ private fun SiteDataContent(state: HomeUiState, site: SiteHomeUi, onOpenRecord: 
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         val hourMode = state.salary.siteDisplayUnit == "HOUR"
-        // 数值变化时轻微缩放淡入（与 DataSection 同款）
-        AnimatedContent(
-            targetState = site.totalWorksMilli,
-            transitionSpec = {
-                (fadeIn(spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium)) + scaleIn(animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium), initialScale = 0.92f)) togetherWith
-                    fadeOut(spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium))
-            },
-            label = "siteBigNumber",
-        ) { milli ->
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
+        // 数值变化时滚动滑入（与工地记工工钱同款滑动动画）
+        Row(verticalAlignment = Alignment.Bottom) {
+            AnimatedNumberText(
+                value = site.totalWorksMilli,
+                text = { milli ->
                     if (hourMode) String.format(java.util.Locale.US, "%.1f", milli / 1000.0 * (site.siteBaseMinutes / 60.0))
-                    else String.format(java.util.Locale.US, "%.1f", milli / 1000.0),
-                    style = MaterialTheme.typography.displayLarge,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                )
-                Text(
-                    if (hourMode) stringResource(R.string.detail_worked_hours_unit)
-                    else stringResource(R.string.stats_works_unit),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 8.dp, start = 4.dp),
-                )
-            }
+                    else String.format(java.util.Locale.US, "%.1f", milli / 1000.0)
+                },
+                style = MaterialTheme.typography.displayLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Bold,
+                label = "siteBigNumber",
+            )
+            Text(
+                if (hourMode) stringResource(R.string.detail_worked_hours_unit)
+                else stringResource(R.string.stats_works_unit),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp, start = 4.dp),
+            )
         }
         if (site.otMinutes > 0 || site.projectName.isNotEmpty()) {
             Row(
@@ -657,22 +668,41 @@ private fun SitePendingCard(site: SiteHomeUi, onOpenDetail: () -> Unit) {
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                 )
-                Text(
-                    Money.yuanWithSign(site.workPayCents),
+                AnimatedMoneyText(
+                    site.workPayCents,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    label = "siteReceivable",
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
-                    Text(
-                        stringResource(R.string.site_stat_advance) + " " + Money.yuanWithSign(site.advanceCents),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = SiteMoneyColors.ReceivedGreen,
-                    )
-                    Text(
-                        stringResource(R.string.site_stat_pending) + " " + Money.yuanWithSign(site.pendingCents),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = SiteMoneyColors.PendingOrange,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            stringResource(R.string.site_stat_advance),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = SiteMoneyColors.ReceivedGreen,
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        AnimatedMoneyText(
+                            site.advanceCents,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = SiteMoneyColors.ReceivedGreen,
+                            label = "siteAdvance",
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            stringResource(R.string.site_stat_pending),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = SiteMoneyColors.PendingOrange,
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        AnimatedMoneyText(
+                            site.pendingCents,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = SiteMoneyColors.PendingOrange,
+                            label = "sitePending",
+                        )
+                    }
                 }
             }
             val interaction = remember { MutableInteractionSource() }

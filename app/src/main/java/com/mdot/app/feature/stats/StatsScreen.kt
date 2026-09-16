@@ -68,6 +68,8 @@ import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.SiteMoneyColors
+import com.mdot.app.core.designsystem.component.AnimatedMoneyText
+import com.mdot.app.core.designsystem.component.AnimatedNumberText
 import com.mdot.app.core.designsystem.component.KeyValue
 import com.mdot.app.core.designsystem.component.EmptyState
 import com.mdot.app.core.designsystem.component.SectionCard
@@ -609,6 +611,8 @@ private fun StatsContent(
                     valueText = { modeValueText(state.workSystem, it) },
                     selectedLabel = selectedBar,
                     onSelect = vm::selectBar,
+                    onDayLongPress = { vm.recordSheet.open(it) },
+                    hintValueText = chartHintText(state.workSystem),
                 )
                 Spacer(Modifier.height(Spacing.m))
             }
@@ -617,7 +621,7 @@ private fun StatsContent(
             val rangeDays = state.rangeFrom?.let { f -> state.rangeTo?.let { t -> (t.toEpochDay() - f.toEpochDay()).toInt() + 1 } } ?: 0
             if (rangeDays in 2..31) {
                 item {
-                    MonthBarCard(state)
+                    MonthBarCard(state, { vm.recordSheet.open(it) }, chartHintText(state.workSystem))
                     Spacer(Modifier.height(Spacing.m))
                 }
             }
@@ -625,7 +629,13 @@ private fun StatsContent(
             // ---- 热点图卡（固定六个月：本月向前推五个月，如九月 = 四~九月） ----
             item {
                 SectionCard {
-                    WorkHeatmap(values = state.heatValues, start = state.heatStart, end = state.heatEnd)
+                    WorkHeatmap(
+                        values = state.heatValues,
+                        start = state.heatStart,
+                        end = state.heatEnd,
+                        onDayLongPress = { vm.recordSheet.open(it) },
+                        hintValueText = chartHintText(state.workSystem),
+                    )
                 }
                 Spacer(Modifier.height(Spacing.m))
             }
@@ -675,7 +685,11 @@ private fun StatsTabBar(pagerState: PagerState, showMonth: Boolean) {
 
 /** 月柱状图：统计页薄包装（共享组件在 core/designsystem/component/MonthBarCard.kt） */
 @Composable
-private fun MonthBarCard(state: StatsUiState) {
+private fun MonthBarCard(
+    state: StatsUiState,
+    onDayLongPress: (LocalDate) -> Unit,
+    hintValueText: @Composable (LocalDate, Float) -> String?,
+) {
     // 铺满完整区间（自然月即 1 号到月末，未来日期空柱），不截断到今天
     val from = state.rangeFrom ?: return
     val to = state.rangeTo ?: return
@@ -686,7 +700,15 @@ private fun MonthBarCard(state: StatsUiState) {
         values = values,
         from = from,
         workSystem = state.workSystem,
+        onDayLongPress = onDayLongPress,
+        hintValueText = hintValueText,
     )
+}
+
+/** 图表点击浮窗文本：日期 · 时长/工数（docs/15 T6 #19） */
+@Composable
+private fun chartHintText(workSystem: WorkSystem): @Composable (LocalDate, Float) -> String? = { date, v ->
+    "${TimeUtils.mdCn(date)} · ${modeValueText(workSystem, v)}"
 }
 
 /** 汇总卡（模式化 hero，与明细页同视觉体系）：
@@ -703,14 +725,18 @@ private fun SummaryCard(state: StatsUiState) {
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                 )
-                val totalWorks = out.totalWorksMilli / 1000f
-                val worksNum = if (totalWorks % 1f == 0f) totalWorks.toInt().toString()
-                else String.format(java.util.Locale.US, "%.1f", totalWorks)
-                Text(
-                    stringResource(R.string.stats_works_value, worksNum),
+                AnimatedNumberText(
+                    value = out.totalWorksMilli,
+                    text = { milli ->
+                        val tw = milli / 1000f
+                        val wn = if (tw % 1f == 0f) tw.toInt().toString()
+                        else String.format(java.util.Locale.US, "%.1f", tw)
+                        stringResource(R.string.stats_works_value, wn)
+                    },
                     style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    fontWeight = FontWeight.Bold,
+                    label = "summaryWorks",
                 )
                 Text(
                     listOf(
@@ -728,18 +754,21 @@ private fun SummaryCard(state: StatsUiState) {
                         Money.yuanWithSign(out.receivableCents),
                         MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.weight(1f),
+                        animatedCents = out.receivableCents,
                     )
                     com.mdot.app.feature.detail.MiniStat(
                         stringResource(R.string.site_stat_advance),
                         Money.yuanWithSign(out.advanceTotalCents),
                         SiteMoneyColors.ReceivedGreen,
                         modifier = Modifier.weight(1f),
+                        animatedCents = out.advanceTotalCents,
                     )
                     com.mdot.app.feature.detail.MiniStat(
                         stringResource(R.string.site_stat_pending),
                         Money.yuanWithSign(out.pendingCents),
                         if (out.pendingCents < 0) MaterialTheme.colorScheme.error else SiteMoneyColors.PendingOrange,
                         modifier = Modifier.weight(1f),
+                        animatedCents = out.pendingCents,
                     )
                 }
             } else {
@@ -752,12 +781,22 @@ private fun SummaryCard(state: StatsUiState) {
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                 )
-                Text(
-                    if (state.showMoney) Money.yuanWithSign(out.incomeCents) else "-",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
+                if (state.showMoney) {
+                    AnimatedMoneyText(
+                        out.incomeCents,
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontWeight = FontWeight.Bold,
+                        label = "summaryIncome",
+                    )
+                } else {
+                    Text(
+                        "-",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
                 Spacer(Modifier.height(Spacing.xs))
                 Text(
                     listOf(
@@ -806,6 +845,7 @@ private fun SummaryCard(state: StatsUiState) {
                         if (state.showMoney) Money.yuanWithSign(out.leaveDeductCents) else "-",
                         MaterialTheme.colorScheme.error,
                         modifier = Modifier.weight(1f),
+                        animatedCents = if (state.showMoney) out.leaveDeductCents else null,
                     )
                 }
             }

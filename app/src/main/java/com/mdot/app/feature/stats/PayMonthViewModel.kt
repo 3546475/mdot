@@ -56,6 +56,13 @@ class PayMonthViewModel @Inject constructor(
         .map { it.workSystem == WorkSystem.SITE }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    // T1-3：同步/导入结果反馈（docs/15；文案按硬规则 10 例外走 VM 消息硬编码）
+    private val message = MutableStateFlow<String?>(null)
+    val messageFlow: StateFlow<String?> = message.asStateFlow()
+    fun clearMessage() {
+        message.value = null
+    }
+
     /** 当月工资计算结果（非工地；供同步回填）。保持冷流：syncFromRecords 按需订阅计算 */
     private val monthCalc = _month
         .flatMapLatest { m ->
@@ -113,6 +120,7 @@ class PayMonthViewModel @Inject constructor(
         viewModelScope.launch {
             val prev = settings.payMonthFlow(cur.minusMonths(1).toString()).first() ?: PayMonthSheet.default()
             settings.setPayMonth(cur.toString(), prev)
+            message.value = "已导入上月模板"
         }
     }
 
@@ -124,6 +132,7 @@ class PayMonthViewModel @Inject constructor(
             val out = monthCalc.filterNotNull().first()
             val fillBase = settings.salaryFlow.first().includeBase
             settings.setPayMonth(_month.value.toString(), applyRecordSync(sheet.value, out, fillBase))
+            message.value = "已同步本月考勤"
         }
     }
 

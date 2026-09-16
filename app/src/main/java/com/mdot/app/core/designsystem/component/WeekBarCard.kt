@@ -14,19 +14,23 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.mdot.app.R
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.domain.util.TimeUtils
 import java.time.LocalDate
@@ -59,8 +63,15 @@ fun WeekBarCard(
     modifier: Modifier = Modifier,
     selectedLabel: String? = null,
     onSelect: (String?) -> Unit = {},
+    /** 长按柱 → 记工弹窗等（docs/15 T6 #19；null 不启用长按） */
+    onDayLongPress: ((LocalDate) -> Unit)? = null,
+    /** 浮窗文本（日期+时长/工数）；返回 null 则不显示浮窗 */
+    hintValueText: @Composable (LocalDate, Float) -> String? = { _, _ -> null },
 ) {
+    val hint = rememberChartHint()
+    val haptic = LocalHapticFeedback.current
     SectionCard(modifier) {
+        ChartHintBox(hint = hint.value, columns = 7) {
         Column {
             // 表头：周几（只显示一、二……）
             Row(Modifier.fillMaxWidth()) {
@@ -91,19 +102,16 @@ fun WeekBarCard(
                     selectedLabel = selectedLabel,
                     onSelect = onSelect,
                     valueTexts = bars.map { if (it.value > 0f) valueText(it.value) else null },
+                    hint = hint,
+                    hintValueText = hintValueText,
+                    onDayLongPress = onDayLongPress,
+                    haptic = haptic,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(gridHeight),
                 )
             }
-            bars.firstOrNull { TimeUtils.md(it.date) == selectedLabel }?.let { bar ->
-                Spacer(Modifier.height(Spacing.xs))
-                Text(
-                    stringResource(R.string.stats_bar_selected, TimeUtils.md(bar.date), valueText(bar.value)),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
+        }
         }
     }
 }
@@ -119,8 +127,13 @@ private fun WeekBarChart(
     onSelect: (String?) -> Unit,
     valueTexts: List<String?>,
     modifier: Modifier = Modifier,
+    hint: MutableState<ChartHint?>,
+    hintValueText: @Composable (LocalDate, Float) -> String? = { _, _ -> null },
+    onDayLongPress: ((LocalDate) -> Unit)? = null,
+    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback? = null,
 ) {
     val primary = MaterialTheme.colorScheme.primary
+    val onPrimary = MaterialTheme.colorScheme.onPrimary
     val outline = MaterialTheme.colorScheme.outlineVariant
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     val slowSpec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
@@ -128,6 +141,11 @@ private fun WeekBarChart(
     LaunchedEffect(bars) {
         progress.snapTo(0f)
         progress.animateTo(1f, slowSpec)
+    }
+    var tapEvent by remember { mutableStateOf<ChartEvent?>(null) }
+    tapEvent?.let { ev ->
+        hintValueText(ev.date, ev.value)?.let { hint.value = ChartHint(ev.column, ev.date, it) }
+        tapEvent = null
     }
     val labelPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
         color = onSurfaceVariant.toArgb(); textSize = 22f; textAlign = android.graphics.Paint.Align.CENTER
@@ -138,14 +156,25 @@ private fun WeekBarChart(
     Canvas(
         modifier
             .pointerInput(bars) {
-                detectTapGestures { offset ->
-                    val idx = (offset.x / size.width * bars.size).toInt().coerceIn(0, bars.size - 1)
-                    val bar = bars[idx]
-                    if (!bar.future) {
-                        val label = TimeUtils.md(bar.date)
-                        onSelect(if (label == selectedLabel) null else label)
-                    }
-                }
+                detectTapGestures(
+                    onTap = { offset ->
+                        val idx = (offset.x / size.width * bars.size).toInt().coerceIn(0, bars.size - 1)
+                        val bar = bars[idx]
+                        if (!bar.future) {
+                            val label = TimeUtils.md(bar.date)
+                            onSelect(if (label == selectedLabel) null else label)
+                            tapEvent = ChartEvent(idx, bar.date, bar.value)
+                        }
+                    },
+                    onLongPress = { offset ->
+                        val idx = (offset.x / size.width * bars.size).toInt().coerceIn(0, bars.size - 1)
+                        val bar = bars[idx]
+                        if (!bar.future) {
+                            haptic?.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onDayLongPress?.invoke(bar.date)
+                        }
+                    },
+                )
             }
     ) {
         if (bars.isEmpty()) return@Canvas
@@ -185,6 +214,30 @@ private fun WeekBarChart(
             }
             // 柱下方：日期（全部显示，含空日/未来日占位）
             drawContext.canvas.nativeCanvas.drawText(TimeUtils.md(bar.date), cx, size.height - 8f, labelPaint)
+            // 选中标记：柱体 onPrimary 描边（不遮挡日期）；空日/未来日不画
+            val isSel = !bar.future && TimeUtils.md(bar.date) == selectedLabel
+            if (isSel) {
+                val r = androidx.compose.ui.geometry.CornerRadius(10f, 10f)
+                if (v > 0f) {
+                    val h = chartH * v / max * progress.value
+                    drawRoundRect(
+                        color = onPrimary,
+                        topLeft = Offset(cx - barWidth / 2, chartBottom - h),
+                        size = Size(barWidth, h.coerceAtLeast(4f * progress.value)),
+                        cornerRadius = r,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(1.5.dp.toPx()),
+                    )
+                } else {
+                    // 空柱选中：基线内侧的占位框
+                    drawRoundRect(
+                        color = onPrimary,
+                        topLeft = Offset(cx - barWidth / 2, chartBottom - 10.dp.toPx()),
+                        size = Size(barWidth, 10.dp.toPx()),
+                        cornerRadius = r,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(1.5.dp.toPx()),
+                    )
+                }
+            }
         }
     }
 }

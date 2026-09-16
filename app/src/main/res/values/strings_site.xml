@@ -55,6 +55,9 @@
     <string name="site_settlement_lock_hint">确认后区间内记录锁定，如需修改请先撤销结算单。</string>
     <string name="site_settlement_confirm">确认结算</string>
     <string name="site_delete">删除</string>
+    <string name="site_settlement_delete_piece_title">删除这笔包工？</string>
+    <string name="site_settlement_delete_advance_title">删除这笔借支？</string>
+    <string name="site_settlement_delete_body_hint">删除后将从待结余额中移除，此操作不可撤销。</string>
     <!-- 借支用途 12 类（12 文档 D5-rev） -->
     <string name="site_purpose_wage">工资</string>
     <string name="site_purpose_living">生活费</string>
