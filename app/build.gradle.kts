@@ -138,3 +138,23 @@ dependencies {
     testImplementation(libs.coroutines.test)
     testImplementation(libs.androidx.junit)
 }
+
+/**
+ * Robolectric 运行期要下载 `android-all-instrumented` jar（默认源 `https://repo1.maven.org/maven2`）。
+ *
+ * ⚠️ **Gradle 命令行 `-D` 只作用于 Gradle 进程，不会传给 fork 出的测试 JVM**——
+ * 在 .cnb.yml 里写 `./gradlew ... -Drobolectric.dependency.repo.url=...` 是无效的。
+ * 后果：CI（国内 runner）上 Robolectric 仍直连 Maven Central，偶发
+ * `MavenArtifactFetcher` → `HttpURLConnection` IOException，挂掉最先跑的 RecordDaoTest 2 例，
+ * 单测门禁随机失败（v0.6.17 事故，见 docs/11 035）。必须在此用 `systemProperty` 显式透传。
+ *
+ * 仓库选择沿用 settings.gradle.kts 的约定：`CI` 非空（GitHub Actions 海外 runner）用官方源，
+ * 否则（本地开发 / CNB 置空 CI）用阿里云镜像（已核实含本版本 jar）。
+ */
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    val onCi = System.getenv("CI")?.isNotBlank() == true
+    systemProperty(
+        "robolectric.dependency.repo.url",
+        if (onCi) "https://repo1.maven.org/maven2" else "https://maven.aliyun.com/repository/public",
+    )
+}
