@@ -19,9 +19,12 @@ import com.mdot.app.domain.model.Shift
 import com.mdot.app.domain.model.SalaryConfig
 import com.mdot.app.domain.model.TierSource
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -83,6 +86,10 @@ class RecordSheetViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(SheetUiState())
     val state: StateFlow<SheetUiState> = _state.asStateFlow()
+
+    /** 保存/删除成功后请求关闭——走 RecordSheet 退出动画（不再直接 controller.dismiss() 摘掉组合） */
+    private val _closeRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val closeRequests: SharedFlow<Unit> = _closeRequests.asSharedFlow()
 
     val visibleShifts: StateFlow<List<Shift>> = shiftRepo.observeAll()
         .map { list -> list.filter { !it.hidden } }
@@ -261,7 +268,7 @@ class RecordSheetViewModel @Inject constructor(
                     )
                 )
             }
-            result.onSuccess { controller.dismiss() }
+            result.onSuccess { _closeRequests.tryEmit(Unit) }
                 .onFailure { err -> _state.update { it.copy(errorText = err.toText()) } }
         }
     }
@@ -270,7 +277,7 @@ class RecordSheetViewModel @Inject constructor(
         val s = _state.value
         viewModelScope.launch {
             recordRepo.delete(s.date, s.tab)
-            controller.dismiss()
+            _closeRequests.tryEmit(Unit)
         }
     }
 

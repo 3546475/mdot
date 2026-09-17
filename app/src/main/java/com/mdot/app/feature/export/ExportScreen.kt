@@ -55,6 +55,7 @@ import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.DatePick
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.MessageSnackbarHost
+import com.mdot.app.core.designsystem.component.InlineLoadingButton
 import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.navigation.contentBottomPadding
@@ -151,21 +152,22 @@ fun ExportScreen(
                     enabled = !state.busy,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.export_import_csv)) }
-                Button(
+                InlineLoadingButton(
+                    busy = state.busyAction == ExportBusyAction.CSV,
+                    text = stringResource(R.string.export_csv_detail),
                     onClick = { vm.prepareCsvPreview() },
                     enabled = !state.busy && state.range != null,
+                    filled = true,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text(stringResource(R.string.export_csv_detail)) }
-                OutlinedButton(
+                )
+                InlineLoadingButton(
+                    busy = state.busyAction == ExportBusyAction.PAYSLIP,
+                    text = stringResource(R.string.export_payslip_generate),
                     onClick = { vm.preparePayslipPreview(payslipPalette) },
                     enabled = !state.busy && state.range != null,
+                    filled = false,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text(stringResource(R.string.export_payslip_generate)) }
-                if (state.busy) {
-                    Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                        CircularProgressIndicator(Modifier.padding(8.dp))
-                    }
-                }
+                )
             }
         }
     }

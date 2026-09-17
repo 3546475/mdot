@@ -132,6 +132,8 @@ fun RecordSheet(
     }
 
     BackHandler(onBack = { requestDismiss() })
+    // 保存/删除成功：走退出动画后再真正关闭（不直接摘掉组合）
+    LaunchedEffect(Unit) { vm.closeRequests.collect { requestDismiss() } }
 
     // 遮罩与面板拆成两个 AnimatedVisibility（共享同一 visibleState）：遮罩原地淡入淡出、
     // 面板自下而上滑入/下滑淡出——避免遮罩跟随上推，且保证退出动画完整播放

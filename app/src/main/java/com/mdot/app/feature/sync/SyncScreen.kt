@@ -43,6 +43,7 @@ import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.SegmentBar
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.MessageSnackbarHost
+import com.mdot.app.core.designsystem.component.InlineLoadingButton
 import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.core.sync.SyncPhase
@@ -275,23 +276,19 @@ private fun SyncTabPage(
                             Text(it, style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.error)
                         }
-                        Button(
+                        InlineLoadingButton(
+                            busy = state.status.busy,
+                            text = stringResource(R.string.sync_backup_now_cloud),
                             onClick = vm::backupNow,
                             enabled = state.status.configured && !state.status.busy,
+                            filled = true,
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text(stringResource(R.string.sync_backup_now_cloud)) }
-
+                        )
                         OutlinedButton(
                             onClick = vm::prepareRestore,
                             enabled = state.status.configured && !state.status.busy,
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text(stringResource(R.string.sync_restore_from_cloud)) }
-
-                        if (state.status.busy) {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                                CircularProgressIndicator(Modifier.padding(8.dp))
-                            }
-                        }
                     }
                 }
 
@@ -322,21 +319,19 @@ private fun SyncTabPage(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Button(
+                        InlineLoadingButton(
+                            busy = state.localBusy,
+                            text = stringResource(R.string.sync_local_export),
                             onClick = { createDoc.launch(SyncViewModel.defaultLocalFileName()) },
                             enabled = !state.localBusy && !state.status.busy,
+                            filled = true,
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text(stringResource(R.string.sync_local_export)) }
+                        )
                         OutlinedButton(
                             onClick = { openDoc.launch(arrayOf("application/zip", "*/*")) },
                             enabled = !state.localBusy && !state.status.busy,
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text(stringResource(R.string.sync_local_restore)) }
-                        if (state.localBusy) {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                                CircularProgressIndicator(Modifier.padding(8.dp))
-                            }
-                        }
                     }
                 }
 

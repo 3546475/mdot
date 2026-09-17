@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -53,9 +54,11 @@ import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.JiabanTopBar
+import com.mdot.app.core.designsystem.component.MessageSnackbarHost
 import com.mdot.app.core.designsystem.component.SegmentBar
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.SettingRow
+import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.core.navigation.Routes
 import com.mdot.app.domain.model.WorkSystem
@@ -274,37 +277,47 @@ fun AboutScreen(
     val hub: SettingsHubViewModel = hiltViewModel()
     val pagerState = rememberPagerState(pageCount = { 2 })
     val scope = rememberCoroutineScope()
+    val updateNotice by updateVm.notice.collectAsStateWithLifecycle()
+    val updateNoticeIsError by updateVm.noticeIsError.collectAsStateWithLifecycle()
 
-    Column(Modifier.fillMaxSize()) {
-        JiabanTopBar(
-            title = null,
-            titleContent = {
-                SegmentBar(
-                    labels = listOf(
-                        stringResource(R.string.settings_about_title),
-                        stringResource(R.string.about_tab_setup),
-                    ),
-                    selected = pagerState.currentPage,
-                    onSelect = { i -> scope.launch { pagerState.animateScrollToPage(i) } },
-                    segWidth = 84.dp,
-                    position = pagerState.currentPage + pagerState.currentPageOffsetFraction,
-                )
-            },
-            showBack = true,
-            onBack = onBack,
-        )
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-            beyondViewportPageCount = 1,
-        ) { page ->
-            when (page) {
-                0 -> AboutPane(updateVm = updateVm, dsVm = dsVm, hub = hub)
-                else -> SettingsHubPane(hub = hub, onOpen = onOpen)
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            JiabanTopBar(
+                title = null,
+                titleContent = {
+                    SegmentBar(
+                        labels = listOf(
+                            stringResource(R.string.settings_about_title),
+                            stringResource(R.string.about_tab_setup),
+                        ),
+                        selected = pagerState.currentPage,
+                        onSelect = { i -> scope.launch { pagerState.animateScrollToPage(i) } },
+                        segWidth = 84.dp,
+                        position = pagerState.currentPage + pagerState.currentPageOffsetFraction,
+                    )
+                },
+                showBack = true,
+                onBack = onBack,
+            )
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                beyondViewportPageCount = 1,
+            ) { page ->
+                when (page) {
+                    0 -> AboutPane(updateVm = updateVm, dsVm = dsVm, hub = hub)
+                    else -> SettingsHubPane(hub = hub, onOpen = onOpen)
+                }
             }
         }
+        // 检查更新结果提示（已是最新/失败等短提示）走底部 Snackbar，不占 hero 版本卡布局（docs/15 反馈）
+        val (snackbarHostState, snackbarIsError) = rememberMessageSnackbar(
+            message = updateNotice,
+            isError = updateNoticeIsError,
+            onClear = updateVm::clearNotice,
+        )
+        MessageSnackbarHost(snackbarHostState, snackbarIsError, Modifier.align(Alignment.BottomCenter))
     }
-    UpdateFlow(updateVm)
 }
 
 /** 「关于」页签内容主体：hero 版本卡（自更新+数据源）+ 隐私说明 + 开源许可 + 项目地址 */

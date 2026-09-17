@@ -39,6 +39,15 @@ class UpdateViewModel @Inject constructor(
     private val _notice = MutableStateFlow<String?>(null)
     val notice: StateFlow<String?> = _notice.asStateFlow()
 
+    /** notice 的错误语义（失败类提示 true，渲染 ⚠ + error 描边；普通/成功 false，渲染 ✓） */
+    private val _noticeIsError = MutableStateFlow(false)
+    val noticeIsError: StateFlow<Boolean> = _noticeIsError.asStateFlow()
+
+    private fun postNotice(msg: String, isError: Boolean = false) {
+        _noticeIsError.value = isError
+        _notice.value = msg
+    }
+
     init {
         // 下载已下沉 Repository 应用级作用域（13 文档 B5-01）：页面重建/离开再回来，
         // 订阅全局进度流恢复"下载中"UI 态，下载本体不随 VM 销毁而中断
@@ -60,14 +69,14 @@ class UpdateViewModel @Inject constructor(
                 val info = r.data
                 if (info == null) {
                     _state.value = UpdateState.Idle
-                    _notice.value = "当前已是最新版本（v${BuildConfig.VERSION_NAME}）"
+                    postNotice("当前已是最新版本（v${BuildConfig.VERSION_NAME}）")
                 } else {
                     _state.value = UpdateState.Available(info)
                 }
             }
             is AppResult.Failure -> {
                 _state.value = UpdateState.Idle
-                _notice.value = "检查更新失败，请稍后再试"
+                postNotice("检查更新失败，请稍后再试", isError = true)
             }
         }
     }
@@ -93,31 +102,24 @@ class UpdateViewModel @Inject constructor(
                     } else {
                         val ok = updateRepo.install(r.data)
                         _state.value = UpdateState.Idle
-                        if (!ok) _notice.value = "无法调起安装器：请在系统设置中允许本应用「安装未知应用」后重试"
+                        if (!ok) postNotice("无法调起安装器：请在系统设置中允许本应用「安装未知应用」后重试", isError = true)
                     }
                 }
                 is AppResult.Failure -> {
                     val bg = _state.value is UpdateState.BackgroundDownloading
                     _state.value = UpdateState.Idle
-                    _notice.value = if (bg) "后台下载失败，请检查网络后重试" else "下载失败，请检查网络后重试"
+                    postNotice(if (bg) "后台下载失败，请检查网络后重试" else "下载失败，请检查网络后重试", isError = true)
                 }
             }
         }
     }
 
-    /** 下载中转入后台：关闭弹窗、下载继续；完成后弹「下载完成」确认安装。 */
+    /** 下载中转入后台：下载继续、按钮与版本行徽章显示后台进度；完成后按钮变「安装」。 */
     fun backgroundDownload() {
         val cur = _state.value
         if (cur is UpdateState.Downloading) {
             _state.value = UpdateState.BackgroundDownloading(cur.progress)
-        }
-    }
-
-    /** 点击进度标志：重新打开下载进度弹窗（T3-2） */
-    fun reopenProgress() {
-        val cur = _state.value
-        if (cur is UpdateState.BackgroundDownloading) {
-            _state.value = UpdateState.Downloading(cur.progress)
+            postNotice("已转入后台下载，完成后会提醒你安装")
         }
     }
 
@@ -127,12 +129,8 @@ class UpdateViewModel @Inject constructor(
         viewModelScope.launch {
             val ok = updateRepo.install(d.file)
             _state.value = UpdateState.Idle
-            if (!ok) _notice.value = "无法调起安装器：请在系统设置中允许本应用「安装未知应用」后重试"
+            if (!ok) postNotice("无法调起安装器：请在系统设置中允许本应用「安装未知应用」后重试", isError = true)
         }
-    }
-
-    fun dismiss() {
-        if (_state.value !is UpdateState.Downloading) _state.value = UpdateState.Idle
     }
 
     fun clearNotice() {

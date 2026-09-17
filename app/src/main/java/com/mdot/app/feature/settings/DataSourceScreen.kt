@@ -9,10 +9,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -33,7 +33,13 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -48,17 +54,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.setValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
@@ -70,7 +78,8 @@ import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.SettingRow
 import com.mdot.app.core.designsystem.component.MessageSnackbarHost
 import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
-import com.mdot.app.core.navigation.contentBottomPadding
+
+import kotlin.math.max
 
 /** 更新与数据源（F7-9 / F8-1）：hero 版本卡（检查更新 + from 源选择胶囊，弹窗内选择/添加更新源）+ 节假日库卡，与首页/统计 hero 同视觉体系 */
 @Composable
@@ -83,6 +92,8 @@ fun DataSourceScreen(
     val holidayUrl by vm.holidayUrl.collectAsStateWithLifecycle()
     val holidayUrls by vm.holidayUrls.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val updateNotice by updateVm.notice.collectAsStateWithLifecycle()
+    val updateNoticeIsError by updateVm.noticeIsError.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
 
     Box(Modifier.fillMaxSize()) {
@@ -146,13 +157,16 @@ fun DataSourceScreen(
         }
 
     }
-        val (snackbarHostState, snackbarIsError) = rememberMessageSnackbar(
-            message = message,
-            onClear = vm::clearMessage,
+        // 两路消息合并到同一 Snackbar：检查更新提示（updateVm.notice）优先于节假日刷新提示（几乎不会同时出现）
+        val snackbarMsg = updateNotice ?: message
+        val snackbarIsError = updateNotice != null && updateNoticeIsError
+        val (snackbarHostState, snackbarIsErrorFlag) = rememberMessageSnackbar(
+            message = snackbarMsg,
+            isError = snackbarIsError,
+            onClear = { if (updateNotice != null) updateVm.clearNotice() else vm.clearMessage() },
         )
-        MessageSnackbarHost(snackbarHostState, snackbarIsError, Modifier.align(Alignment.BottomCenter))
+        MessageSnackbarHost(snackbarHostState, snackbarIsErrorFlag, Modifier.align(Alignment.BottomCenter))
     }
-    UpdateFlow(updateVm)
 }
 
 
@@ -180,9 +194,7 @@ internal fun UpdateHeroCard(
 ) {
     val updateUrl by dsVm.updateUrl.collectAsStateWithLifecycle()
     val updateUrls by dsVm.updateUrls.collectAsStateWithLifecycle()
-    val updateNotice by updateVm.notice.collectAsStateWithLifecycle()
     val updateState by updateVm.state.collectAsStateWithLifecycle()
-    val downloadProgress = (updateState as? UpdateState.BackgroundDownloading)?.progress
     val context = LocalContext.current
     val versionText = remember {
         runCatching {
@@ -201,12 +213,12 @@ internal fun UpdateHeroCard(
                 versionText = versionText,
                 updateUrls = updateUrls,
                 updateUrl = updateUrl,
-                updateNotice = updateNotice,
+                updateState = updateState,
                 onCheck = updateVm::check,
+                onDownload = updateVm::downloadAndInstall,
+                onInstall = updateVm::installDownloaded,
+                onBackgroundDownload = updateVm::backgroundDownload,
                 onPickSource = { showSourcePicker = true },
-                onNoticeShown = updateVm::clearNotice,
-                downloadProgress = downloadProgress,
-                onReopenProgress = updateVm::reopenProgress,
             )
         }
 
@@ -227,12 +239,12 @@ internal fun UpdateHeroCard(
                     versionText = versionText,
                     updateUrls = updateUrls,
                     updateUrl = updateUrl,
-                    updateNotice = updateNotice,
+                    updateState = updateState,
                     onCheck = updateVm::check,
+                    onDownload = updateVm::downloadAndInstall,
+                    onInstall = updateVm::installDownloaded,
+                    onBackgroundDownload = updateVm::backgroundDownload,
                     onPickSource = { showSourcePicker = true },
-                    onNoticeShown = updateVm::clearNotice,
-                    downloadProgress = downloadProgress,
-                    onReopenProgress = updateVm::reopenProgress,
                     // 标题装饰：星光带（仅玻璃版提供）
                     titleTrailing = {
                         Spacer(Modifier.width(Spacing.s))
@@ -264,21 +276,25 @@ internal fun UpdateHeroCard(
 }
 
 /**
- * hero 卡内容体（两套样式共用）：当前版本标签 + 版本大字 + 检查更新按钮 + from 源胶囊 + 状态提示。
+ * hero 卡内容体（两套样式共用）：当前版本标签 + 版本大字 + 更新操作按钮 + from 源胶囊。
  * 外观差异通过 [titleTrailing]（标题尾随装饰，仅玻璃版有星光带）注入，其余完全一致。
  * 前景色统一用 onPrimaryContainer——Classic 的 primaryContainer 底与 Glass 的磨砂底都适配。
+ *
+ * 更新操作按钮为无弹窗状态流转（docs/15 反馈）：检查更新 → 按钮内圆环（检查中）→
+ * 有更新变「下载 vX」→ 下载中显示进度（点击转后台）→ 下载完变「安装」→ 装完回「检查更新」。
+ * 结果提示（已是最新/失败）走页面级底部 Snackbar，不占卡片布局。
  */
 @Composable
 private fun UpdateHeroContent(
     versionText: String,
     updateUrls: List<String>,
     updateUrl: String,
-    updateNotice: String?,
+    updateState: UpdateState,
     onCheck: () -> Unit,
+    onDownload: () -> Unit,
+    onInstall: () -> Unit,
+    onBackgroundDownload: () -> Unit,
     onPickSource: () -> Unit,
-    onNoticeShown: () -> Unit,
-    downloadProgress: Int? = null,
-    onReopenProgress: () -> Unit = {},
     titleTrailing: (@Composable androidx.compose.foundation.layout.RowScope.() -> Unit)? = null,
 ) {
     val onContainer = MaterialTheme.colorScheme.onPrimaryContainer
@@ -298,23 +314,22 @@ private fun UpdateHeroContent(
                 fontWeight = FontWeight.Bold,
                 color = onContainer,
             )
-            if (downloadProgress != null) {
+            if (updateState is UpdateState.BackgroundDownloading) {
                 Spacer(Modifier.width(Spacing.m))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .clip(RoundedCornerShape(Radius.pill))
-                        .clickable(onClick = onReopenProgress)
                         .padding(horizontal = Spacing.s, vertical = Spacing.xs),
                 ) {
                     CircularProgressIndicator(
-                        progress = { downloadProgress / 100f },
+                        progress = { updateState.progress / 100f },
                         modifier = Modifier.size(18.dp),
                         strokeWidth = 2.dp,
                     )
                     Spacer(Modifier.width(Spacing.xs))
                     Text(
-                        stringResource(R.string.update_background_progress, downloadProgress),
+                        stringResource(R.string.update_background_progress, updateState.progress),
                         style = MaterialTheme.typography.labelMedium,
                         color = onContainer,
                     )
@@ -323,13 +338,13 @@ private fun UpdateHeroContent(
         }
         Spacer(Modifier.height(Spacing.s))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Button(
-                onClick = onCheck,
-                shape = RoundedCornerShape(Radius.pill),
-                contentPadding = PaddingValues(horizontal = Spacing.l, vertical = 8.dp),
-            ) {
-                Text(stringResource(R.string.datasource_check_update))
-            }
+            UpdateActionButton(
+                state = updateState,
+                onCheck = onCheck,
+                onDownload = onDownload,
+                onInstall = onInstall,
+                onBackgroundDownload = onBackgroundDownload,
+            )
             if (updateUrls.isNotEmpty()) {
                 Spacer(Modifier.width(Spacing.s))
                 Text(
@@ -357,22 +372,171 @@ private fun UpdateHeroContent(
                 }
             }
         }
-        updateNotice?.let { msg ->
-            LaunchedEffect(msg) {
-                kotlinx.coroutines.delay(3000)
-                onNoticeShown()
+    }
+}
+
+/**
+ * 更新操作按钮：无弹窗状态流转（docs/15 反馈）。
+ * - Checking/Downloading/BackgroundDownloading 时按钮承载圆环/进度且视觉保持 primary 主色
+ *   （禁用仅拦截点击，不置灰）；Downloading 点击转后台下载（进度徽章同步出现在版本行右侧）。
+ * - 宽度随内容紧凑排布（空闲态无大空白）；busy 态只留圆环居中、移除文字；
+ *   收缩动画由单一 Animatable 驱动宽度+位置 → 从两侧往中间对称缩小。
+ */
+@Composable
+private fun UpdateActionButton(
+    state: UpdateState,
+    onCheck: () -> Unit,
+    onDownload: () -> Unit,
+    onInstall: () -> Unit,
+    onBackgroundDownload: () -> Unit,
+) {
+    val shape = RoundedCornerShape(Radius.pill)
+    // 进行中状态视觉不变（primary 底 + onPrimary 内容），enabled=false 只拦截点击
+    val activeColors = ButtonDefaults.buttonColors(
+        containerColor = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+        disabledContainerColor = MaterialTheme.colorScheme.primary,
+        disabledContentColor = MaterialTheme.colorScheme.onPrimary,
+    )
+
+    // ---- 状态 → 触发行为 + 渲染数据（单点分发，避免多分支漂移） ----
+    val busy = state is UpdateState.Checking ||
+        state is UpdateState.Downloading ||
+        state is UpdateState.BackgroundDownloading
+    val contentPadding = PaddingValues(horizontal = Spacing.l, vertical = 8.dp)
+    val progress: Float? = when (state) {
+        is UpdateState.Downloading -> state.progress / 100f
+        is UpdateState.BackgroundDownloading -> state.progress / 100f
+        else -> null
+    }
+    val label: String = when (state) {
+        UpdateState.Idle -> stringResource(R.string.datasource_check_update)
+        UpdateState.Checking -> stringResource(R.string.update_checking_short)
+        is UpdateState.Available -> stringResource(R.string.update_action_download_version, state.info.versionName)
+        is UpdateState.Downloading -> stringResource(R.string.update_background_progress, state.progress)
+        is UpdateState.BackgroundDownloading -> stringResource(R.string.update_background_progress, state.progress)
+        is UpdateState.Downloaded -> stringResource(R.string.update_action_install_short)
+    }
+    val enabled = state is UpdateState.Idle ||
+        state is UpdateState.Available ||
+        state is UpdateState.Downloading ||
+        state is UpdateState.Downloaded
+    val onClick: () -> Unit = when (state) {
+        UpdateState.Idle -> onCheck
+        is UpdateState.Available -> onDownload
+        is UpdateState.Downloading -> onBackgroundDownload
+        is UpdateState.Downloaded -> onInstall
+        else -> ({ })
+    }
+
+    // 收缩/展开动画：宽度+位置由同一 Animatable 驱动 → 每帧左右对称、无右侧缺失。
+    // ⚠️ 背景：animateContentSize + Box(contentAlignment=Center) 时，尺寸动画与位置动画
+    //    不同步（录屏实测：尺寸瞬间缩到 159px、位置随后 0.4s 慢速漂移）→ 右侧瞬时空洞
+    //    + 两边收缩速度不同。改用单一 shrink 进度：按钮宽 = lerp(idleW, busyW, shrink)，
+    //    容器固定 idleW + contentAlignment=Center → 位置 = (idleW - 宽)/2 随 shrink 同步，
+    //    左缘 = (Δ/2)·t、右缘 = idleW - (Δ/2)·t，完全对称。
+    // 展开（busy→idle）时文字（≈238px）在插值宽 < 文字宽时会被压缩省略——文字用 alpha
+    // 渐入（宽 > 230px 才可见），视觉为「按钮扩宽 + 文字淡入」，无省略号闪动。
+    // 收缩动画 spec（fastSpatialSpec 是 @Composable 泛型函数，须显式 <Float> 且在 Composable 上下文先取值）
+    val shrinkSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
+    val shrink = remember { Animatable(0f) }
+    LaunchedEffect(busy) {
+        shrink.animateTo(if (busy) 1f else 0f, shrinkSpec)
+    }
+    var idleWpx by remember { mutableStateOf(0) }
+    val density = LocalDensity.current
+    // busy 目标宽：环 14 + 水平 padding 2×Spacing.l；M3E Button minWidth 60dp 兜底
+    val busyWdp = Spacing.l * 2 + 14.dp
+    val busyWpx = with(density) { (if (busyWdp > 60.dp) busyWdp else 60.dp).toPx() }.toInt()
+    val interpWpx = if (idleWpx > 0) {
+        (idleWpx + (busyWpx - idleWpx) * shrink.value)
+    } else {
+        null
+    }
+    val textAlpha = if (interpWpx != null) {
+        ((interpWpx - 230f) / 8f).coerceIn(0f, 1f)
+    } else {
+        1f
+    }
+
+    Box(
+        modifier = if (idleWpx > 0) {
+            Modifier.width(with(density) { idleWpx.toDp() })
+        } else {
+            Modifier
+        },
+        contentAlignment = Alignment.Center,
+    ) {
+        Button(
+            onClick = onClick,
+            enabled = enabled,
+            shape = shape,
+            contentPadding = contentPadding,
+            colors = if (busy) activeColors else ButtonDefaults.buttonColors(),
+            modifier = Modifier
+                .then(
+                    if (interpWpx != null) {
+                        Modifier.width(with(density) { interpWpx.toDp() })
+                    } else {
+                        Modifier
+                    },
+                )
+                .onGloballyPositioned {
+                    // 记录 idle 自然宽（idle 时按钮宽 = interp = idleW，稳定不循环）
+                    if (!busy && it.size.width > idleWpx) idleWpx = it.size.width
+                },
+        ) {
+            // busy 态只显示圆环（Button 内容默认居中），无文字——用户明确要求；
+            // 非 busy 态显示状态文字；文字直接切换（不用 Crossfade——新旧文字交叉淡化
+            // 的瞬间观感是「闪」，用户已否）。
+            ButtonSpinner(busy = busy, progress = progress)
+            if (!busy) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.alpha(textAlpha),
+                )
             }
-            Text(
-                msg,
-                style = MaterialTheme.typography.labelMedium,
-                color = onContainer,
-                modifier = Modifier.padding(top = Spacing.xs),
-            )
         }
     }
 }
 
-
+/**
+ * 按钮内圆环：busy 时淡入淡出 + 横向展开（progress 非空=定环，null=不定环），居中于按钮。
+ * color 必须传 onPrimary：CircularProgressIndicator 默认 primary 色与按钮底色同色不可见。
+ */
+@Composable
+private fun ButtonSpinner(
+    busy: Boolean,
+    progress: Float?,
+) {
+    AnimatedVisibility(
+        visible = busy,
+        enter = fadeIn(MaterialTheme.motionScheme.fastEffectsSpec()) +
+            expandHorizontally(animationSpec = MaterialTheme.motionScheme.fastSpatialSpec()),
+        exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()) +
+            shrinkHorizontally(animationSpec = MaterialTheme.motionScheme.fastSpatialSpec()),
+    ) {
+        val p = progress
+        if (p != null) {
+            CircularProgressIndicator(
+                progress = { p },
+                modifier = Modifier.size(14.dp),
+                strokeWidth = 1.5.dp,
+                color = MaterialTheme.colorScheme.onPrimary,
+                trackColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f),
+            )
+        } else {
+            CircularProgressIndicator(
+                modifier = Modifier.size(14.dp),
+                strokeWidth = 1.5.dp,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+        }
+    }
+}
 /** URL 多选一列表：RadioButton 点选即生效；多项时可删除；底部添加（对话框校验 http(s) 前缀与重复） */
 @Composable
 private fun UrlPicker(

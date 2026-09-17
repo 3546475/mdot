@@ -1,4 +1,4 @@
-import java.util.Properties
+﻿import java.util.Properties
 
 // 签名信息（keystore/keystore.properties，不入库；缺失时 release 不签名）
 val keystoreProps = Properties().apply {
@@ -31,8 +31,8 @@ android {
         applicationId = "com.mdot.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 43
-        versionName = "0.6.15"
+        versionCode = 44
+        versionName = "0.6.16"
     }
 
     signingConfigs {

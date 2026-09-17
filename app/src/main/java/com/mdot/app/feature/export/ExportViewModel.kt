@@ -35,10 +35,15 @@ enum class ExportDimension(val labelRes: Int) {
     CUSTOM(R.string.export_dim_custom),
 }
 
+/** 哪个导出按钮在 busy（docs/15：只有被点的按钮变圆环居中，另一个保持文字 disabled） */
+enum class ExportBusyAction { CSV, PAYSLIP }
+
 data class ExportUiState(
     val dimension: ExportDimension = ExportDimension.CYCLE,
     val range: CycleCalculator.Period? = null,
     val busy: Boolean = false,
+    /** 正在 busy 的导出按钮（CSV 详情 / 生成工资单）；null=无导出按钮在 busy */
+    val busyAction: ExportBusyAction? = null,
     val doneText: String? = null,
     val errorText: String? = null,
     val customFrom: LocalDate? = null,
@@ -122,7 +127,7 @@ class ExportViewModel @Inject constructor(
     fun prepareCsvPreview() {
         val st = uiState.value
         val range = st.range ?: run { extra.update { it.copy(errorText = "请先选择有效区间") }; return }
-        extra.update { it.copy(busy = true, errorText = null) }
+        extra.update { it.copy(busy = true, busyAction = ExportBusyAction.CSV, errorText = null) }
         viewModelScope.launch {
             try {
                 val salary = settings.salaryFlow.first()
@@ -138,7 +143,7 @@ class ExportViewModel @Inject constructor(
                     val pieces = siteRepo.observePieceWorks(pid, range.from, range.to).first()
                     val advs = siteRepo.observeAdvances(pid, range.from, range.to).first()
                     if (atts.isEmpty() && pieces.isEmpty() && advs.isEmpty()) {
-                        extra.update { it.copy(busy = false, errorText = "该区间没有记录") }
+                        extra.update { it.copy(busy = false, busyAction = null, errorText = "该区间没有记录") }
                         return@launch
                     }
                     val siteOut = com.mdot.app.domain.SitePayCalculator.summarize(
@@ -149,7 +154,7 @@ class ExportViewModel @Inject constructor(
                 } else {
                     val records = recordRepo.getRange(range.from, range.to)
                     if (records.isEmpty()) {
-                        extra.update { it.copy(busy = false, errorText = "该区间没有记录") }
+                        extra.update { it.copy(busy = false, busyAction = null, errorText = "该区间没有记录") }
                         return@launch
                     }
                     csv = CsvWriter.buildRangeCsv(
@@ -165,10 +170,10 @@ class ExportViewModel @Inject constructor(
                 }
                 val file = File(dir, fileName)
                 file.writeText(csv, Charsets.UTF_8)
-                extra.update { it.copy(busy = false, preview = PreviewArtifact.Csv(file)) }
+                extra.update { it.copy(busy = false, busyAction = null, preview = PreviewArtifact.Csv(file)) }
             } catch (e: Exception) {
             e.rethrowIfCancellation()
-                extra.update { it.copy(busy = false, errorText = e.message ?: "生成失败") }
+                extra.update { it.copy(busy = false, busyAction = null, errorText = e.message ?: "生成失败") }
             }
         }
     }
@@ -177,7 +182,7 @@ class ExportViewModel @Inject constructor(
     fun preparePayslipPreview(palette: PayslipRenderer.Palette) {
         val st = uiState.value
         val range = st.range ?: run { extra.update { it.copy(errorText = "请先选择有效区间") }; return }
-        extra.update { it.copy(busy = true, errorText = null) }
+        extra.update { it.copy(busy = true, busyAction = ExportBusyAction.PAYSLIP, errorText = null) }
         viewModelScope.launch {
             try {
                 val salary = settings.salaryFlow.first()
@@ -192,7 +197,7 @@ class ExportViewModel @Inject constructor(
                     val pieces = siteRepo.observePieceWorks(pid, range.from, range.to).first()
                     val advs = siteRepo.observeAdvances(pid, range.from, range.to).first()
                     if (atts.isEmpty() && pieces.isEmpty() && advs.isEmpty()) {
-                        extra.update { it.copy(busy = false, errorText = "该区间没有记录") }
+                        extra.update { it.copy(busy = false, busyAction = null, errorText = "该区间没有记录") }
                         return@launch
                     }
                     val siteOut = com.mdot.app.domain.SitePayCalculator.summarize(
@@ -217,7 +222,7 @@ class ExportViewModel @Inject constructor(
                 } else {
                     val records = recordRepo.getRange(range.from, range.to)
                     if (records.isEmpty()) {
-                        extra.update { it.copy(busy = false, errorText = "该区间没有记录") }
+                        extra.update { it.copy(busy = false, busyAction = null, errorText = "该区间没有记录") }
                         return@launch
                     }
                     val out = PayrollCalculator.summarize(
@@ -245,10 +250,10 @@ class ExportViewModel @Inject constructor(
                     fileName = "工资单_${range.from}_${range.to}.png"
                 }
                 val file = PayslipRenderer.savePng(bitmap, context, fileName)
-                extra.update { it.copy(busy = false, preview = PreviewArtifact.Payslip(file)) }
+                extra.update { it.copy(busy = false, busyAction = null, preview = PreviewArtifact.Payslip(file)) }
             } catch (e: Exception) {
             e.rethrowIfCancellation()
-                extra.update { it.copy(busy = false, errorText = e.message ?: "生成失败") }
+                extra.update { it.copy(busy = false, busyAction = null, errorText = e.message ?: "生成失败") }
             }
         }
     }
