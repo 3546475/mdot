@@ -140,18 +140,50 @@ dependencies {
 }
 
 /**
- * Robolectric 运行期要下载 `android-all-instrumented` jar（默认源 `https://repo1.maven.org/maven2`）。
+ * Robolectric 运行期依赖（`android-all-instrumented` jar，单个 ~200MB）**改为构建期解析 + 离线目录**。
  *
- * ⚠️ **Gradle 命令行 `-D` 只作用于 Gradle 进程，不会传给 fork 出的测试 JVM**——
- * 在 .cnb.yml 里写 `./gradlew ... -Drobolectric.dependency.repo.url=...` 是无效的。
- * 后果：CI（国内 runner）上 Robolectric 仍直连 Maven Central，偶发
- * `MavenArtifactFetcher` → `HttpURLConnection` IOException，挂掉最先跑的 RecordDaoTest 2 例，
- * 单测门禁随机失败（v0.6.17 事故，见 docs/11 035）。必须在此用 `systemProperty` 显式透传。
+ * 背景（v0.6.17 单测门禁事故，见 docs/11 035）：Robolectric 默认在**测试运行期**从
+ * Maven Central 下载这些 jar（`MavenArtifactFetcher`），国内 CI 极不稳 →
+ * `HttpURLConnection` IOException，挂掉最先跑的 RecordDaoTest，单测门禁随机失败。
+ * 仅靠 `robolectric.dependency.repo.url` 指镜像在 CNB 容器上仍不够（大文件/路径原因，实测仍失败）。
  *
- * 仓库选择沿用 settings.gradle.kts 的约定：`CI` 非空（GitHub Actions 海外 runner）用官方源，
- * 否则（本地开发 / CNB 置空 CI）用阿里云镜像（已核实含本版本 jar）。
+ * 做法：用 Gradle 自己的仓库配置（带镜像/重试/缓存）在**构建期**把这些 jar 解析下来，
+ * 复制到扁平目录，再让 Robolectric 走**离线模式**只读该目录 —— **测试运行期零网络**。
+ * 不把 jar 提交进仓库（避免 ~260MB 入库），Gradle 缓存（CI 已挂载）会跨构建复用。
+ *
+ * ⚠️ 版本名与 Robolectric / targetSdk 绑定：升 Robolectric 或 targetSdk 后需同步更新；
+ *    离线模式下缺哪个 jar 会明确报出来（不会静默降级）。
  */
+/**
+ * ⚠️ 每个 jar **各用一个 configuration**：它们同 group:artifact，放进同一个 configuration 会被
+ * Gradle 冲突解析成单一版本（实测 `5.0.2_r3-... -> 15-...`），导致 API 21 的 jar 缺失，
+ * 离线模式下 `LocalDependencyResolver` 直接抛「Path is not a file」。
+ */
+val robolectricDeps: List<org.gradle.api.artifacts.Configuration> = listOf(
+    // targetSdk 35 对应的 instrumented jar
+    "robolectricAndroidAll35" to "15-robolectric-12650502-i7",
+    // Robolectric 初始化 SdkCollection 时还需要最低支持版本（API 21）的 jar
+    "robolectricAndroidAll21" to "5.0.2_r3-robolectric-r0-i7",
+).map { (cfgName, version) ->
+    configurations.create(cfgName) {
+        isCanBeConsumed = false
+        isCanBeResolved = true
+        dependencies.add(project.dependencies.create("org.robolectric:android-all-instrumented:$version"))
+    }
+}
+
+val robolectricDepsDir = layout.buildDirectory.dir("robolectric-deps")
+val prepareRobolectricDeps by tasks.registering(org.gradle.api.tasks.Copy::class) {
+    robolectricDeps.forEach { from(it) }
+    into(robolectricDepsDir)
+}
+
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    dependsOn(prepareRobolectricDeps)
+    // 离线：只从 prepareRobolectricDeps 拷出来的扁平目录取 jar，运行期不联网
+    systemProperty("robolectric.offline", "true")
+    systemProperty("robolectric.dependency.dir", robolectricDepsDir.get().asFile.absolutePath)
+    // 兜底：万一离线目录机制未生效，也别退回 Maven Central（源按 settings.gradle.kts 约定切）
     val onCi = System.getenv("CI")?.isNotBlank() == true
     systemProperty(
         "robolectric.dependency.repo.url",
