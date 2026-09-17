@@ -68,18 +68,39 @@ class CompBalanceViewModelFeedbackTest {
         db.close()
     }
 
-    /** 轮询直到条件成立（真实 IO 发射需要让出线程），超时保留断言信息便于定位 */
+    /**
+     * 轮询直到条件成立（真实 IO 发射需要让出线程）。
+     * 预算 5s：CI（--no-daemon、冷 Robolectric）比本地慢得多，2s 曾致偶发超时（docs/16 坑 15）。
+     */
     private suspend fun awaitUntil(
         what: String,
         vm: CompBalanceViewModel,
         cond: (CompBalanceUiState) -> Boolean,
     ) {
         var tries = 0
-        while (!cond(vm.uiState.value) && tries < 100) {
+        while (!cond(vm.uiState.value) && tries < 250) {
             delay(20)
             tries++
         }
         assertTrue("等待超时：$what（最后状态 ${vm.uiState.value}）", cond(vm.uiState.value))
+    }
+
+    /**
+     * 轮询等 message 到位。
+     * ⚠️ message 由删除/撤销协程写入，与 Room Flow 的「列表已变」**无先后保证**，
+     * 所以不能等列表一变就直接断言 message（CI 曾因此偶发失败，docs/16 坑 15）。
+     */
+    private suspend fun awaitMessage(
+        what: String,
+        vm: CompBalanceViewModel,
+        cond: (CompBalanceViewModel.Message?) -> Boolean,
+    ) {
+        var tries = 0
+        while (!cond(vm.messageFlow.value) && tries < 250) {
+            delay(20)
+            tries++
+        }
+        assertTrue("等待超时：$what（最后 message ${vm.messageFlow.value}）", cond(vm.messageFlow.value))
     }
 
     /** 实体 → 领域模型（测试里从 DAO 取回真实行后再喂给 VM.delete） */
@@ -105,7 +126,7 @@ class CompBalanceViewModelFeedbackTest {
             vm.delete(adj)
             awaitUntil("列表应移除该行", vm) { it.adjustments.isEmpty() }
 
-            assertEquals("删除成功应提示已删除", "已删除调整记录", vm.messageFlow.value?.text)
+            awaitMessage("应提示已删除", vm) { it?.text == "已删除调整记录" }
             assertEquals("成功提示不是错误态", false, vm.messageFlow.value?.isError)
             assertEquals("删除成功应提供撤销入口", true, vm.messageFlow.value?.canUndo)
 
@@ -133,12 +154,12 @@ class CompBalanceViewModelFeedbackTest {
 
             vm.undoDelete()
             awaitUntil("撤销后记录应回来", vm) { it.adjustments.isNotEmpty() }
+            awaitMessage("撤销后应提示", vm) { it?.text == "已撤销删除" }
 
             val back = db.compAdjustmentDao().getAll().first()
             assertEquals("应插回原 id", originalId, back.id)
             assertEquals("分钟数应一致", 120, back.deltaMinutes)
             assertEquals("备注应一致", "测试备注", back.note)
-            assertEquals("撤销后应提示", "已撤销删除", vm.messageFlow.value?.text)
         } finally {
             collectJob.cancel()
         }

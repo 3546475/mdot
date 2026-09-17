@@ -105,14 +105,17 @@ class CompBalanceViewModel @Inject constructor(
     }
 
     fun delete(adj: CompAdjustment) {
+        // 快照先落：Room 的 observeAdjustments 可能先于本协程后续语句把「列表已空」发出去，
+        // 若此时撤销入口还没就绪，用户/测试就会拿到一次空撤销（CI 曾因此偶发失败，docs/16 坑 15）。
+        lastDeleted = adj
         viewModelScope.launch {
             when (val r = recordRepo.deleteAdjustment(adj.id)) {
-                is AppResult.Success -> {
-                    // 立即删除 + 提示窗给撤销（本行随即从列表消失，无法在按钮内原地撤销）
-                    lastDeleted = adj
+                is AppResult.Success ->
                     message.value = Message("已删除调整记录", canUndo = true)
+                is AppResult.Failure -> {
+                    lastDeleted = null
+                    message.value = Message(r.error.toText(), isError = true)
                 }
-                is AppResult.Failure -> message.value = Message(r.error.toText(), isError = true)
             }
         }
     }
