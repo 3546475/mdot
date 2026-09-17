@@ -1,16 +1,16 @@
 {
-  "versionName": "0.6.15",
-  "versionCode": 43,
-  "tag": "v0.6.15",
-  "releaseNotes": "## 更新内容\n\n- 结算页删除借支/包工记录不再弹确认框，删除后底部提示「已删除」，3 秒内可点「撤销」恢复，误删不怕\n- 记工时滚轮选完时长会有轻微振动提示（定档感更清晰）\n- 工时制度选择卡选中态更流畅：颜色与描边平滑过渡，选中带勾选角标\n- 引导页步骤切换带方向滑动动画（前进右进、返回左出），切换更有方向感\n- 开关类切换保持轻量无振动（避免频繁打扰），与工地表单「选择」语义区分\n\n\n系统要求：Android 10（API 29）及以上。",
+  "versionName": "0.6.16",
+  "versionCode": 44,
+  "tag": "v0.6.16",
+  "releaseNotes": "## 更新内容\n\n- 检查更新不再弹窗打断：点「检查更新」后原按钮直接变加载圆环，发现新版本时按钮变成「下载」，下载进度与「安装」都在原按钮上完成，全程无弹窗\n- 底部操作提示升级为浅色悬浮胶囊：成功打勾、失败警示图标，不再是一条深色横条\n- 导出 CSV、生成工资单、同步立即备份、导出备份文件时，按钮自身转圈提示进度，不再在按钮下方另起一行转圈\n- 记加班弹窗点「保存」后平滑下滑关闭，和取消/返回一致，不再瞬间消失\n\n\n系统要求：Android 10（API 29）及以上。",
   "apkUrl": {
-    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.6.15/MDOT-RELEASE-0.6.15-v8a.apk",
-    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.6.15/MDOT-RELEASE-0.6.15-v7a.apk",
-    "universal": "https://github.com/3546475/mdot/releases/download/v0.6.15/MDOT-RELEASE-0.6.15-dual.apk"
+    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.6.16/MDOT-RELEASE-0.6.16-v8a.apk",
+    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.6.16/MDOT-RELEASE-0.6.16-v7a.apk",
+    "universal": "https://github.com/3546475/mdot/releases/download/v0.6.16/MDOT-RELEASE-0.6.16-dual.apk"
   },
   "apkSha256": {
-    "arm64-v8a": "535963dc734736b9031a50528c5dc66a5a686df70b0955f25d9d2627101a932a",
-    "armeabi-v7a": "36b3f5cc616227aeecfd22f1c48bb12d5dba07d82509a317d1067c38e88bdf4e",
-    "universal": "a0ab3fba1f86534fee847bbecb23f37291556a2b2a46f794bbbd1474dc3daa35"
+    "arm64-v8a": "2b58dcd190be85a4dfeba6801516b55bda31c3dad606046ed929594901a03427",
+    "armeabi-v7a": "0d7699de9ee3e2fdd313ab7e778df21a954db03f62f5411cfba8a56f60f3071e",
+    "universal": "337bebf86746ca9636e2462ea330464fede06053ea4e8d501be7009b528141ba"
   }
 }
