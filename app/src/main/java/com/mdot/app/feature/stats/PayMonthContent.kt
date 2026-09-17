@@ -30,14 +30,14 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
+import com.mdot.app.core.designsystem.component.InlineConfirmButton
+import com.mdot.app.core.designsystem.component.MessageSnackbarHost
+import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -78,17 +78,12 @@ fun PayMonthContent(vm: PayMonthViewModel = hiltViewModel()) {
     val isSite by vm.isSite.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<Pair<PayGroup, PayMonthItem>?>(null) }
     var adding by remember { mutableStateOf<PayGroup?>(null) }
-    var importing by remember { mutableStateOf(false) }
-    var syncing by remember { mutableStateOf(false) }
-    // T1-3：同步/导入结果 Snackbar（docs/15）
-    val snackbarHostState = remember { SnackbarHostState() }
+    // T1-3：同步/导入结果 Snackbar（docs/15）：浅色悬浮胶囊（与关于页检查更新同范式）
     val opMessage by vm.messageFlow.collectAsStateWithLifecycle()
-    androidx.compose.runtime.LaunchedEffect(opMessage) {
-        opMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            vm.clearMessage()
-        }
-    }
+    val (snackbarHostState, snackbarIsError) = rememberMessageSnackbar(
+        message = opMessage,
+        onClear = vm::clearMessage,
+    )
 
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -128,8 +123,28 @@ fun PayMonthContent(vm: PayMonthViewModel = hiltViewModel()) {
                 onEdit = { editing = PayGroup.BASIC to it },
                 extraAction = if (!isSite) {
                     {
-                        TextButton(onClick = { syncing = true }, modifier = Modifier.fillMaxWidth()) {
-                            Text(stringResource(R.string.paymonth_sync))
+                        Column(
+                            Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            // 同步本月考勤：原地确认 + 倒计时撤销（与导入上月同范式）
+                            InlineConfirmButton(
+                                idleText = stringResource(R.string.paymonth_sync),
+                                confirmText = stringResource(R.string.paymonth_sync_confirm_action),
+                                cancelText = stringResource(R.string.paymonth_cancel),
+                                undoText = stringResource(R.string.paymonth_undo),
+                                onConfirm = vm::syncFromRecords,
+                                onUndo = vm::undoSync,
+                                resetKey = month,
+                            )
+                            Spacer(Modifier.height(Spacing.xs))
+                            // 覆盖范围说明：从旧确认弹窗正文改成常驻提示（点之前就能看到，信息不丢失）
+                            Text(
+                                stringResource(R.string.paymonth_sync_hint),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                            )
                         }
                     }
                 } else null,
@@ -150,19 +165,20 @@ fun PayMonthContent(vm: PayMonthViewModel = hiltViewModel()) {
             PayGroupCard(PayGroup.OTHER, sheet.other, onEdit = { editing = PayGroup.OTHER to it })
             Spacer(Modifier.height(Spacing.l))
 
-            Button(
-                onClick = { importing = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(Radius.pill),
-            ) {
-                Text(stringResource(R.string.paymonth_import_prev))
-            }
+            InlineConfirmButton(
+                idleText = stringResource(R.string.paymonth_import_prev),
+                confirmText = stringResource(R.string.paymonth_import_confirm_action),
+                cancelText = stringResource(R.string.paymonth_cancel),
+                undoText = stringResource(R.string.paymonth_undo),
+                onConfirm = vm::importPrevMonth,
+                onUndo = vm::undoImport,
+                resetKey = month,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
             Spacer(Modifier.height(Spacing.l))
         }
 
-        SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter))
+        MessageSnackbarHost(snackbarHostState, snackbarIsError, Modifier.align(Alignment.BottomCenter))
     }
     editing?.let { (group, item) ->
         EditItemDialog(
@@ -190,38 +206,6 @@ fun PayMonthContent(vm: PayMonthViewModel = hiltViewModel()) {
                 adding = null
             },
             onDismiss = { adding = null },
-        )
-    }
-    if (importing) {
-        AlertDialog(
-            onDismissRequest = { importing = false },
-            title = { Text(stringResource(R.string.paymonth_import_title)) },
-            text = { Text(stringResource(R.string.paymonth_import_confirm)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    vm.importPrevMonth()
-                    importing = false
-                }) { Text(stringResource(R.string.paymonth_ok)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { importing = false }) { Text(stringResource(R.string.paymonth_cancel)) }
-            },
-        )
-    }
-    if (syncing) {
-        AlertDialog(
-            onDismissRequest = { syncing = false },
-            title = { Text(stringResource(R.string.paymonth_sync_title)) },
-            text = { Text(stringResource(R.string.paymonth_sync_confirm)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    vm.syncFromRecords()
-                    syncing = false
-                }) { Text(stringResource(R.string.paymonth_ok)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { syncing = false }) { Text(stringResource(R.string.paymonth_cancel)) }
-            },
         )
     }
 }

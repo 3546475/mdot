@@ -34,6 +34,30 @@ class ShiftRepository @Inject constructor(
         return Success(Unit)
     }
 
+    /**
+     * 撤销删除班次：按原 id/排序/状态插回（误删后在信息提示窗的撤销窗口内恢复）。
+     * 班次名在记录里是快照（`shiftName`），故删除/恢复都不影响已有记录。
+     */
+    suspend fun restore(shift: Shift): AppResult<Unit> = try {
+        dao.insertAll(
+            listOf(
+                ShiftEntity(
+                    id = shift.id,
+                    name = shift.name,
+                    sort = shift.sort,
+                    builtin = shift.builtin,
+                    hidden = shift.hidden,
+                    rest = shift.rest,
+                )
+            )
+        )
+        settings.touch()
+        Success(Unit)
+    } catch (e: Exception) {
+        e.rethrowIfCancellation()
+        Failure(AppError.Storage(e.message ?: "恢复失败"))
+    }
+
     suspend fun create(name: String): AppResult<Shift> {
         val trimmed = name.trim()
         if (trimmed.isEmpty() || trimmed.length > 10) return Failure(AppError.InvalidName)

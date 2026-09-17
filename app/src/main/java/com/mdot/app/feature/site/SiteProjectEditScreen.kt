@@ -19,8 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -56,6 +54,8 @@ import com.mdot.app.R
 import com.mdot.app.feature.record.toText
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.component.InlineConfirmButton
+import com.mdot.app.core.designsystem.component.InlineConfirmStyle
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.repository.SiteRepository
@@ -195,7 +195,6 @@ fun SiteProjectEditScreen(
     vm: SiteProjectEditViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
-    var confirmArchive by remember { mutableStateOf(false) }
     var showStandard by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.saved) {
@@ -265,15 +264,23 @@ fun SiteProjectEditScreen(
         ) { Text(stringResource(R.string.site_save)) }
 
         Spacer(Modifier.height(Spacing.m))
-        TextButton(
-            onClick = { confirmArchive = true },
+        // 删除/归档项目：原地确认（确认后返回列表，归档项可在「已归档区」一键恢复，故无需 toast 撤销）
+        InlineConfirmButton(
+            idleText = stringResource(R.string.site_project_archive),
+            confirmText = stringResource(R.string.site_project_archive),
+            cancelText = stringResource(R.string.site_dialog_cancel),
+            undoText = stringResource(R.string.site_project_archive),
+            onConfirm = { vm.archiveOrDelete(onDone = onBack) },
+            style = InlineConfirmStyle.Compact,
             modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(
-                stringResource(R.string.site_project_archive),
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        // 归档后果说明：从旧确认弹窗正文改为常驻提示
+        Text(
+            text = stringResource(R.string.site_project_archive_body),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         state.error?.let {
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
         }
@@ -288,23 +295,6 @@ fun SiteProjectEditScreen(
                 showStandard = false
             },
             onDismiss = { showStandard = false },
-        )
-    }
-
-    if (confirmArchive) {
-        AlertDialog(
-            onDismissRequest = { confirmArchive = false },
-            title = { Text(stringResource(R.string.site_project_archive_title)) },
-            text = { Text(stringResource(R.string.site_project_archive_body)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmArchive = false
-                    vm.archiveOrDelete(onDone = onBack)
-                }) { Text(stringResource(R.string.site_project_archive), color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmArchive = false }) { Text(stringResource(R.string.site_dialog_cancel)) }
-            },
         )
     }
 }

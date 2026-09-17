@@ -25,8 +25,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
+import com.mdot.app.core.designsystem.component.MessageSnackbarHost
+import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -63,6 +63,8 @@ import com.mdot.app.R
 import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.component.InlineConfirmButton
+import com.mdot.app.core.designsystem.component.InlineConfirmStyle
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.pressScale
@@ -176,9 +178,13 @@ fun SiteProjectsPane(
     val ui by vm.projectsUi.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     var showCreate by remember { mutableStateOf(false) }
-    var deleting by remember { mutableStateOf<SiteProject?>(null) }
     var purging by remember { mutableStateOf<SiteProject?>(null) }
-    val snackbarHostState = remember { SnackbarHostState() }
+    // 写操作结果提示：浅色悬浮胶囊（与关于页检查更新同范式）；message 仅在创建失败时赋值 → 错误语义
+    val (snackbarHostState, snackbarIsError) = rememberMessageSnackbar(
+        message = message,
+        onClear = vm::clearMessage,
+        isError = true,
+    )
 
     // 拖拽排序草稿（仿班次管理卡）
     var draftIds by remember { mutableStateOf<List<Long>>(emptyList()) }
@@ -190,13 +196,6 @@ fun SiteProjectsPane(
 
     LaunchedEffect(ui.projects) {
         if (draggingId == null) draftIds = ui.projects.sortedBy { it.sort }.map { it.id }
-    }
-
-    message?.let { msg ->
-        LaunchedEffect(msg) {
-            snackbarHostState.showSnackbar(msg)
-            vm.clearMessage()
-        }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -419,17 +418,17 @@ fun SiteProjectsPane(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
-                                    // 修改（进入项目设置）
-                                    RowIconAction(
-                                        iconRes = R.drawable.ic_ms_edit,
-                                        desc = stringResource(R.string.site_project_edit),
-                                    ) { onOpenProject(project.id) }
-                                    // 删除（有记录→归档）
-                                    RowIconAction(
-                                        iconRes = R.drawable.ic_ms_delete,
-                                        desc = stringResource(R.string.site_project_delete),
-                                        tint = MaterialTheme.colorScheme.error,
-                                    ) { deleting = project }
+                                    // 修改入口已由行主体「点击进入项目设置」承担，故不再单列编辑图标
+                                    // （腾出的宽度给删除的原地确认）。
+                                    // 删除项目：原地确认（有记录→归档，归档项可在「已归档区」一键恢复）
+                                    InlineConfirmButton(
+                                        idleText = stringResource(R.string.site_delete),
+                                        confirmText = stringResource(R.string.site_delete_confirm),
+                                        cancelText = stringResource(R.string.site_dialog_cancel),
+                                        undoText = stringResource(R.string.site_undo),
+                                        onConfirm = { vm.deleteProject(project.id) },
+                                        style = InlineConfirmStyle.Compact,
+                                    )
                                 }
                             }
                         }
@@ -519,8 +518,9 @@ fun SiteProjectsPane(
             Spacer(Modifier.height(Spacing.xl))
         }
 
-        SnackbarHost(
+        MessageSnackbarHost(
             hostState = snackbarHostState,
+            isError = snackbarIsError,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
@@ -555,27 +555,9 @@ fun SiteProjectsPane(
             },
         )
     }
-
-    // ---- 删除确认 ----
-    deleting?.let { p ->
-        AlertDialog(
-            onDismissRequest = { deleting = null },
-            title = { Text(stringResource(R.string.site_project_delete_title)) },
-            text = { Text(stringResource(R.string.site_project_delete_body)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    deleting = null
-                    vm.deleteProject(p.id)
-                }) { Text(stringResource(R.string.site_project_delete), color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                TextButton(onClick = { deleting = null }) { Text(stringResource(R.string.site_dialog_cancel)) }
-            },
-        )
-    }
 }
 
-/** 行内图标按钮（修改/删除） */
+/** 行内图标按钮（如已归档项的「彻底删除」） */
 @Composable
 private fun RowIconAction(
     iconRes: Int,

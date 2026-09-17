@@ -18,6 +18,7 @@ import com.mdot.app.domain.model.OtDraft
 import com.mdot.app.domain.model.RateTier
 import com.mdot.app.domain.model.RecordType
 import com.mdot.app.domain.model.TierSource
+import com.mdot.app.domain.model.WorkSystem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -155,6 +156,26 @@ class RecordRepository @Inject constructor(
         Failure(AppError.Storage(e.message ?: "删除失败"))
     }
 
+    /** 撤销「删除调休调整」：按原 id/时间插回（误删后在信息提示窗的撤销窗口内恢复） */
+    suspend fun restoreAdjustment(adjustment: CompAdjustment): AppResult<Unit> = try {
+        adjustDao.insertAll(
+            listOf(
+                CompAdjustmentEntity(
+                    id = adjustment.id,
+                    date = adjustment.date,
+                    deltaMinutes = adjustment.deltaMinutes,
+                    note = adjustment.note,
+                    createdAt = adjustment.createdAt,
+                )
+            )
+        )
+        settings.touch()
+        Success(Unit)
+    } catch (e: Exception) {
+        e.rethrowIfCancellation()
+        Failure(AppError.Storage(e.message ?: "恢复失败"))
+    }
+
     /** 切换到小时工制度时调用：清零转调休 + 删除所有调休手动调整记录 */
     suspend fun clearCompData() {
         recordDao.clearAllCompMinutes()
@@ -162,10 +183,39 @@ class RecordRepository @Inject constructor(
         settings.touch()
     }
 
+    /**
+     * 切换工时制度前的调休数据快照（供撤销）：即切到非标准工时时会被清空的全部内容——
+     * 标准工时的加班记录转调休分钟数 + 全部调休手动调整记录。
+     */
+    suspend fun snapshotCompData(): CompDataSnapshot = CompDataSnapshot(
+        toCompByRecordId = recordDao.getAll()
+            .filter { it.type == RecordType.OT.name && it.workSystem == WorkSystem.STANDARD.name && it.toCompMinutes != 0 }
+            .associate { it.id to it.toCompMinutes },
+        adjustments = adjustDao.getAll(),
+    )
+
+    /** 撤销切换工时制度：把快照里的转调休分钟数写回、把已删的调休调整记录插回 */
+    suspend fun restoreCompData(snapshot: CompDataSnapshot) {
+        if (snapshot.toCompByRecordId.isNotEmpty()) {
+            recordDao.getAll().forEach { rec ->
+                val minutes = snapshot.toCompByRecordId[rec.id] ?: return@forEach
+                if (rec.toCompMinutes != minutes) recordDao.update(rec.copy(toCompMinutes = minutes))
+            }
+        }
+        if (snapshot.adjustments.isNotEmpty()) adjustDao.insertAll(snapshot.adjustments)
+        settings.touch()
+    }
+
     companion object {
         const val MAX_MINUTES = 1440
     }
 }
+
+/** 切换工时制度会清空的调休数据快照（撤销用）：转调休分钟数 + 手动调整记录 */
+data class CompDataSnapshot(
+    val toCompByRecordId: Map<Long, Int>,
+    val adjustments: List<CompAdjustmentEntity>,
+)
 
 fun DailyRecordEntity.toDomain() = DailyRecord(
     id = id,

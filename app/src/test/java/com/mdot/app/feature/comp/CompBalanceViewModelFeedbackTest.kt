@@ -7,6 +7,7 @@ import com.mdot.app.core.database.AppDatabase
 import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.core.repository.RecordRepository
 import com.mdot.app.core.util.AppResult
+import com.mdot.app.domain.model.CompAdjustment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -81,10 +82,19 @@ class CompBalanceViewModelFeedbackTest {
         assertTrue("等待超时：$what（最后状态 ${vm.uiState.value}）", cond(vm.uiState.value))
     }
 
+    /** 实体 → 领域模型（测试里从 DAO 取回真实行后再喂给 VM.delete） */
+    private fun com.mdot.app.core.database.CompAdjustmentEntity.toAdjustment() = CompAdjustment(
+        id = id,
+        date = date,
+        deltaMinutes = deltaMinutes,
+        note = note,
+        createdAt = createdAt,
+    )
+
     @Test
     fun `删除调整记录成功时置已删除message且列表移除`() = runBlocking {
         assertTrue(repo.adjustComp(LocalDate.now(), 120, "测试备注") is AppResult.Success)
-        val id = db.compAdjustmentDao().getAll().first().id
+        val adj = db.compAdjustmentDao().getAll().first().toAdjustment()
 
         val vm = CompBalanceViewModel(repo)
         // uiState 是 WhileSubscribed 冷流，需先订阅激活（无 init collect 驱动）
@@ -92,15 +102,43 @@ class CompBalanceViewModelFeedbackTest {
         try {
             awaitUntil("调整记录应出现", vm) { it.adjustments.isNotEmpty() }
 
-            vm.delete(id)
+            vm.delete(adj)
             awaitUntil("列表应移除该行", vm) { it.adjustments.isEmpty() }
 
             assertEquals("删除成功应提示已删除", "已删除调整记录", vm.messageFlow.value?.text)
             assertEquals("成功提示不是错误态", false, vm.messageFlow.value?.isError)
+            assertEquals("删除成功应提供撤销入口", true, vm.messageFlow.value?.canUndo)
 
             // 复用 clearMessage（UI 侧 3s 自清入口）
             vm.clearMessage()
             assertEquals("clearMessage 应清空", null, vm.messageFlow.value)
+        } finally {
+            collectJob.cancel()
+        }
+    }
+
+    @Test
+    fun `撤销删除应把调整记录按原样插回`() = runBlocking {
+        assertTrue(repo.adjustComp(LocalDate.now(), 120, "测试备注") is AppResult.Success)
+        val adj = db.compAdjustmentDao().getAll().first().toAdjustment()
+        val originalId = adj.id
+
+        val vm = CompBalanceViewModel(repo)
+        val collectJob = launch { vm.uiState.collect {} }
+        try {
+            awaitUntil("调整记录应出现", vm) { it.adjustments.isNotEmpty() }
+
+            vm.delete(adj)
+            awaitUntil("列表应移除该行", vm) { it.adjustments.isEmpty() }
+
+            vm.undoDelete()
+            awaitUntil("撤销后记录应回来", vm) { it.adjustments.isNotEmpty() }
+
+            val back = db.compAdjustmentDao().getAll().first()
+            assertEquals("应插回原 id", originalId, back.id)
+            assertEquals("分钟数应一致", 120, back.deltaMinutes)
+            assertEquals("备注应一致", "测试备注", back.note)
+            assertEquals("撤销后应提示", "已撤销删除", vm.messageFlow.value?.text)
         } finally {
             collectJob.cancel()
         }

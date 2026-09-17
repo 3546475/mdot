@@ -27,14 +27,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
+import com.mdot.app.core.designsystem.component.MessageSnackbarHost
+import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -54,7 +51,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -68,7 +64,8 @@ import com.mdot.app.R
 import com.mdot.app.core.designsystem.Duration
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
-import com.mdot.app.core.designsystem.component.ConfirmDialog
+import com.mdot.app.core.designsystem.component.InlineConfirmButton
+import com.mdot.app.core.designsystem.component.InlineConfirmStyle
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.domain.model.Shift
@@ -208,38 +205,6 @@ private fun buildExample(anchor: Int): String {
     return period.toString()
 }
 
-/** 紧凑 34dp 图标按钮（班次行排序/菜单用）；涟漪已裁剪到圆角内 */
-@Composable
-private fun CompactIconButton(
-    icon: Painter,
-    contentDescription: String,
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-) {
-    val interaction = remember { MutableInteractionSource() }
-    Box(
-        modifier = Modifier
-            .size(34.dp)
-            .pressScale(interaction, pressedScale = 0.85f)
-            .clip(RoundedCornerShape(Radius.small))
-            .clickable(
-                interactionSource = interaction,
-                indication = LocalIndication.current,
-                enabled = enabled,
-                onClick = onClick,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            icon,
-            contentDescription = contentDescription,
-            modifier = Modifier.size(20.dp),
-            tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
-            else MaterialTheme.colorScheme.outline,
-        )
-    }
-}
-
 /** 工作日设定内容主体（设定多页签「工作日」页签复用；F7-4：影响档位自动判定的兜底） */
 @Composable
 fun WorkdaysPane(vm: WorkdaysViewModel = hiltViewModel()) {
@@ -281,18 +246,26 @@ fun WorkdaysPane(vm: WorkdaysViewModel = hiltViewModel()) {
 }
 
 /** 班次管理内容主体（设定多页签「班次」页签复用；F7-5：预置可隐藏不可删；自定义可增删改、排序）；
- *  仿底栏配置卡：左侧六点手柄拖动排序，Switch 控制显示/隐藏，⋮ 菜单收纳改名/删除 */
+ *  拖拽手柄排序，Switch 控制显示/隐藏，**点行主体改名**，行尾原地确认删除 + 底部提示窗撤销 */
 @Composable
 fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
     val shifts by vm.shifts.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val messageIsError by vm.messageIsError.collectAsStateWithLifecycle()
     var showCreate by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
     var renaming by remember { mutableStateOf<Shift?>(null) }
     var renameText by remember { mutableStateOf("") }
-    var deleting by remember { mutableStateOf<Shift?>(null) }
-    var menuFor by remember { mutableStateOf<Shift?>(null) }
-    val snackbarHostState = remember { SnackbarHostState() }
+    val messageCanUndo by vm.messageCanUndo.collectAsStateWithLifecycle()
+    // 结果提示：浅色悬浮胶囊（与关于页检查更新同范式；错误/成功自动选 ⚠/✓ 描边；删除班次时带「撤销」）
+    val undoLabel = stringResource(R.string.shifts_undo)
+    val (snackbarHostState, snackbarIsError) = rememberMessageSnackbar(
+        message = message,
+        onClear = vm::clearMessage,
+        isError = messageIsError,
+        actionLabel = if (messageCanUndo) undoLabel else null,
+        onAction = vm::undoDelete,
+    )
 
     // 拖拽排序状态（仿底栏配置卡）
     var draftIds by remember { mutableStateOf<List<Long>>(emptyList()) }
@@ -305,13 +278,6 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
     // 数据源变化且未在拖拽中时同步草稿顺序
     LaunchedEffect(shifts) {
         if (draggingId == null) draftIds = shifts.sortedBy { it.sort }.map { it.id }
-    }
-
-    message?.let { msg ->
-        LaunchedEffect(msg) {
-            snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Short)
-            vm.clearMessage()
-        }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -482,7 +448,21 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
                                             )
                                         }
                                         Spacer(Modifier.width(Spacing.m))
-                                        Column(Modifier.weight(1f)) {
+                                        // 行主体点击 = 改名（把原 ⋮ 菜单里的「改名」提到明面；拖拽手柄独立，不冲突）
+                                        val bodyInteraction = remember { MutableInteractionSource() }
+                                        Column(
+                                            Modifier
+                                                .weight(1f)
+                                                .pressScale(bodyInteraction, pressedScale = 0.98f)
+                                                .clip(RoundedCornerShape(Radius.small))
+                                                .clickable(
+                                                    interactionSource = bodyInteraction,
+                                                    indication = LocalIndication.current,
+                                                ) {
+                                                    renaming = shift
+                                                    renameText = shift.name
+                                                },
+                                        ) {
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -514,44 +494,24 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
                                         }
+                                        // 删除（仅自定义班次）：原地确认（只确认，不原地撤销：删除后本行即从列表消失）
+                                        // → 撤销由底部信息提示窗（Snackbar）承担
+                                        if (!shift.builtin) {
+                                            InlineConfirmButton(
+                                                idleText = stringResource(R.string.shifts_delete),
+                                                confirmText = stringResource(R.string.shifts_delete_confirm),
+                                                cancelText = stringResource(R.string.shifts_cancel),
+                                                undoText = stringResource(R.string.shifts_undo),
+                                                onConfirm = { vm.delete(shift) },
+                                                style = InlineConfirmStyle.Compact,
+                                            )
+                                            Spacer(Modifier.width(Spacing.xs))
+                                        }
                                         // 显示开关：开=显示，关=隐藏
                                         Switch(
                                             checked = !shift.hidden,
                                             onCheckedChange = { vm.setHidden(shift.id, !shift.hidden) },
                                         )
-                                        Spacer(Modifier.width(Spacing.xs))
-                                        Box {
-                                            CompactIconButton(painterResource(R.drawable.ic_ms_more_vert), stringResource(R.string.shifts_more_actions)) { menuFor = shift }
-                                            DropdownMenu(
-                                                expanded = menuFor?.id == shift.id,
-                                                onDismissRequest = { menuFor = null },
-                                            ) {
-                                                DropdownMenuItem(
-                                                    text = { Text(stringResource(R.string.shifts_rename)) },
-                                                    leadingIcon = { Icon(painterResource(R.drawable.ic_ms_edit), null) },
-                                                    onClick = {
-                                                        menuFor = null
-                                                        renaming = shift
-                                                        renameText = shift.name
-                                                    },
-                                                )
-                                                if (!shift.builtin) {
-                                                    DropdownMenuItem(
-                                                        text = { Text(stringResource(R.string.shifts_delete), color = MaterialTheme.colorScheme.error) },
-                                                        leadingIcon = {
-                                                            Icon(
-                                                                painterResource(R.drawable.ic_ms_delete), null,
-                                                                tint = MaterialTheme.colorScheme.error,
-                                                            )
-                                                        },
-                                                        onClick = {
-                                                            menuFor = null
-                                                            deleting = shift
-                                                        },
-                                                    )
-                                                }
-                                            }
-                                        }
                                     }
                                 }
                             }
@@ -563,11 +523,10 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
         }
 
         // 结果提示：悬浮在页面底部（而非内联在列表流里）
-        SnackbarHost(
+        MessageSnackbarHost(
             hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(Spacing.l),
+            isError = snackbarIsError,
+            modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
 
@@ -603,17 +562,6 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
     }
 
     // 删除（二次确认；预置班次不提供入口）
-    deleting?.let { target ->
-        ConfirmDialog(
-            title = stringResource(R.string.shifts_delete_title, target.name),
-            text = stringResource(R.string.shifts_delete_text),
-            onConfirm = {
-                vm.delete(target.id)
-                deleting = null
-            },
-            onDismiss = { deleting = null },
-        )
-    }
 }
 
 

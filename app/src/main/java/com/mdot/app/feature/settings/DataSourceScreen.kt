@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalContentColor
@@ -440,8 +442,9 @@ private fun UpdateActionButton(
     // 收缩动画 spec（fastSpatialSpec 是 @Composable 泛型函数，须显式 <Float> 且在 Composable 上下文先取值）
     val shrinkSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
     val shrink = remember { Animatable(0f) }
-    LaunchedEffect(busy) {
-        shrink.animateTo(if (busy) 1f else 0f, shrinkSpec)
+    val compact = busy || state is UpdateState.Available
+    LaunchedEffect(compact) {
+        shrink.animateTo(if (compact) 1f else 0f, shrinkSpec)
     }
     var idleWpx by remember { mutableStateOf(0) }
     val density = LocalDensity.current
@@ -483,14 +486,20 @@ private fun UpdateActionButton(
                 )
                 .onGloballyPositioned {
                     // 记录 idle 自然宽（idle 时按钮宽 = interp = idleW，稳定不循环）
-                    if (!busy && it.size.width > idleWpx) idleWpx = it.size.width
+                    if (!compact && it.size.width > idleWpx) idleWpx = it.size.width
                 },
         ) {
             // busy 态只显示圆环（Button 内容默认居中），无文字——用户明确要求；
             // 非 busy 态显示状态文字；文字直接切换（不用 Crossfade——新旧文字交叉淡化
             // 的瞬间观感是「闪」，用户已否）。
             ButtonSpinner(busy = busy, progress = progress)
-            if (!busy) {
+            if (state is UpdateState.Available) {
+                Icon(
+                    imageVector = Icons.Filled.Download,
+                    contentDescription = label,
+                    modifier = Modifier.size(ButtonDefaults.IconSize),
+                )
+            } else if (!busy) {
                 Text(
                     label,
                     style = MaterialTheme.typography.labelLarge,

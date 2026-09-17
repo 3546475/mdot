@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.LocalDate
 import java.time.YearMonth
 import javax.inject.Inject
@@ -91,6 +93,15 @@ class PayMonthViewModel @Inject constructor(
             }
         }
 
+    /** 覆盖前快照（撤销用）：导入上月 / 同步考勤各留一份，仅各自最近一次有效 */
+    private var importBackup: PayMonthSheet? = null
+    private var importBackupMonth: YearMonth? = null
+    private var syncBackup: PayMonthSheet? = null
+    private var syncBackupMonth: YearMonth? = null
+
+    /** 覆盖/撤销串行化：防止「撤销早于覆盖落盘」导致撤销结果被覆盖 */
+    private val sheetEditMutex = Mutex()
+
     fun prevMonth() {
         _month.value = _month.value.minusMonths(1)
     }
@@ -117,22 +128,56 @@ class PayMonthViewModel @Inject constructor(
     /** 导入上月：上月单据整体覆盖本月（上月未编辑过则用出厂单） */
     fun importPrevMonth() {
         val cur = _month.value
+        // 同步取快照（sheet 已是 StateFlow 值），避免「撤销早于导入落盘」被覆盖的竞态
+        importBackup = sheet.value
+        importBackupMonth = cur
         viewModelScope.launch {
-            val prev = settings.payMonthFlow(cur.minusMonths(1).toString()).first() ?: PayMonthSheet.default()
-            settings.setPayMonth(cur.toString(), prev)
-            message.value = "已导入上月模板"
+            sheetEditMutex.withLock {
+                val prev = settings.payMonthFlow(cur.minusMonths(1).toString()).first() ?: PayMonthSheet.default()
+                settings.setPayMonth(cur.toString(), prev)
+            }
         }
     }
 
-    /** 同步本月考勤：加班工资/基本工资/事假/病假 ← PayrollCalculator 当月结果（可再手改） */
+    /** 撤销最近一次导入上月：恢复导入前的本月快照（仍在本月时；翻月后作废） */
+    fun undoImport() {
+        val backup = importBackup ?: return
+        val month = importBackupMonth ?: return
+        importBackup = null
+        importBackupMonth = null
+        viewModelScope.launch {
+            sheetEditMutex.withLock {
+                if (month == _month.value) settings.setPayMonth(month.toString(), backup)
+            }
+        }
+    }
+
+    /** 同步本月考勤：加班工资/基本工资/事假/病假 ← PayrollCalculator 当月结果（可再手改）；覆盖前快照供撤销 */
     fun syncFromRecords() {
         viewModelScope.launch {
             if (isSite.value) return@launch // 工地无引擎值
             // 订阅冷流触发计算并等到首个非空结果（修：stateIn .value 在无订阅者时恒为初始 null，点一次无效）
             val out = monthCalc.filterNotNull().first()
             val fillBase = settings.salaryFlow.first().includeBase
-            settings.setPayMonth(_month.value.toString(), applyRecordSync(sheet.value, out, fillBase))
-            message.value = "已同步本月考勤"
+            sheetEditMutex.withLock {
+                val cur = _month.value
+                syncBackup = sheet.value
+                syncBackupMonth = cur
+                settings.setPayMonth(cur.toString(), applyRecordSync(sheet.value, out, fillBase))
+            }
+        }
+    }
+
+    /** 撤销最近一次同步考勤：恢复同步前的本月快照（仍在本月时；翻月后作废） */
+    fun undoSync() {
+        val backup = syncBackup ?: return
+        val month = syncBackupMonth ?: return
+        syncBackup = null
+        syncBackupMonth = null
+        viewModelScope.launch {
+            sheetEditMutex.withLock {
+                if (month == _month.value) settings.setPayMonth(month.toString(), backup)
+            }
         }
     }
 

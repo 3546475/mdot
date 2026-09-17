@@ -18,8 +18,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -29,7 +27,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -41,7 +38,8 @@ import androidx.lifecycle.viewModelScope
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.AnimatedNumberText
-import com.mdot.app.core.designsystem.component.ConfirmDialog
+import com.mdot.app.core.designsystem.component.InlineConfirmButton
+import com.mdot.app.core.designsystem.component.InlineConfirmStyle
 import com.mdot.app.core.designsystem.component.MessageSnackbarHost
 import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import com.mdot.app.core.designsystem.component.SectionCard
@@ -73,7 +71,7 @@ class CompBalanceViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val message = MutableStateFlow<Message?>(null)
-    data class Message(val text: String, val isError: Boolean = false)
+    data class Message(val text: String, val isError: Boolean = false, val canUndo: Boolean = false)
 
     val uiState: StateFlow<CompBalanceUiState> = combine(
         recordRepo.observeCompBalance(),
@@ -106,14 +104,33 @@ class CompBalanceViewModel @Inject constructor(
         }
     }
 
-    fun delete(id: Long) {
+    fun delete(adj: CompAdjustment) {
         viewModelScope.launch {
-            when (val r = recordRepo.deleteAdjustment(id)) {
-                is AppResult.Success -> message.value = Message("已删除调整记录")
+            when (val r = recordRepo.deleteAdjustment(adj.id)) {
+                is AppResult.Success -> {
+                    // 立即删除 + 提示窗给撤销（本行随即从列表消失，无法在按钮内原地撤销）
+                    lastDeleted = adj
+                    message.value = Message("已删除调整记录", canUndo = true)
+                }
                 is AppResult.Failure -> message.value = Message(r.error.toText(), isError = true)
             }
         }
     }
+
+    /** 撤销最近一次删除：按原记录插回（仅最近一次有效） */
+    fun undoDelete() {
+        val adj = lastDeleted ?: return
+        lastDeleted = null
+        viewModelScope.launch {
+            when (val r = recordRepo.restoreAdjustment(adj)) {
+                is AppResult.Success -> message.value = Message("已撤销删除")
+                is AppResult.Failure -> message.value = Message(r.error.toText(), isError = true)
+            }
+        }
+    }
+
+    /** 最近一次删除的调整记录（撤销用） */
+    private var lastDeleted: CompAdjustment? = null
 }
 
 /** 调休余额内容主体（设定多页签「调休」页签复用）：查看余额、手动补差/扣减（留痕）、删除误操作调整 */
@@ -127,7 +144,6 @@ fun CompBalancePane(
     var add by remember { mutableStateOf(true) }
     var hours by remember { mutableStateOf<Double?>(null) }
     var note by remember { mutableStateOf("") }
-    var deleting by remember { mutableStateOf<CompAdjustment?>(null) }
 
     Box(Modifier.fillMaxSize()) {
     Column(
@@ -266,14 +282,16 @@ fun CompBalancePane(
                                     )
                                 }
                             }
-                            IconButton(onClick = { deleting = adj }) {
-                                Icon(
-                                    painterResource(R.drawable.ic_ms_delete),
-                                    contentDescription = stringResource(R.string.comp_delete_cd),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
+                            // 删除调整：原地确认（只确认，不原地撤销：删除后本行即从列表消失）
+                            // → 撤销由下方信息提示窗（Snackbar）承担
+                            InlineConfirmButton(
+                                idleText = stringResource(R.string.comp_delete),
+                                confirmText = stringResource(R.string.comp_delete_confirm),
+                                cancelText = stringResource(R.string.comp_cancel),
+                                undoText = stringResource(R.string.comp_undo),
+                                onConfirm = { vm.delete(adj) },
+                                style = InlineConfirmStyle.Compact,
+                            )
                         }
                         Spacer(Modifier.height(Spacing.xs))
                     }
@@ -283,25 +301,13 @@ fun CompBalancePane(
         Spacer(Modifier.height(Spacing.xl))
     }
 
-    deleting?.let { adj ->
-        ConfirmDialog(
-            title = stringResource(R.string.comp_delete_confirm_title),
-            text = "${TimeUtils.mdCn(adj.date)} ${if (adj.deltaMinutes >= 0) "+" else "-"}" +
-                "${TimeUtils.prettyDuration(kotlin.math.abs(adj.deltaMinutes))}" +
-                (adj.note?.let { stringResource(R.string.comp_note_paren, it) } ?: "") +
-                stringResource(R.string.comp_delete_confirm_suffix),
-            onConfirm = {
-                vm.delete(adj.id)
-                deleting = null
-            },
-            onDismiss = { deleting = null },
-        )
-    }
-
+    val undoLabel = stringResource(R.string.comp_undo)
     val (snackbarHostState, snackbarIsError) = rememberMessageSnackbar(
         message = msg?.text,
         onClear = vm::clearMessage,
         isError = msg?.isError == true,
+        actionLabel = if (msg?.canUndo == true) undoLabel else null,
+        onAction = vm::undoDelete,
     )
     MessageSnackbarHost(snackbarHostState, snackbarIsError, Modifier.align(Alignment.BottomCenter))
     }

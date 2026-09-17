@@ -35,8 +35,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
+import com.mdot.app.core.designsystem.component.MessageSnackbarHost
+import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -412,15 +412,12 @@ fun CalendarScreen(
     var showBatchDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     // 已有加班记录的选中天数（弹层/操作条覆盖提示）
     val overwriteCount = batchSelected.count { d -> state.cells.any { it.date == d && it.otMinutes > 0 } }
-    // T1-2：批量保存结果 Snackbar（docs/15）
-    val snackbarHostState = remember { SnackbarHostState() }
+    // T1-2：批量保存结果 Snackbar（docs/15）：浅色悬浮胶囊（与关于页检查更新同范式）
     val batchMessage by vm.messageFlow.collectAsStateWithLifecycle()
-    androidx.compose.runtime.LaunchedEffect(batchMessage) {
-        batchMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            vm.clearMessage()
-        }
-    }
+    val (snackbarHostState, snackbarIsError) = rememberMessageSnackbar(
+        message = batchMessage,
+        onClear = vm::clearMessage,
+    )
     // T1-1：批量保存触觉（LongPress）
     val saveHaptic = rememberSaveWithHaptic()
     // 多选模式下系统返回先退出多选，不退出日历页
@@ -502,7 +499,7 @@ fun CalendarScreen(
             }
         }
 
-        SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter))
+        MessageSnackbarHost(snackbarHostState, snackbarIsError, Modifier.align(Alignment.BottomCenter))
     }
     if (showBatchDialog) {
         BatchOtDialog(

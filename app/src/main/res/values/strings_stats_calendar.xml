@@ -22,11 +22,11 @@
     <string name="paymonth_cancel">取消</string>
     <string name="paymonth_ok">确定</string>
     <string name="paymonth_import_prev">导入上月</string>
-    <string name="paymonth_import_title">导入上月</string>
-    <string name="paymonth_import_confirm">将用上月数据覆盖本月记录，确定？</string>
+    <string name="paymonth_import_confirm_action">确认覆盖</string>
+    <string name="paymonth_undo">撤销</string>
     <string name="paymonth_sync">同步本月考勤</string>
-    <string name="paymonth_sync_title">同步本月考勤</string>
-    <string name="paymonth_sync_confirm">将按本月加班/请假记录覆盖：加班工资、事假、病假（已设底薪时含基本工资），继续？</string>
+    <string name="paymonth_sync_confirm_action">确认同步</string>
+    <string name="paymonth_sync_hint">按本月加班/请假记录覆盖加班工资、事假、病假（已设底薪时含基本工资）</string>
     <!-- 记月添加条目预选项（参考主流记工记账 App 常见工资项） -->
     <string-array name="paymonth_subsidy_presets">
         <item>高温补贴</item>
@@ -117,10 +117,10 @@
     <string name="comp_btn_deduct">扣减调休</string>
     <string name="comp_history_title">调整记录</string>
     <string name="comp_history_empty">还没有手动调整记录</string>
-    <string name="comp_delete_cd">删除该笔调整</string>
-    <string name="comp_delete_confirm_title">删除这笔调整？</string>
-    <string name="comp_note_paren">（%1$s）</string>
-    <string name="comp_delete_confirm_suffix">"\n余额会同步回退，此操作不可撤销。"</string>
+    <string name="comp_delete">删除</string>
+    <string name="comp_delete_confirm">确认删除</string>
+    <string name="comp_cancel">取消</string>
+    <string name="comp_undo">撤销</string>
     <!-- 工地记工统计（Phase 2） -->
     <string name="stats_site_empty_hint">这个区间还没有工地记录，去记一笔工</string>
     <string name="site_stat_works">工数合计</string>

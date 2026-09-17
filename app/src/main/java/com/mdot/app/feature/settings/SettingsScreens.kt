@@ -5,10 +5,12 @@ import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,13 +29,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +53,8 @@ import com.mdot.app.R
 import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.component.InlineConfirmButton
+import com.mdot.app.core.designsystem.component.InlineConfirmPhase
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.MessageSnackbarHost
 import com.mdot.app.core.designsystem.component.SegmentBar
@@ -98,49 +100,52 @@ fun SystemSwitchScreen(onBack: () -> Unit) {
         JiabanTopBar(title = stringResource(R.string.settings_switch_title), onBack = onBack)
         Spacer(Modifier.height(Spacing.m))
 
-        SystemCard(
-            title = stringResource(R.string.settings_system_standard),
-            desc = stringResource(R.string.settings_system_standard_desc),
-            enabled = true,
-            isSelected = currentSystem == WorkSystem.STANDARD,
-            onClick = {
-                if (currentSystem != WorkSystem.STANDARD) pendingSystem = WorkSystem.STANDARD
-            },
+        // 四种工时制度：点卡即在**该卡下方原地展开确认**（不弹窗）；确认后可倒计时撤销。
+        // 不额外加提示行（切换后果已在页底 settings_switch_warning 统一说明）。
+        val systems = listOf(
+            WorkSystem.STANDARD,
+            WorkSystem.HOURLY,
+            WorkSystem.COMPREHENSIVE,
+            WorkSystem.SITE,
         )
-        Spacer(Modifier.height(Spacing.m))
-
-        SystemCard(
-            title = stringResource(R.string.settings_system_hourly),
-            desc = stringResource(R.string.settings_system_desc_hourly),
-            enabled = true,
-            isSelected = currentSystem == WorkSystem.HOURLY,
-            onClick = {
-                if (currentSystem != WorkSystem.HOURLY) pendingSystem = WorkSystem.HOURLY
-            },
-        )
-        Spacer(Modifier.height(Spacing.m))
-
-        SystemCard(
-            title = stringResource(R.string.settings_system_comprehensive),
-            desc = stringResource(R.string.settings_system_comprehensive_desc),
-            enabled = true,
-            isSelected = currentSystem == WorkSystem.COMPREHENSIVE,
-            onClick = {
-                if (currentSystem != WorkSystem.COMPREHENSIVE) pendingSystem = WorkSystem.COMPREHENSIVE
-            },
-        )
-        Spacer(Modifier.height(Spacing.m))
-
-        SystemCard(
-            title = stringResource(R.string.settings_system_construction),
-            desc = stringResource(R.string.site_system_desc),
-            enabled = true,
-            isSelected = currentSystem == WorkSystem.SITE,
-            onClick = {
-                if (currentSystem != WorkSystem.SITE) pendingSystem = WorkSystem.SITE
-            },
-        )
-        Spacer(Modifier.height(Spacing.xl))
+        systems.forEach { sys ->
+            SystemCard(
+                title = stringResource(systemTitleRes(sys)),
+                desc = stringResource(systemDescRes(sys)),
+                enabled = true,
+                isSelected = currentSystem == sys,
+                onClick = { if (currentSystem != sys) pendingSystem = sys },
+            )
+            // 原地确认：入场/退场都做动画（高度展开/收拢 + 淡入淡出，走 motionScheme），
+            // 否则按钮会生硬地凭空出现/消失。
+            // resetOnSettle=false：收尾时不先跳回 Idle，退场期间内容保持原样（不会闪一下白态）。
+            AnimatedVisibility(
+                visible = pendingSystem == sys,
+                enter = fadeIn(MaterialTheme.motionScheme.fastEffectsSpec()) +
+                    expandVertically(animationSpec = MaterialTheme.motionScheme.fastSpatialSpec()),
+                exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()) +
+                    shrinkVertically(animationSpec = MaterialTheme.motionScheme.fastSpatialSpec()),
+            ) {
+                Column(Modifier.fillMaxWidth()) {
+                    Spacer(Modifier.height(Spacing.s))
+                    InlineConfirmButton(
+                        idleText = sys.displayName,
+                        confirmText = stringResource(R.string.settings_confirm_switch),
+                        cancelText = stringResource(R.string.settings_cancel),
+                        undoText = stringResource(R.string.settings_undo),
+                        onConfirm = { hub.switchWorkSystem(sys) },
+                        onUndo = { hub.undoSwitchWorkSystem() },
+                        startPhase = InlineConfirmPhase.Asking,
+                        onSettled = { pendingSystem = null },
+                        resetOnSettle = false,
+                        resetKey = sys,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    )
+                }
+            }
+            Spacer(Modifier.height(Spacing.m))
+        }
+        Spacer(Modifier.height(Spacing.s))
 
         Text(
             text = stringResource(R.string.settings_switch_warning),
@@ -148,35 +153,20 @@ fun SystemSwitchScreen(onBack: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
 
-    // ---- 切换确认对话框 ----
-    pendingSystem?.let { target ->
-        AlertDialog(
-            onDismissRequest = { pendingSystem = null },
-            title = { Text(stringResource(R.string.settings_switch_confirm_title, target.displayName)) },
-            text = {
-                Text(
-                    when (target) {
-                        WorkSystem.HOURLY -> stringResource(R.string.settings_switch_confirm_hourly)
-                        WorkSystem.COMPREHENSIVE -> stringResource(R.string.settings_switch_confirm_comprehensive)
-                        WorkSystem.STANDARD -> stringResource(R.string.settings_switch_confirm_standard)
-                        WorkSystem.SITE -> stringResource(R.string.site_switch_confirm)
-                    },
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        hub.switchWorkSystem(target)
-                        pendingSystem = null
-                    },
-                ) { Text(stringResource(R.string.settings_confirm_switch)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingSystem = null }) { Text(stringResource(R.string.settings_cancel)) }
-            },
-        )
-    }
+private fun systemTitleRes(sys: WorkSystem) = when (sys) {
+    WorkSystem.STANDARD -> R.string.settings_system_standard
+    WorkSystem.HOURLY -> R.string.settings_system_hourly
+    WorkSystem.COMPREHENSIVE -> R.string.settings_system_comprehensive
+    WorkSystem.SITE -> R.string.settings_system_construction
+}
+
+private fun systemDescRes(sys: WorkSystem) = when (sys) {
+    WorkSystem.STANDARD -> R.string.settings_system_standard_desc
+    WorkSystem.HOURLY -> R.string.settings_system_desc_hourly
+    WorkSystem.COMPREHENSIVE -> R.string.settings_system_comprehensive_desc
+    WorkSystem.SITE -> R.string.site_system_desc
 }
 
 @Composable

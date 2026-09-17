@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.core.holiday.HolidayRepository
+import com.mdot.app.core.repository.CompDataSnapshot
 import com.mdot.app.core.repository.RecordRepository
 import com.mdot.app.core.repository.ShiftRepository
 import com.mdot.app.core.sync.SyncEngine
@@ -71,17 +72,54 @@ class ShiftsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val message = MutableStateFlow<String?>(null)
+    /** message 的错误语义：失败类提示 true（渲染 ⚠ + error 描边），成功类 false（✓） */
+    val messageIsError = MutableStateFlow(false)
+    /** message 是否带「撤销」动作（删除班次成功时为 true） */
+    val messageCanUndo = MutableStateFlow(false)
+    /** 最近一次删除的班次（撤销用；仅最近一次有效） */
+    private var lastDeleted: Shift? = null
 
     fun create(name: String) = viewModelScope.launch {
-        repo.create(name).let { r -> message.value = r.messageOrSuccess("已添加") }
+        repo.create(name).let { r -> postResultMessage(r, "已添加") }
     }
 
     fun rename(id: Long, name: String) = viewModelScope.launch {
-        repo.rename(id, name).let { r -> message.value = r.messageOrSuccess("已改名") }
+        repo.rename(id, name).let { r -> postResultMessage(r, "已改名") }
     }
 
-    fun delete(id: Long) = viewModelScope.launch {
-        repo.delete(id).let { r -> message.value = r.messageOrSuccess("已删除") }
+    fun delete(shift: Shift) = viewModelScope.launch {
+        when (val r = repo.delete(shift.id)) {
+            is AppResult.Success -> {
+                // 立即删除 + 提示窗给撤销（本行随即从列表消失，无法在按钮内原地撤销）
+                lastDeleted = shift
+                messageIsError.value = false
+                messageCanUndo.value = true
+                message.value = "已删除班次「${shift.name}」"
+            }
+            is AppResult.Failure -> postResultMessage(r, "已删除")
+        }
+    }
+
+    /** 撤销最近一次删除：按原 id/排序插回（仅最近一次有效） */
+    fun undoDelete() {
+        val shift = lastDeleted ?: return
+        lastDeleted = null
+        viewModelScope.launch {
+            when (val r = repo.restore(shift)) {
+                is AppResult.Success -> {
+                    messageIsError.value = false
+                    messageCanUndo.value = false
+                    message.value = "已撤销删除"
+                }
+                is AppResult.Failure -> postResultMessage(r, "已撤销删除")
+            }
+        }
+    }
+
+    private fun postResultMessage(r: AppResult<*>, ok: String) {
+        messageIsError.value = r is AppResult.Failure
+        messageCanUndo.value = false
+        message.value = r.messageOrSuccess(ok)
     }
 
     fun setHidden(id: Long, hidden: Boolean) = viewModelScope.launch {
@@ -107,6 +145,8 @@ class ShiftsViewModel @Inject constructor(
 
     fun clearMessage() {
         message.value = null
+        messageIsError.value = false
+        messageCanUndo.value = false
     }
 }
 
@@ -422,12 +462,14 @@ class SettingsHubViewModel @Inject constructor(
     /**
      * 切换工时制度（08 文档 §2.3 F-H1、10 文档 F-Z1）。
      * 切到非标准工时（小时工/综合工时均无调休基础，10 文档 D4）时清理调休数据：
-     * 转调休清零 + 删除调休手动调整记录。
+     * 转调休清零 + 删除调休手动调整记录。清理前快照调休数据，供按钮原地撤销。
      */
     fun switchWorkSystem(system: WorkSystem) {
         viewModelScope.launch {
             val current = settings.salaryFlow.first()
             if (current.workSystem == system) return@launch
+            // 先快照（切到非标准工时会清空调休数据）→ 供 undoSwitchWorkSystem 还原
+            val snapshot = recordRepo.snapshotCompData()
             val next = current.copy(workSystem = system)
             settings.setSalary(next)
             if (system != WorkSystem.STANDARD) {
@@ -437,8 +479,24 @@ class SettingsHubViewModel @Inject constructor(
             if (system == WorkSystem.SITE) {
                 siteRepo.currentProjectId()
             }
+            switchBackup = current.workSystem to snapshot
         }
     }
+
+    /** 撤销最近一次切换工时制度：切回原制度 + 还原被清空的调休数据（仅最近一次有效） */
+    fun undoSwitchWorkSystem() {
+        val (back, snapshot) = switchBackup ?: return
+        switchBackup = null
+        viewModelScope.launch {
+            val current = settings.salaryFlow.first()
+            if (current.workSystem == back) return@launch
+            settings.setSalary(current.copy(workSystem = back))
+            recordRepo.restoreCompData(snapshot)
+        }
+    }
+
+    /** 最近一次切换工时的撤销快照：原制度 + 被清空的调休数据 */
+    private var switchBackup: Pair<WorkSystem, CompDataSnapshot>? = null
 }
 
 /** 首页卡片配置（v0.6.0 首页卡片可编辑）：开关显隐 + 拖拽排序；至少保留一张 */

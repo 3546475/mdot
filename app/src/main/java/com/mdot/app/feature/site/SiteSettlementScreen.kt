@@ -18,7 +18,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarHost
+import com.mdot.app.core.designsystem.component.MessageSnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
@@ -48,6 +48,8 @@ import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.SiteMoneyColors
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.AnimatedMoneyText
+import com.mdot.app.core.designsystem.component.InlineConfirmButton
+import com.mdot.app.core.designsystem.component.InlineConfirmStyle
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.SettingRow
 import com.mdot.app.core.designsystem.component.SectionCard
@@ -281,6 +283,8 @@ fun SiteSettlementPane(
     val scope = rememberCoroutineScope()
 
     val snackbarHostState = remember { SnackbarHostState() }
+    // 错误/撤销两类提示共用一个 host：显示前置 isError 标志，渲染层据此选 ⚠/✓ 描边胶囊
+    var snackbarIsError by remember { mutableStateOf(false) }
 
     // #21 文案（Composable 体内求值后供局部 fun 使用）
     val pieceDeletedMsg = stringResource(R.string.site_piece_deleted)
@@ -292,6 +296,7 @@ fun SiteSettlementPane(
         saveHaptic()
         vm.deletePiece(piece.id)
         scope.launch {
+            snackbarIsError = false
             val result = snackbarHostState.showSnackbar(
                 message = pieceDeletedMsg,
                 actionLabel = undoLabel,
@@ -306,6 +311,7 @@ fun SiteSettlementPane(
         saveHaptic()
         vm.deleteAdvance(adv.id)
         scope.launch {
+            snackbarIsError = false
             val result = snackbarHostState.showSnackbar(
                 message = advanceDeletedMsg,
                 actionLabel = undoLabel,
@@ -318,6 +324,7 @@ fun SiteSettlementPane(
     // 写操作失败提示：悬浮页底（与项目管理页同范式；T0-1 前 VM 各处 message 均无渲染点）
     state.message?.let { msg ->
         LaunchedEffect(msg) {
+            snackbarIsError = true
             snackbarHostState.showSnackbar(msg)
             vm.clearMessage()
         }
@@ -430,9 +437,16 @@ fun SiteSettlementPane(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
-                                    TextButton(onClick = { deletePieceWithUndo(piece) }) {
-                                        Text(stringResource(R.string.site_delete), color = MaterialTheme.colorScheme.error)
-                                    }
+                                    // 原地确认（只确认，不原地撤销：删除后本行即从列表消失，撤销 UI 无处安放）
+                                    // → 撤销仍由底部信息提示窗（Snackbar）承担
+                                    InlineConfirmButton(
+                                        idleText = stringResource(R.string.site_delete),
+                                        confirmText = stringResource(R.string.site_delete_confirm),
+                                        cancelText = stringResource(R.string.site_dialog_cancel),
+                                        undoText = stringResource(R.string.site_undo),
+                                        onConfirm = { deletePieceWithUndo(piece) },
+                                        style = InlineConfirmStyle.Compact,
+                                    )
                                 }
                             }
                         }
@@ -466,9 +480,15 @@ fun SiteSettlementPane(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
-                                    TextButton(onClick = { deleteAdvanceWithUndo(adv) }) {
-                                        Text(stringResource(R.string.site_delete), color = MaterialTheme.colorScheme.error)
-                                    }
+                                    // 同包工行：原地确认 + 底部信息提示窗撤销
+                                    InlineConfirmButton(
+                                        idleText = stringResource(R.string.site_delete),
+                                        confirmText = stringResource(R.string.site_delete_confirm),
+                                        cancelText = stringResource(R.string.site_dialog_cancel),
+                                        undoText = stringResource(R.string.site_undo),
+                                        onConfirm = { deleteAdvanceWithUndo(adv) },
+                                        style = InlineConfirmStyle.Compact,
+                                    )
                                 }
                             }
                         }
@@ -540,11 +560,10 @@ fun SiteSettlementPane(
         }
 
         // 结果提示：悬浮在页面底部（而非内联在列表流里）
-        SnackbarHost(
+        MessageSnackbarHost(
             hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = Spacing.l),
+            isError = snackbarIsError,
+            modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
 
