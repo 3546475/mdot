@@ -466,7 +466,15 @@ private fun AppRootContent(
                         SystemSwitchScreen(
                             onBack = { navController.popBackStack() },
                             // 切换确认生效（撤销倒计时结束）后自动回首页（Tab 式导航，恢复首页状态）
-                            onAutoHome = { navTo(navController, Routes.HOME, slots) },
+                            onAutoHome = {
+                                // 回首页用**纯弹栈**：实测 navigate(HOME) + popUpTo(start){saveState}+restoreState
+                                // 在这里是 no-op（currentDestination 不变、界面不动，debug/release 一样，见 docs/11 043）——
+                                // 弹栈不走那套 saved-state 机制，也不受 Tab 防抖影响。
+                                if (!navController.popBackStack(Routes.HOME, inclusive = false)) {
+                                    // 万一首页不在栈里（异常状态）：直接重建到首页
+                                    navTo(navController, Routes.HOME, slots, clearStack = true)
+                                }
+                            },
                         )
                     }
                 }
