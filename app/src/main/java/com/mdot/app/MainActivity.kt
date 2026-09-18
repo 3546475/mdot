@@ -91,11 +91,16 @@ fun MdJiabanApp(appVm: AppViewModel = hiltViewModel()) {
     val firstLaunchDone by appVm.firstLaunchDone.collectAsStateWithLifecycle()
 
     JiabanTheme(appearance = appearance) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background,
+        // 弹层背景效果档位（外观页可选）全局下发：SheetBackdropLayer 据此决定缩放/模糊/压暗组合
+        androidx.compose.runtime.CompositionLocalProvider(
+            com.mdot.app.core.designsystem.component.LocalSheetBackdropMode provides appearance.sheetBackdropMode
         ) {
-            AppRoot(firstLaunchDone = firstLaunchDone, appVm = appVm)
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background,
+            ) {
+                AppRoot(firstLaunchDone = firstLaunchDone, appVm = appVm)
+            }
         }
     }
 }

@@ -63,6 +63,8 @@ data class AppearanceConfig(
     val paletteId: String = PALETTE_CLASSIC_BLUE,
     /** Android 12+ 动态取色开关 */
     val dynamicColor: Boolean = true,
+    /** 底部弹层背景效果（压暗 / 模糊 / 模糊缩小），默认模糊（v0.6.19 出厂默认） */
+    val sheetBackdropMode: SheetBackdropMode = SheetBackdropMode.BLUR,
 ) {
     companion object {
         const val PALETTE_CLASSIC_BLUE = "classic_blue"
@@ -100,8 +102,8 @@ data class HomeCardsConfig(
     companion object {
         /** 卡片功能池（含默认隐藏的统计卡；「记加班」主按钮为固定悬浮胶囊，不参与配置） */
         val POOL = listOf("data", "income", "entries", "heatmap", "weekbar", "monthbar")
-        /** 出厂默认显示顺序（热点图/本周柱状默认隐藏，可在配置页开启） */
-        val DEFAULT_CARDS = listOf("data", "income", "entries")
+        /** 出厂默认显示顺序：数据区 → 收入卡 → 日历/统计入口 → 本周柱状（热点图/月柱状默认隐藏，可在配置页开启） */
+        val DEFAULT_CARDS = listOf("data", "income", "entries", "weekbar")
         /** 至少保留的卡片数（防整页清空无从下手） */
         const val MIN_CARDS = 1
     }

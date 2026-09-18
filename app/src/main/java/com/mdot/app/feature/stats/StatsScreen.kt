@@ -39,11 +39,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.drawText
@@ -55,6 +59,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -74,6 +80,7 @@ import com.mdot.app.core.designsystem.component.KeyValue
 import com.mdot.app.core.designsystem.component.EmptyState
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.WeekBarCard
+import com.mdot.app.core.designsystem.component.chartHintText
 import com.mdot.app.core.designsystem.component.buildWeekBars
 import com.mdot.app.core.designsystem.component.WorkHeatmap
 import com.mdot.app.core.designsystem.component.SegmentBar
@@ -111,6 +118,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 enum class StatsDimension(val labelRes: Int) {
@@ -460,17 +468,41 @@ fun StatsScreen(
     // 首帧 workSystem 尚未加载（默认 STANDARD=3 页签），按初始页签夹取防越界
     val pagerState = rememberPagerState(initialPage = initialTab.coerceAtMost(2), pageCount = { if (monthTab) 3 else 2 })
 
-    Column(Modifier.fillMaxSize()) {
-        JiabanTopBar(
-            title = null,
-            titleContent = { StatsTabBar(pagerState, monthTab) },
-            showBack = canBack,
-            onBack = onBack,
-        )
+    Column(
+        Modifier
+            .fillMaxSize()
+            // 一级 Tab 形态下的「边缘接力」：内层 pager 滑到第一/最后一页还在拖时，
+            // 把余量交给整页横滑（LocalPrimaryTabSwipe）切相邻一级 Tab
+            .primaryTabEdgeRelay(pagerState),
+    ) {
+        if (canBack) {
+            // 二级页形态（从首页收入卡/工资页等入栈）：本页自带顶栏 + 返回
+            JiabanTopBar(
+                title = null,
+                titleContent = { StatsTabBar(pagerState, monthTab) },
+                showBack = true,
+                onBack = onBack,
+            )
+        } else {
+            // 一级 Tab 形态：AppRoot 的固定顶栏（工时制度 + 设置齿轮）压在本页之上，
+            // 故页签条下移一行（避让状态栏 + 固定顶栏高度），不再被固定顶栏遮住（用户所选方案）
+            val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            Spacer(Modifier.height(statusBar + TopBarHeight))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = Spacing.s),
+                contentAlignment = Alignment.Center,
+            ) {
+                StatsTabBar(pagerState, monthTab)
+            }
+        }
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
-            beyondViewportPageCount = 1,
+            // 不预组合相邻页（记月/明细体量都不小）：进入统计页只组合当前页 → 减少切页卡顿；
+            // 代价是点页签切换时目标页在动画中才组合（体感好于「一进场就卡」）
+            beyondViewportPageCount = 0,
         ) { page ->
             when (page) {
                 0 -> StatsContent(
@@ -485,6 +517,55 @@ fun StatsScreen(
             }
         }
     }
+}
+
+/**
+ * 一级 Tab「边缘接力」：pager 已在第一/最后一页时，继续拖动的横向余量累计超过阈值就把
+ * 「继续滑」交给整页横滑（LocalPrimaryTabSwipe）；同一次手势只触发一次（甩动结束时复位）。
+ * 用 nestedScroll 的 **post 阶段**取余量：内层能滚就内层滚，只有到尽头才轮到外层（docs 11 026/027）。
+ */
+@Composable
+private fun Modifier.primaryTabEdgeRelay(pagerState: PagerState): Modifier {
+    val swipe = rememberUpdatedState(com.mdot.app.core.navigation.LocalPrimaryTabSwipe.current)
+    val thresholdPx = with(LocalDensity.current) { 28.dp.toPx() }
+    val acc = remember { mutableStateOf(0f) }
+    val fired = remember { mutableStateOf(false) }
+    return this.nestedScroll(
+        remember {
+            object : NestedScrollConnection {
+                override fun onPostScroll(
+                    consumed: Offset,
+                    available: Offset,
+                    source: NestedScrollSource,
+                ): Offset {
+                    if (available.x == 0f) return Offset.Zero
+                    // 只看「当前页 + 拖动方向」：向右拖（available.x > 0）且已在第一页 → 上一个一级 Tab；
+                    // 向左拖且已在末页 → 下一个。不用 currentPageOffsetFraction 的符号（约定易搞反，反而静默失效）
+                    val atFirst = pagerState.currentPage == 0
+                    val atLast = pagerState.currentPage == pagerState.pageCount - 1
+                    val dir = when {
+                        available.x > 0f && atFirst -> -1
+                        available.x < 0f && atLast -> 1
+                        else -> return Offset.Zero
+                    }
+                    // 方向反了就重新累计
+                    if (acc.value != 0f && (acc.value > 0f) != (available.x > 0f)) acc.value = 0f
+                    acc.value += available.x
+                    if (!fired.value && abs(acc.value) >= thresholdPx) {
+                        fired.value = true
+                        swipe.value(dir)
+                    }
+                    return Offset(available.x, 0f) // 消费余量：不再上抛
+                }
+
+                override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                    acc.value = 0f // 一次手势只接力一次
+                    fired.value = false
+                    return Velocity.Zero
+                }
+            }
+        }
+    )
 }
 
 /** 统计页第 0 页：原统计内容（维度行→汇总→热点图→柱状→饼图） */
@@ -703,12 +784,6 @@ private fun MonthBarCard(
         onDayLongPress = onDayLongPress,
         hintValueText = hintValueText,
     )
-}
-
-/** 图表点击浮窗文本：日期 · 时长/工数（docs/15 T6 #19） */
-@Composable
-private fun chartHintText(workSystem: WorkSystem): @Composable (LocalDate, Float) -> String? = { date, v ->
-    "${TimeUtils.mdCn(date)} · ${modeValueText(workSystem, v)}"
 }
 
 /** 汇总卡（模式化 hero，与明细页同视觉体系）：

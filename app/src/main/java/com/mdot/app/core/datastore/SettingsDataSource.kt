@@ -159,10 +159,15 @@ class SettingsDataSource @Inject constructor(
         if (value == null) prefs.remove(AVATAR_PATH) else prefs[AVATAR_PATH] = value
     }
 
-    // ---- 底栏仅图标模式 ----
-    val bottomBarIconOnlyFlow: Flow<Boolean> = dataStore.data.map { it[BOTTOM_BAR_ICON_ONLY] ?: false }
+    // ---- 底栏仅图标模式（出厂默认开启）----
+    val bottomBarIconOnlyFlow: Flow<Boolean> = dataStore.data.map { it[BOTTOM_BAR_ICON_ONLY] ?: true }
     suspend fun setBottomBarIconOnly(value: Boolean) =
         dataStore.edit { it[BOTTOM_BAR_ICON_ONLY] = value }
+
+    // ---- 底栏布局：记加班按钮置右（独立圆钮，始终无文字；默认居中） ----
+    val bottomBarSideActionFlow: Flow<Boolean> = dataStore.data.map { it[BOTTOM_BAR_SIDE_ACTION] ?: false }
+    suspend fun setBottomBarSideAction(value: Boolean) =
+        dataStore.edit { it[BOTTOM_BAR_SIDE_ACTION] = value }
 
     // ---- SQLCipher raw key 迁移标记（旧库完成一次 byte[]→raw key 的 rekey 后置 true；
     //       新装/空库直接置 true）。未置 true 时按 byte[]（PBKDF2）打开，可正常打开旧库。 ----
@@ -212,6 +217,7 @@ class SettingsDataSource @Inject constructor(
         private val NICKNAME = stringPreferencesKey("nickname")
         private val AVATAR_PATH = stringPreferencesKey("avatar_path")
         private val BOTTOM_BAR_ICON_ONLY = booleanPreferencesKey("bottom_bar_icon_only")
+        private val BOTTOM_BAR_SIDE_ACTION = booleanPreferencesKey("bottom_bar_side_action")
 
         const val DEFAULT_NICKNAME = "即兴生长"
     }

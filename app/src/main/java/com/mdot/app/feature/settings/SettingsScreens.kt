@@ -35,6 +35,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,6 +65,8 @@ import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.core.navigation.Routes
 import com.mdot.app.domain.model.WorkSystem
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 
@@ -85,11 +88,23 @@ private fun SettingsGroup(title: String, content: @Composable () -> Unit) {
 
 /** 切换工时制度（v0.5.x：标准工时/小时工/综合工时可选，工地记工规划中） */
 @Composable
-fun SystemSwitchScreen(onBack: () -> Unit) {
+fun SystemSwitchScreen(
+    onBack: () -> Unit,
+    /** 切换确认生效（撤销倒计时结束）后自动回首页 */
+    onAutoHome: () -> Unit = onBack,
+) {
     val hub: SettingsHubViewModel = hiltViewModel()
     val salary by hub.salary.collectAsStateWithLifecycle()
     val currentSystem = salary.workSystem
     var pendingSystem by remember { mutableStateOf<WorkSystem?>(null) }
+    val scope = rememberCoroutineScope()
+    /** 撤销窗口 = 自动回首页的延时（用户指定 0.5s）；两处共用同一常量 */
+    val undoWindowMs = 500L
+    /** 自动回首页任务：确认后启动，撤销/离开页面时取消（不依赖组件的回调时机） */
+    val autoHomeJob = remember { mutableStateOf<Job?>(null) }
+    DisposableEffect(Unit) {
+        onDispose { autoHomeJob.value?.cancel() }
+    }
 
     Column(
         Modifier
@@ -133,12 +148,26 @@ fun SystemSwitchScreen(onBack: () -> Unit) {
                         confirmText = stringResource(R.string.settings_confirm_switch),
                         cancelText = stringResource(R.string.settings_cancel),
                         undoText = stringResource(R.string.settings_undo),
-                        onConfirm = { hub.switchWorkSystem(sys) },
-                        onUndo = { hub.undoSwitchWorkSystem() },
+                        onConfirm = {
+                            hub.switchWorkSystem(sys)
+                            // 撤销窗口内可撤销；窗口一过即自动回首页。
+                            // 用自起的延时任务而非组件 onSettled 回调：不受组件相位/重组时机影响（曾因此不回首页）
+                            autoHomeJob.value?.cancel()
+                            autoHomeJob.value = scope.launch {
+                                delay(undoWindowMs)
+                                onAutoHome()
+                            }
+                        },
+                        onUndo = {
+                            autoHomeJob.value?.cancel() // 撤销：留在本页继续选，不回首页
+                            hub.undoSwitchWorkSystem()
+                        },
                         startPhase = InlineConfirmPhase.Asking,
                         onSettled = { pendingSystem = null },
                         resetOnSettle = false,
                         resetKey = sys,
+                        // 撤销窗口 0.5s（v0.6.19 用户指定）：与上面的自动回首页延时同一常量
+                        undoWindowMs = undoWindowMs,
                         modifier = Modifier.align(Alignment.CenterHorizontally),
                     )
                 }

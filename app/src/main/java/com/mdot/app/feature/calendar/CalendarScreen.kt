@@ -15,6 +15,7 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -49,6 +50,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -600,7 +602,41 @@ private fun MonthGrid(state: CalendarUiState, vm: CalendarViewModel) {
             label = "monthGrid",
         ) { page ->
             val today = LocalDate.now()
-            Column {
+            // 长按后拖动快速多选（一次连续手势）：长按本身仍由单元格触发（含触觉），本手势接棒处理「拖动扫过」——
+            // 拖动经过的日期依次加入选择。长按成立后本手势会 consume 拖动，故不会误触发外层横滑切月；
+            // 未长按就移动则本手势自行取消，交回外层切月。
+            Column(
+                Modifier.pointerInput(page.month, page.cells) {
+                    fun dateAt(pos: Offset): LocalDate? {
+                        if (pos.x < 0f || pos.y < 0f) return null
+                        val cellW = size.width / 7f
+                        val cellH = cellW / 0.95f   // 与单元格 aspectRatio(0.95f) 一致
+                        val col = (pos.x / cellW).toInt().coerceIn(0, 6)
+                        val row = (pos.y / cellH).toInt()
+                        val d = page.cells.getOrNull(row * 7 + col)?.date ?: return null
+                        return if (d.isAfter(LocalDate.now())) null else d
+                    }
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = { pos ->
+                            dateAt(pos)?.let { d ->
+                                if (vm.isBatchSelecting.value) {
+                                    if (d !in vm.batchSelection.value) vm.toggleBatchSelect(d)
+                                } else {
+                                    vm.startBatchSelect(d)
+                                }
+                            }
+                        },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            dateAt(change.position)?.let { d ->
+                                if (vm.isBatchSelecting.value && d !in vm.batchSelection.value) {
+                                    vm.toggleBatchSelect(d)
+                                }
+                            }
+                        },
+                    )
+                }
+            ) {
                 page.cells.chunked(7).forEach { week ->
                     Row(Modifier.fillMaxWidth()) {
                         week.forEach { cell ->

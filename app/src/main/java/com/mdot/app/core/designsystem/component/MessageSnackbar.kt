@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -90,7 +91,12 @@ fun MessageSnackbarHost(
     isError: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    SnackbarHost(hostState, modifier) { data ->
+    SnackbarHost(
+        hostState,
+        // 上移避让（v0.6.19）：原先 0 底距＝贴着屏幕/内容下缘，看上去贴边且可能被系统导航条压住；
+        // 统一在此补导航条 inset + 一段间距，各调用点无需各自处理
+        modifier.navigationBarsPadding().padding(bottom = Spacing.l),
+    ) { data ->
         MessageSnackbarCapsule(data, isError)
     }
 }

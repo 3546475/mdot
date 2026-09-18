@@ -9,6 +9,11 @@
     <string name="appearance_palette_heading">配色方案</string>
     <string name="appearance_dynamic_color">动态取色</string>
     <string name="appearance_dynamic_color_desc">跟随壁纸配色（Android 12+），关闭则使用所选配色</string>
+    <string name="appearance_sheet_backdrop_heading">弹层背景</string>
+    <string name="appearance_sheet_backdrop_dim">压暗</string>
+    <string name="appearance_sheet_backdrop_blur">模糊</string>
+    <string name="appearance_sheet_backdrop_blur_scale">模糊缩小</string>
+    <string name="appearance_sheet_backdrop_desc">底部弹层弹出时背景的表现：压暗为整屏渐暗；模糊缩小会让背景退后成圆角卡片。Android 11 及以下无模糊能力，将自动回退为压暗</string>
 
     <!-- 首页卡片 + 底栏配置合并页（v0.6.7 双页签） -->
     <string name="home_bottom_tab_home">首页</string>
@@ -17,6 +22,8 @@
     <!-- 底栏配置页 -->
     <string name="appearance_icon_only">仅图标</string>
     <string name="appearance_icon_only_desc">开启后底栏只显示图标，不显示文字</string>
+    <string name="appearance_side_action">记加班按钮置右</string>
+    <string name="appearance_side_action_desc">开启后底栏右侧为独立圆形记加班按钮（始终不显示文字）；关闭则仍居中显示</string>
     <string name="appearance_preview">预览</string>
     <string name="appearance_drag_reorder">拖动排序</string>
 

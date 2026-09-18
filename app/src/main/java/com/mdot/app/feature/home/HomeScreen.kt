@@ -93,6 +93,8 @@ fun HomeScreen(
     // 卡片渲染序列（v0.6.0 首页卡片可编辑；id -> 内容由 HomeCardContent 按 id 分发）
     val cardIds = state.cards
     val site by homeVm.siteState.collectAsStateWithLifecycle()
+    // 图表统一接线（与统计页完全一致）：长按某日 → 打开该日记加班弹层
+    val onChartDay: (LocalDate) -> Unit = { homeVm.recordSheet.open(it) }
 
     if (twoPane) {
         // ---- 宽屏双栏：总宽 720dp 居中，左右各半 ----
@@ -113,7 +115,7 @@ fun HomeScreen(
                     Spacer(Modifier.height(Spacing.xl))
                     var firstData = true
                     cardIds.forEach { id ->
-                        val content = HomeCardContent(id, state, site, onOpenCalendar, onOpenStats, onOpenDetail, onOpenRecord, stackedEntries = true)
+                        val content = HomeCardContent(id, state, site, onOpenCalendar, onOpenStats, onOpenDetail, onOpenRecord, onChartDay = onChartDay, stackedEntries = true)
                         if (content != null) {
                             if (!firstData) Spacer(Modifier.height(Spacing.l))
                             content()
@@ -133,7 +135,7 @@ fun HomeScreen(
                 if (!state.loading) {
                     cardIds.forEach { id ->
                         if (id == "entries" || id == "record") {
-                            HomeCardContent(id, state, site, onOpenCalendar, onOpenStats, onOpenDetail, onOpenRecord, stackedEntries = true)?.let {
+                            HomeCardContent(id, state, site, onOpenCalendar, onOpenStats, onOpenDetail, onOpenRecord, onChartDay = onChartDay, stackedEntries = true)?.let {
                                 it()
                                 Spacer(Modifier.height(Spacing.m))
                             }
@@ -167,7 +169,7 @@ fun HomeScreen(
             // 按配置序列渲染卡片；卡间距沿用原节奏：数据区之后 l，其余 m
             var prev: String? = null
             cardIds.forEach { id ->
-                val content = HomeCardContent(id, state, site, onOpenCalendar, onOpenStats, onOpenDetail, onOpenRecord, stackedEntries = false)
+                val content = HomeCardContent(id, state, site, onOpenCalendar, onOpenStats, onOpenDetail, onOpenRecord, onChartDay = onChartDay, stackedEntries = false)
                 if (content != null) {
                     if (prev != null) {
                         Spacer(Modifier.height(if (prev == "data") Spacing.l else Spacing.m))
@@ -193,6 +195,8 @@ private fun HomeCardContent(
     onOpenStats: () -> Unit,
     onOpenDetail: () -> Unit,
     onOpenRecord: () -> Unit,
+    /** 图表长按某日 → 记录（与统计页同一接线） */
+    onChartDay: (LocalDate) -> Unit,
     stackedEntries: Boolean,
 ): (@Composable () -> Unit)? = when (id) {
     "data" -> ({
@@ -234,7 +238,7 @@ private fun HomeCardContent(
     })
     "heatmap" -> ({
         // 显隐与数据解耦：所有制度同序列（配置驱动）；固定六个月窗口（本月向前推五个月），与统计页同款
-        HomeHeatmapCard(site.heatValues, state.salary.workSystem == WorkSystem.SITE)
+        HomeHeatmapCard(site.heatValues, state.salary.workSystem, onChartDay)
     })
     "weekbar" -> ({
         // 本周柱状卡（与统计页同款共享组件）：从本月 daily 过滤本周；强度随制度（工地=工数，其他=加班分钟）
@@ -247,7 +251,8 @@ private fun HomeCardContent(
         }.toMap()
         HomeWeekBarCard(
             bars = com.mdot.app.core.designsystem.component.buildWeekBars(weekValues),
-            isSite = isSite,
+            workSystem = state.salary.workSystem,
+            onChartDay = onChartDay,
         )
     })
     "monthbar" -> ({
@@ -261,13 +266,14 @@ private fun HomeCardContent(
             val p = byDate[from.plusDays(off.toLong())]
             if (p == null) 0f else if (isSite) p.worksMilli / 1000f else p.otMinutes.toFloat()
         }
-        SectionCard {
-            com.mdot.app.core.designsystem.component.MonthBarCard(
-                values = values,
-                from = from,
-                workSystem = state.salary.workSystem,
-            )
-        }
+        // 与统计页完全一致（共享组件自带卡片底，故不再套 SectionCard）：点击出浮窗、长按进该日记加班弹层
+        com.mdot.app.core.designsystem.component.MonthBarCard(
+            values = values,
+            from = from,
+            workSystem = state.salary.workSystem,
+            onDayLongPress = onChartDay,
+            hintValueText = com.mdot.app.core.designsystem.component.chartHintText(state.salary.workSystem),
+        )
     })
     else -> null
 }
@@ -722,37 +728,40 @@ private fun SitePendingCard(site: SiteHomeUi, onOpenDetail: () -> Unit) {
 }
 
 
-/** 首页本周柱状卡：与统计页同款共享组件；柱顶数值单位随制度（时长 | N 工） */
+/** 首页本周柱状卡：与统计页同款共享组件与同款接线（点柱出浮窗 / 长按进记加班弹层） */
 @Composable
 private fun HomeWeekBarCard(
     bars: List<com.mdot.app.core.designsystem.component.WeekBar>,
-    isSite: Boolean,
+    workSystem: WorkSystem,
+    onChartDay: (LocalDate) -> Unit,
 ) {
     var selected by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
     com.mdot.app.core.designsystem.component.WeekBarCard(
         bars = bars,
-        valueText = { v ->
-            if (isSite) {
-                val num = if (v % 1f == 0f) v.toInt().toString() else String.format(java.util.Locale.US, "%.1f", v)
-                stringResource(R.string.stats_works_value, num)
-            } else {
-                TimeUtils.prettyDuration(v.roundToInt())
-            }
-        },
+        // 与统计页同一取值函数（不再自带一套数字格式，避免两页分叉）
+        valueText = { com.mdot.app.core.designsystem.component.modeValueText(workSystem, it) },
         selectedLabel = selected,
         onSelect = { selected = if (selected == it) null else it },
+        onDayLongPress = onChartDay,
+        hintValueText = com.mdot.app.core.designsystem.component.chartHintText(workSystem),
     )
 }
 
-/** 首页热点图卡：GitHub 贡献图风格，与统计页一致（无标题）；固定六个月窗口（本月向前推五个月），强度随制度（工地=工数，其他=加班分钟） */
+/** 首页热点图卡：与统计页一致（GitHub 贡献图风格、固定六个月窗口）＋同款接线（点击浮窗 / 长按记录） */
 @Composable
-private fun HomeHeatmapCard(heatValues: Map<LocalDate, Float>, isSite: Boolean) {
+private fun HomeHeatmapCard(
+    heatValues: Map<LocalDate, Float>,
+    workSystem: WorkSystem,
+    onChartDay: (LocalDate) -> Unit,
+) {
     SectionCard {
         val today = LocalDate.now()
         WorkHeatmap(
             values = heatValues,
             start = today.withDayOfMonth(1).minusMonths(5),
             end = today,
+            onDayLongPress = onChartDay,
+            hintValueText = com.mdot.app.core.designsystem.component.chartHintText(workSystem),
         )
     }
 }

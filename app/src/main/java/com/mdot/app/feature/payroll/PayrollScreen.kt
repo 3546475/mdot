@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
@@ -35,6 +36,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
@@ -47,6 +49,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -65,6 +69,7 @@ import com.mdot.app.core.designsystem.component.FloatingLabelTextField
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.designsystem.component.SettingRow
+import com.mdot.app.core.designsystem.component.ShrinkFeedbackButton
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.domain.CycleCalculator
 import com.mdot.app.domain.HourlyPayrollStrategy
@@ -257,12 +262,6 @@ fun PayrollPane(
     val saveHaptic = rememberSaveWithHaptic()
     val scope = rememberCoroutineScope()
     var saveFlash by remember { mutableStateOf(false) }
-    val flashSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
-    val flashAlpha by animateFloatAsState(
-        targetValue = if (saveFlash) 1f else 0f,
-        animationSpec = flashSpec,
-        label = "payrollSaveFlash",
-    )
     // 用户再改任意字段即撤下 ✓（各 onXxx 会把 state.saved 置回 false）
     LaunchedEffect(state.saved) { if (!state.saved) saveFlash = false }
     // ✓ 短暂停留后自动回退为「保存」——页签形态不关闭界面，必须自行收起反馈
@@ -300,37 +299,22 @@ fun PayrollPane(
             }
         }
 
-        // 悬浮底部保存按钮
+        // 悬浮底部保存按钮：与记工页保存、调休余额「增加/扣减」同款（ShrinkFeedbackButton）——
+        // 48dp 高 / 最小宽 144dp，保存后收缩到 ✓ 内容宽再展开（单一 Animatable 驱动，docs/11 034）
         Box(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .padding(horizontal = Spacing.page, vertical = 12.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            Button(
+            ShrinkFeedbackButton(
+                text = stringResource(R.string.payroll_save),
+                busy = saveFlash,
                 onClick = ::saveWithFeedback,
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(com.mdot.app.core.designsystem.Radius.pill),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-            ) {
-                // 保存后短暂变身 ✓（同一位置，不改布局尺寸），给出明确成功反馈
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        stringResource(R.string.payroll_save),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.graphicsLayer { alpha = 1f - flashAlpha },
-                    )
-                    Icon(
-                        painter = painterResource(R.drawable.ic_ms_check),
-                        contentDescription = stringResource(R.string.payroll_saved_cd),
-                        modifier = Modifier
-                            .size(24.dp)
-                            .graphicsLayer { alpha = flashAlpha },
-                    )
-                }
-            }
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

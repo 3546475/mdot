@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
@@ -73,6 +74,7 @@ fun BottomBarPane(
 ) {
     val config by vm.config.collectAsStateWithLifecycle()
     val iconOnly by vm.iconOnly.collectAsStateWithLifecycle()
+    val sideAction by vm.sideAction.collectAsStateWithLifecycle()
 
     // 本地编辑草稿：拖动实时换位先改草稿，松手一次性持久化
     var draft by remember { mutableStateOf(config.slots) }
@@ -112,10 +114,33 @@ fun BottomBarPane(
         }
         Spacer(Modifier.height(Spacing.m))
 
+        // 记加班按钮置右（右侧独立圆钮）
+        Surface(
+            shape = RoundedCornerShape(Radius.card),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                Modifier.padding(horizontal = Spacing.l, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.appearance_side_action), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        stringResource(R.string.appearance_side_action_desc),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = sideAction, onCheckedChange = vm::setSideAction)
+            }
+        }
+        Spacer(Modifier.height(Spacing.m))
+
         // ---- 预览（纯展示，不可交互） ----
         Text(stringResource(R.string.appearance_preview), style = MaterialTheme.typography.titleSmall)
         Spacer(Modifier.height(Spacing.l))
-        BottomBarPreview(slots = draft, iconOnly = iconOnly)
+        BottomBarPreview(slots = draft, iconOnly = iconOnly, sideAction = sideAction)
         Spacer(Modifier.height(Spacing.l))
 
         // ---- 功能配置卡片：开关 + 拖拽排序（v0.6.9 起去掉上方「功能」标题） ----
@@ -135,13 +160,42 @@ fun BottomBarPane(
     }
 }
 
-/** 底栏预览：直接复用 JiabanBottomBar，与真实底栏完全一致（宽度随槽位数自适应） */
+/** 底栏预览：直接复用 JiabanBottomBar，与真实底栏完全一致（宽度随槽位数自适应；两种布局同真实形态） */
 @Composable
-private fun BottomBarPreview(slots: List<String>, iconOnly: Boolean) {
+private fun BottomBarPreview(slots: List<String>, iconOnly: Boolean, sideAction: Boolean) {
     val density = LocalDensity.current
     val slotSpecs = slots.mapNotNull { SlotRegistry.resolve(it) }
     // JiabanBottomBar 内部有 bottomMargin padding，预览中向上偏移抵消
     val offsetY = with(density) { -BottomBarSpec.bottomMargin.toPx() }
+    // 两形态共用的「记加班」图标
+    val recordIcon: @Composable () -> Unit = {
+        Icon(
+            painterResource(R.drawable.ic_ms_more_time),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.size(24.dp),
+        )
+    }
+    // 居中胶囊（默认）/ 右侧独立圆钮（仅图标，与真实底栏一致）
+    val recordPill: @Composable () -> Unit = {
+        Box(
+            Modifier
+                .size(52.dp)
+                .background(
+                    MaterialTheme.colorScheme.primary,
+                    RoundedCornerShape(20.dp),
+                ),
+            contentAlignment = Alignment.Center,
+        ) { recordIcon() }
+    }
+    val recordCircle: @Composable () -> Unit = {
+        Box(
+            Modifier
+                .size(BottomBarSpec.height)
+                .background(MaterialTheme.colorScheme.primary, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) { recordIcon() }
+    }
     Box(
         Modifier
             .fillMaxWidth()
@@ -156,25 +210,8 @@ private fun BottomBarPreview(slots: List<String>, iconOnly: Boolean) {
             onSlotClick = {},
             iconOnly = iconOnly,
             showIndicator = true,
-            // 与真实底栏一致：中央「记加班」按钮（静态预览形态）
-            centerAction = {
-                Box(
-                    Modifier
-                        .size(52.dp)
-                        .background(
-                            MaterialTheme.colorScheme.primary,
-                            RoundedCornerShape(20.dp),
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        painterResource(R.drawable.ic_ms_more_time),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-            },
+            centerAction = if (sideAction) null else recordPill,
+            sideAction = if (sideAction) recordCircle else null,
             modifier = Modifier.graphicsLayer { translationY = offsetY },
         )
     }

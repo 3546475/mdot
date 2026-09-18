@@ -1,5 +1,7 @@
 package com.mdot.app.core.navigation
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.res.stringResource
 import com.mdot.app.R
 import androidx.compose.animation.core.tween
@@ -16,6 +18,7 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -78,6 +81,7 @@ import com.mdot.app.core.designsystem.rememberContentSideInset
 import com.mdot.app.core.designsystem.rememberWindowSpec
 import com.mdot.app.core.designsystem.component.JiabanBottomBar
 import com.mdot.app.core.designsystem.component.TopLevelBar
+import com.mdot.app.core.designsystem.component.SheetBackdropLayer
 import com.mdot.app.core.designsystem.component.SlotRegistry
 import com.mdot.app.feature.calendar.CalendarScreen
 import com.mdot.app.feature.export.ExportScreen
@@ -134,6 +138,13 @@ fun contentPaddingValues(showBottomBar: Boolean): androidx.compose.foundation.la
 private val lastTabSwipeDir = androidx.compose.runtime.mutableStateOf(1)
 
 /**
+ * 一级 Tab「边缘接力」：内层横向滚动（如统计页的多页签 pager）滑到尽头后，页面调用它把
+ * 「继续滑」的意图交给整页横滑（切相邻一级 Tab）——两套横滑不再抢手势。
+ * [dir]：-1 = 上一个槽位（向右滑），+1 = 下一个槽位（向左滑）；非一级页形态下为空实现。
+ */
+val LocalPrimaryTabSwipe = compositionLocalOf<(Int) -> Unit> { {} }
+
+/**
  * 一级 Tab 页滑动切换：跟手平移 + 松手后按方向滑出并切换到相邻底栏槽位页。
  * 页面内部自身的横向手势（如统计维度的横向 chip 行）优先级更高、不受影响。
  *
@@ -173,6 +184,15 @@ private fun SwipeTabHost(
             onNavigate(route)
         }
 
+        // 边缘接力：本页内的横向滚动滚到尽头后，把续滑意图交回整页横滑
+        val primarySwipe: (Int) -> Unit = { dir ->
+            if (dir < 0) {
+                if (prev != null) goTo(prev, -1)
+            } else {
+                if (next != null) goTo(next, 1)
+            }
+        }
+        CompositionLocalProvider(LocalPrimaryTabSwipe provides primarySwipe) {
         Box(
             Modifier
                 .fillMaxSize()
@@ -216,6 +236,7 @@ private fun SwipeTabHost(
                     },
                 ),
         ) { content() }
+        }
     } else {
         // 非当前页（正在滑出/转场中）：保留残留位移，避免内容在淡出途中跳回原位
         Box(Modifier.fillMaxSize().graphicsLayer { translationX = offset.value }) { content() }
@@ -243,8 +264,12 @@ private fun AppRootContent(
 ) {
     val navController = rememberNavController()
     val request by appVm.recordRequest.collectAsStateWithLifecycle()
+    // 记录弹层可见性状态提升到此处：背景「模糊 + 缩小」层（SheetBackdropLayer）与弹层自身
+    // 共享同一过渡状态，进出场严格同步（弹层内部负责置 targetState）
+    val recordSheetVisible = remember { MutableTransitionState(false) }
     val bottomBar by appVm.bottomBar.collectAsStateWithLifecycle()
     val bottomBarIconOnly by appVm.bottomBarIconOnly.collectAsStateWithLifecycle()
+    val bottomBarSideAction by appVm.bottomBarSideAction.collectAsStateWithLifecycle()
     val workSystem by appVm.workSystem.collectAsStateWithLifecycle()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -259,334 +284,367 @@ private fun AppRootContent(
     val inBar: (String) -> Boolean = { it.substringBefore('?') in slots }
 
     Box(Modifier.fillMaxSize()) {
-        // 转场动画（03 文档 §7）：底栏 Tab=淡入淡出 200ms；层级跳转=水平滑入 300ms（返回反向）
-        val isTabEntry: (androidx.navigation.NavBackStackEntry) -> Boolean =
-            { entry -> entry.destination.route?.substringBefore('?') in slots }
-        NavHost(
-            navController = navController,
-            startDestination = if (firstLaunchDone) Routes.HOME else Routes.ONBOARDING,
-            modifier = Modifier.fillMaxSize(),
-            enterTransition = {
-                if (isTabEntry(targetState) && isTabEntry(initialState))
-                    slideInHorizontally(
-                        spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
-                    ) { it * lastTabSwipeDir.value } +
-                        fadeIn(tween(Duration.normal))
-                else
-                    slideInHorizontally(tween(Duration.slow)) { it } +
-                        fadeIn(tween(Duration.slow)) +
-                        scaleIn(tween(Duration.slow), initialScale = 0.96f)
-            },
-            exitTransition = {
-                if (isTabEntry(targetState))
-                    slideOutHorizontally(
-                        spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
-                    ) { -it * lastTabSwipeDir.value / 4 } +
-                        fadeOut(tween(Duration.normal))
-                else
-                    slideOutHorizontally(tween(Duration.slow)) { -it / 4 } +
-                        fadeOut(tween(Duration.slow)) +
-                        scaleOut(tween(Duration.slow), targetScale = 0.96f)
-            },
-            popEnterTransition = {
-                when {
-                    isTabEntry(targetState) && isTabEntry(initialState) ->
+        // 背景层：弹层出现时整屏内容模糊 + 缩小成圆角卡片（弹层自身在最上层、不受影响）
+        SheetBackdropLayer(visible = recordSheetVisible.targetState) {
+            // 转场动画（03 文档 §7）：底栏 Tab=淡入淡出 200ms；层级跳转=水平滑入 300ms（返回反向）
+            val isTabEntry: (androidx.navigation.NavBackStackEntry) -> Boolean =
+                { entry -> entry.destination.route?.substringBefore('?') in slots }
+            NavHost(
+                navController = navController,
+                startDestination = if (firstLaunchDone) Routes.HOME else Routes.ONBOARDING,
+                modifier = Modifier.fillMaxSize(),
+                enterTransition = {
+                    if (isTabEntry(targetState) && isTabEntry(initialState))
                         slideInHorizontally(
                             spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
                         ) { it * lastTabSwipeDir.value } +
                             fadeIn(tween(Duration.normal))
-                    isTabEntry(targetState) ->
-                        fadeIn(tween(Duration.normal))
-                    else ->
-                        slideInHorizontally(tween(Duration.slow)) { -it / 4 } +
+                    else
+                        slideInHorizontally(tween(Duration.slow)) { it } +
                             fadeIn(tween(Duration.slow)) +
-                            scaleIn(tween(Duration.slow), initialScale = 1.04f)
-                }
-            },
-            popExitTransition = {
-                if (isTabEntry(targetState) && isTabEntry(initialState))
-                    slideOutHorizontally(
-                        spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
-                    ) { -it * lastTabSwipeDir.value / 4 } +
-                        fadeOut(tween(Duration.normal))
-                else
-                    slideOutHorizontally(tween(Duration.slow)) { it } +
-                        fadeOut(tween(Duration.slow)) +
-                        scaleOut(tween(Duration.slow), targetScale = 1.04f)
-            },
-        ) {
-            composable(Routes.ONBOARDING) {
-                AdaptiveContainer {
-                    OnboardingScreen(onDone = { navTo(navController, Routes.HOME, slots, clearStack = true) })
-                }
-            }
-            composable(Routes.HOME) {
-                SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.HOME, onNavigate = { navTo(navController, it, slots) }) {
-                    HomeScreen(
-                        onOpenCalendar = { navTo(navController, Routes.CALENDAR_PATTERN, slots) },
-                        onOpenStats = { navTo(navController, Routes.STATS, slots) },
-                        onOpenDetail = { navTo(navController, Routes.stats(if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) 1 else 2), slots) },
-                        onOpenRecord = {
-                            if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
-                                navTo(navController, Routes.SITE_RECORD, slots)
-                            } else {
-                                appVm.recordSheetController.open(java.time.LocalDate.now())
-                            }
-                        },
-                    )
-                }
-            }
-            composable(
-                Routes.CALENDAR_PATTERN,
-                arguments = listOf(navArgument("month") {
-                    type = NavType.StringType
-                    defaultValue = ""
-                }),
-            ) { entry ->
-                SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.CALENDAR_PATTERN, onNavigate = { navTo(navController, it, slots) }) {
-                    CalendarScreen(
-                        initialMonth = entry.arguments?.getString("month"),
-                        canBack = !inBar("calendar"),
-                        onBack = { navController.popBackStack() },
-                    )
-                }
-            }
-            composable(
-                Routes.STATS_PATTERN,
-                arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = 0 }),
-            ) { entry ->
-                SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.STATS, onNavigate = { navTo(navController, it, slots) }) {
-                    StatsScreen(
-                        canBack = !inBar("stats"),
-                        onBack = { navController.popBackStack() },
-                        initialTab = entry.arguments?.getInt("tab") ?: 0,
-                    )
-                }
-            }
-            composable(Routes.PAYROLL) {
-                SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.PAYROLL, onNavigate = { navTo(navController, it, slots) }) {
+                            scaleIn(tween(Duration.slow), initialScale = 0.96f)
+                },
+                exitTransition = {
+                    if (isTabEntry(targetState))
+                        slideOutHorizontally(
+                            spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
+                        ) { -it * lastTabSwipeDir.value / 4 } +
+                            fadeOut(tween(Duration.normal))
+                    else
+                        slideOutHorizontally(tween(Duration.slow)) { -it / 4 } +
+                            fadeOut(tween(Duration.slow)) +
+                            scaleOut(tween(Duration.slow), targetScale = 0.96f)
+                },
+                popEnterTransition = {
+                    when {
+                        isTabEntry(targetState) && isTabEntry(initialState) ->
+                            slideInHorizontally(
+                                spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
+                            ) { it * lastTabSwipeDir.value } +
+                                fadeIn(tween(Duration.normal))
+                        isTabEntry(targetState) ->
+                            fadeIn(tween(Duration.normal))
+                        else ->
+                            slideInHorizontally(tween(Duration.slow)) { -it / 4 } +
+                                fadeIn(tween(Duration.slow)) +
+                                scaleIn(tween(Duration.slow), initialScale = 1.04f)
+                    }
+                },
+                popExitTransition = {
+                    if (isTabEntry(targetState) && isTabEntry(initialState))
+                        slideOutHorizontally(
+                            spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
+                        ) { -it * lastTabSwipeDir.value / 4 } +
+                            fadeOut(tween(Duration.normal))
+                    else
+                        slideOutHorizontally(tween(Duration.slow)) { it } +
+                            fadeOut(tween(Duration.slow)) +
+                            scaleOut(tween(Duration.slow), targetScale = 1.04f)
+                },
+            ) {
+                composable(Routes.ONBOARDING) {
                     AdaptiveContainer {
-                        PayrollScreen(
-                            canBack = !inBar("payroll"),
-                            onBack = { navController.popBackStack() },
-                            onOpenSiteProjects = { navTo(navController, Routes.SITE_PROJECTS, slots) },
-                            onOpenSiteSettlement = { navTo(navController, Routes.SITE_SETTLEMENT, slots) },
+                        OnboardingScreen(onDone = { navTo(navController, Routes.HOME, slots, clearStack = true) })
+                    }
+                }
+                composable(Routes.HOME) {
+                    SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.HOME, onNavigate = { navTo(navController, it, slots) }) {
+                        HomeScreen(
+                            onOpenCalendar = { navTo(navController, Routes.CALENDAR_PATTERN, slots) },
+                            onOpenStats = { navTo(navController, Routes.statsDetail(0), slots) },
+                            onOpenDetail = { navTo(navController, Routes.statsDetail(if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) 1 else 2), slots) },
+                            onOpenRecord = {
+                                if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
+                                    navTo(navController, Routes.SITE_RECORD, slots)
+                                } else {
+                                    appVm.recordSheetController.open(java.time.LocalDate.now())
+                                }
+                            },
                         )
                     }
                 }
-            }
-            composable(Routes.EXPORT) {
-                SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.EXPORT, onNavigate = { navTo(navController, it, slots) }) {
-                    AdaptiveContainer {
-                        ExportScreen(
-                            canBack = !inBar("export"),
-                            onBack = { navController.popBackStack() },
-                            onViewRecords = { navTo(navController, Routes.stats(if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) 1 else 2), slots) },
-                        )
-                    }
-                }
-            }
-            composable(Routes.SYNC) {
-                SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.SYNC, onNavigate = { navTo(navController, it, slots) }) {
-                    AdaptiveContainer {
-                        SyncScreen(
-                            canBack = !inBar("sync"),
+                composable(
+                    Routes.CALENDAR_PATTERN,
+                    arguments = listOf(navArgument("month") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    }),
+                ) { entry ->
+                    SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.CALENDAR_PATTERN, onNavigate = { navTo(navController, it, slots) }) {
+                        CalendarScreen(
+                            initialMonth = entry.arguments?.getString("month"),
+                            canBack = !inBar("calendar"),
                             onBack = { navController.popBackStack() },
                         )
                     }
                 }
-            }
-            composable(Routes.SYNC_STORAGE) {
-                AdaptiveContainer {
-                    SyncScreen(canBack = true, initialTab = 1, onBack = { navController.popBackStack() })
-                }
-            }
-            composable(Routes.PROFILE) {
-                SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.PROFILE, onNavigate = { navTo(navController, it, slots) }) {
+                composable(
+                    Routes.STATS_DETAIL_PATTERN,
+                    arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = 0 }),
+                ) { entry ->
+                    // 统计页二级页实例：不包 SwipeTabHost（不参与整页横滑），永远带返回
                     AdaptiveContainer {
-                        ProfileScreen(
-                            canBack = !inBar("profile"),
+                        StatsScreen(
+                            canBack = true,
+                            onBack = { navController.popBackStack() },
+                            initialTab = entry.arguments?.getInt("tab") ?: 0,
+                        )
+                    }
+                }
+                composable(
+                    Routes.STATS_PATTERN,
+                    arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = 0 }),
+                ) { entry ->
+                    SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.STATS, onNavigate = { navTo(navController, it, slots) }) {
+                        StatsScreen(
+                            canBack = !inBar("stats"),
+                            onBack = { navController.popBackStack() },
+                            initialTab = entry.arguments?.getInt("tab") ?: 0,
+                        )
+                    }
+                }
+                composable(Routes.PAYROLL) {
+                    SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.PAYROLL, onNavigate = { navTo(navController, it, slots) }) {
+                        AdaptiveContainer {
+                            PayrollScreen(
+                                canBack = !inBar("payroll"),
+                                onBack = { navController.popBackStack() },
+                                onOpenSiteProjects = { navTo(navController, Routes.SITE_PROJECTS, slots) },
+                                onOpenSiteSettlement = { navTo(navController, Routes.SITE_SETTLEMENT, slots) },
+                            )
+                        }
+                    }
+                }
+                composable(Routes.EXPORT) {
+                    SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.EXPORT, onNavigate = { navTo(navController, it, slots) }) {
+                        AdaptiveContainer {
+                            ExportScreen(
+                                canBack = !inBar("export"),
+                                onBack = { navController.popBackStack() },
+                                onViewRecords = { navTo(navController, Routes.statsDetail(if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) 1 else 2), slots) },
+                            )
+                        }
+                    }
+                }
+                composable(Routes.SYNC) {
+                    SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.SYNC, onNavigate = { navTo(navController, it, slots) }) {
+                        AdaptiveContainer {
+                            SyncScreen(
+                                canBack = !inBar("sync"),
+                                onBack = { navController.popBackStack() },
+                            )
+                        }
+                    }
+                }
+                composable(Routes.SYNC_STORAGE) {
+                    AdaptiveContainer {
+                        SyncScreen(canBack = true, initialTab = 1, onBack = { navController.popBackStack() })
+                    }
+                }
+                composable(Routes.PROFILE) {
+                    SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.PROFILE, onNavigate = { navTo(navController, it, slots) }) {
+                        AdaptiveContainer {
+                            ProfileScreen(
+                                canBack = !inBar("profile"),
+                                onBack = { navController.popBackStack() },
+                                onOpen = { route -> navTo(navController, route, slots) },
+                            )
+                        }
+                    }
+                }
+                composable(Routes.SYSTEM) {
+                    AdaptiveContainer {
+                        // 顶栏齿轮：当前工时制度的设定多页签页（原工时设置入口列表页移除）
+                        SystemSettingsScreen(
+                            onBack = { navController.popBackStack() },
+                            onOpenProject = { id -> navTo(navController, Routes.siteProjectEdit(id), slots) },
+                        )
+                    }
+                }
+                composable(Routes.SYSTEM_SWITCH) {
+                    AdaptiveContainer {
+                        SystemSwitchScreen(
+                            onBack = { navController.popBackStack() },
+                            // 切换确认生效（撤销倒计时结束）后自动回首页（Tab 式导航，恢复首页状态）
+                            onAutoHome = { navTo(navController, Routes.HOME, slots) },
+                        )
+                    }
+                }
+                composable(Routes.APPEARANCE) {
+                    AdaptiveContainer {
+                        // 「外观」入口进入「外观 / 首页 / 底栏」合并页，默认落「外观」页签
+                        HomeBottomConfigScreen(initialTab = 0, onBack = { navController.popBackStack() })
+                    }
+                }
+                composable(Routes.BOTTOM_BAR) {
+                    AdaptiveContainer { HomeBottomConfigScreen(initialTab = 2, onBack = { navController.popBackStack() }) }
+                }
+                composable(Routes.HOME_CARDS) {
+                    AdaptiveContainer { HomeBottomConfigScreen(initialTab = 1, onBack = { navController.popBackStack() }) }
+                }
+                // ---- 工地记工（12 文档 F-S2/F-S6） ----
+                composable(
+                    Routes.SITE_PROJECTS_PATTERN,
+                    arguments = listOf(navArgument("pick") {
+                        type = NavType.StringType
+                        defaultValue = "0"
+                    }),
+                ) { entry ->
+                    AdaptiveContainer {
+                        SiteProjectsScreen(
+                            pickMode = entry.arguments?.getString("pick") == "1",
+                            onBack = { navController.popBackStack() },
+                            onOpenProject = { id -> navTo(navController, Routes.siteProjectEdit(id), slots) },
+                            onPicked = { navController.popBackStack() },
+                        )
+                    }
+                }
+                composable(Routes.SITE_PROJECT_EDIT_PATTERN) { entry ->
+                    AdaptiveContainer {
+                        SiteProjectEditScreen(onBack = { navController.popBackStack() })
+                    }
+                }
+                composable(Routes.SITE_SETTLEMENT) {
+                    AdaptiveContainer {
+                        SiteSettlementScreen(onBack = { navController.popBackStack() })
+                    }
+                }
+                composable(Routes.SITE_RECORD) {
+                    AdaptiveContainer {
+                        SiteRecordScreen(
+                            onBack = { navController.popBackStack() },
+                            onOpenProjectSettings = { id ->
+                                navTo(navController, Routes.siteProjectEdit(id), slots)
+                            },
+                            onOpenProjectPick = {
+                                navTo(navController, Routes.siteProjects(pick = true), slots)
+                            },
+                            onOpenSettlement = { navTo(navController, Routes.SITE_SETTLEMENT, slots) },
+                        )
+                    }
+                }
+                composable(Routes.DATASOURCE) {
+                    AdaptiveContainer { DataSourceScreen(onBack = { navController.popBackStack() }) }
+                }
+                composable(Routes.ABOUT) {
+                    AdaptiveContainer {
+                        AboutScreen(
                             onBack = { navController.popBackStack() },
                             onOpen = { route -> navTo(navController, route, slots) },
                         )
                     }
                 }
             }
-            composable(Routes.SYSTEM) {
-                AdaptiveContainer {
-                    // 顶栏齿轮：当前工时制度的设定多页签页（原工时设置入口列表页移除）
-                    SystemSettingsScreen(
-                        onBack = { navController.popBackStack() },
-                        onOpenProject = { id -> navTo(navController, Routes.siteProjectEdit(id), slots) },
-                    )
-                }
-            }
-            composable(Routes.SYSTEM_SWITCH) {
-                AdaptiveContainer {
-                    SystemSwitchScreen(onBack = { navController.popBackStack() })
-                }
-            }
-            composable(Routes.APPEARANCE) {
-                AdaptiveContainer {
-                    // 「外观」入口进入「外观 / 首页 / 底栏」合并页，默认落「外观」页签
-                    HomeBottomConfigScreen(initialTab = 0, onBack = { navController.popBackStack() })
-                }
-            }
-            composable(Routes.BOTTOM_BAR) {
-                AdaptiveContainer { HomeBottomConfigScreen(initialTab = 2, onBack = { navController.popBackStack() }) }
-            }
-            composable(Routes.HOME_CARDS) {
-                AdaptiveContainer { HomeBottomConfigScreen(initialTab = 1, onBack = { navController.popBackStack() }) }
-            }
-            // ---- 工地记工（12 文档 F-S2/F-S6） ----
-            composable(
-                Routes.SITE_PROJECTS_PATTERN,
-                arguments = listOf(navArgument("pick") {
-                    type = NavType.StringType
-                    defaultValue = "0"
-                }),
-            ) { entry ->
-                AdaptiveContainer {
-                    SiteProjectsScreen(
-                        pickMode = entry.arguments?.getString("pick") == "1",
-                        onBack = { navController.popBackStack() },
-                        onOpenProject = { id -> navTo(navController, Routes.siteProjectEdit(id), slots) },
-                        onPicked = { navController.popBackStack() },
-                    )
-                }
-            }
-            composable(Routes.SITE_PROJECT_EDIT_PATTERN) { entry ->
-                AdaptiveContainer {
-                    SiteProjectEditScreen(onBack = { navController.popBackStack() })
-                }
-            }
-            composable(Routes.SITE_SETTLEMENT) {
-                AdaptiveContainer {
-                    SiteSettlementScreen(onBack = { navController.popBackStack() })
-                }
-            }
-            composable(Routes.SITE_RECORD) {
-                AdaptiveContainer {
-                    SiteRecordScreen(
-                        onBack = { navController.popBackStack() },
-                        onOpenProjectSettings = { id ->
-                            navTo(navController, Routes.siteProjectEdit(id), slots)
-                        },
-                        onOpenProjectPick = {
-                            navTo(navController, Routes.siteProjects(pick = true), slots)
-                        },
-                        onOpenSettlement = { navTo(navController, Routes.SITE_SETTLEMENT, slots) },
-                    )
-                }
-            }
-            composable(Routes.DATASOURCE) {
-                AdaptiveContainer { DataSourceScreen(onBack = { navController.popBackStack() }) }
-            }
-            composable(Routes.ABOUT) {
-                AdaptiveContainer {
-                    AboutScreen(
-                        onBack = { navController.popBackStack() },
-                        onOpen = { route -> navTo(navController, route, slots) },
-                    )
-                }
-            }
-        }
 
-        // 一级页面统一固定顶栏（无标题：左=标准工时切换，右=齿轮设置）。
-        // 挂在 NavHost 之外、底栏与弹层之下，页面切换时不参与转场、保持不动。
-        // MD3E：顶栏显隐走 motionScheme effects spec（与底栏动效语言一致，禁硬编码时长）
-        val topBarFadeSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-        AnimatedVisibility(
-            visible = showBar,
-            enter = fadeIn(topBarFadeSpec),
-            exit = fadeOut(topBarFadeSpec),
-        ) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface),
+            // 一级页面统一固定顶栏（无标题：左=标准工时切换，右=齿轮设置）。
+            // 挂在 NavHost 之外、底栏与弹层之下，页面切换时不参与转场、保持不动。
+            // MD3E：顶栏显隐走 motionScheme effects spec（与底栏动效语言一致，禁硬编码时长）
+            val topBarFadeSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+            AnimatedVisibility(
+                visible = showBar,
+                enter = fadeIn(topBarFadeSpec),
+                exit = fadeOut(topBarFadeSpec),
             ) {
-                TopLevelBar(
-                    workSystem = workSystem,
-                    onOpenWorkSystem = { navTo(navController, Routes.SYSTEM_SWITCH, slots) },
-                    onOpenSettings = { navTo(navController, Routes.SYSTEM, slots) },
-                )
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface),
+                ) {
+                    TopLevelBar(
+                        workSystem = workSystem,
+                        onOpenWorkSystem = { navTo(navController, Routes.SYSTEM_SWITCH, slots) },
+                        onOpenSettings = { navTo(navController, Routes.SYSTEM, slots) },
+                    )
+                }
             }
-        }
 
-        val calSelDate by appVm.recordSheetController.calendarSelectedDate.collectAsStateWithLifecycle()
-        // 中央按钮入场动画只播一次：底栏隐藏→再现会销毁/重建该按钮，
-        // flag 提升到 AppRootContent（跨导航存活）避免每次重播弹簧弹入
-        var recordPillEntered by remember { mutableStateOf(false) }
-        JiabanBottomBar(
-            slots = bottomBar.slots.mapNotNull { SlotRegistry.resolve(it) },
-            selectedRoute = currentBase,
-            visible = showBar,
-            iconOnly = bottomBarIconOnly,
-            centerAction = {
+            val calSelDate by appVm.recordSheetController.calendarSelectedDate.collectAsStateWithLifecycle()
+            // 中央按钮入场动画只播一次：底栏隐藏→再现会销毁/重建该按钮，
+            // flag 提升到 AppRootContent（跨导航存活）避免每次重播弹簧弹入
+            var recordPillEntered by remember { mutableStateOf(false) }
+            // 记加班按钮的触发逻辑（居中胶囊 / 右侧圆钮两种布局共用）
+            val recordAction: () -> Unit = {
+                when {
+                    // 日历一级页：承担原悬浮 FAB 功能——工地模式直达记工页，其余打开选中日期的记录
+                    currentBase == "calendar" && workSystem == com.mdot.app.domain.model.WorkSystem.SITE ->
+                        navTo(navController, Routes.SITE_RECORD, slots)
+                    currentBase == "calendar" -> appVm.recordSheetController.open(calSelDate)
+                    workSystem == com.mdot.app.domain.model.WorkSystem.SITE ->
+                        navTo(navController, Routes.SITE_RECORD, slots)
+                    else -> appVm.recordSheetController.open(java.time.LocalDate.now())
+                }
+            }
+            // 两种布局形态二选一（外观页「记加班按钮置右」）：居中胶囊 / 右侧独立圆钮（仅图标）
+            val recordPill: @Composable () -> Unit = {
                 RecordPillButton(
-                    onRecord = {
-                        when {
-                            // 日历一级页：承担原悬浮 FAB 功能——工地模式直达记工页，其余打开选中日期的记录
-                            currentBase == "calendar" && workSystem == com.mdot.app.domain.model.WorkSystem.SITE ->
-                                navTo(navController, Routes.SITE_RECORD, slots)
-                            currentBase == "calendar" -> appVm.recordSheetController.open(calSelDate)
-                            workSystem == com.mdot.app.domain.model.WorkSystem.SITE ->
-                                navTo(navController, Routes.SITE_RECORD, slots)
-                            else -> appVm.recordSheetController.open(java.time.LocalDate.now())
-                        }
-                    },
+                    onRecord = recordAction,
                     playEntrance = !recordPillEntered,
                     onEntranceDone = { recordPillEntered = true },
                 )
-            },
-            onSlotClick = { spec ->
-                // 点击底栏：按目标相对当前位置设置左右平移方向
-                val fromIdx = orderedSlots.indexOf(currentBase)
-                val toIdx = orderedSlots.indexOf(spec.route)
-                lastTabSwipeDir.value = if (fromIdx >= 0 && toIdx >= 0 && toIdx < fromIdx) -1 else 1
-                navTo(navController, spec.route, slots)
-            },
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
-
-        // 日历页面右下角 FAB：补记/编辑
-        val isCalendarPage = currentBase == "calendar"
-        // 日历为一级页（在底栏）时由底栏中央记加班按钮承担记录入口，悬浮 FAB 仅二级页形态保留
-        val showCalendarFab = isCalendarPage && !inBar("calendar")
-        val fabBottomPadding = Spacing.page + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        val calFabFadeSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-        val calFabScaleSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
-        androidx.compose.animation.AnimatedVisibility(
-            visible = showCalendarFab,
-            enter = androidx.compose.animation.fadeIn(calFabFadeSpec) +
-                androidx.compose.animation.scaleIn(calFabScaleSpec, initialScale = 0.8f),
-            exit = androidx.compose.animation.fadeOut(calFabFadeSpec) +
-                androidx.compose.animation.scaleOut(calFabScaleSpec, targetScale = 0.8f),
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = Spacing.page + fabSideInset, bottom = fabBottomPadding),
-        ) {
-            FloatingActionButton(
-                onClick = {
-                    // 工地模式：直接打开记工页（不走加班/请假弹窗）
-                    if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
-                        navTo(navController, Routes.SITE_RECORD, slots)
-                    } else {
-                        appVm.recordSheetController.open(calSelDate)
-                    }
+            }
+            val recordCircle: @Composable () -> Unit = {
+                RecordCircleButton(
+                    onRecord = recordAction,
+                    playEntrance = !recordPillEntered,
+                    onEntranceDone = { recordPillEntered = true },
+                )
+            }
+            JiabanBottomBar(
+                slots = bottomBar.slots.mapNotNull { SlotRegistry.resolve(it) },
+                selectedRoute = currentBase,
+                visible = showBar,
+                iconOnly = bottomBarIconOnly,
+                centerAction = if (bottomBarSideAction) null else recordPill,
+                sideAction = if (bottomBarSideAction) recordCircle else null,
+                onSlotClick = { spec ->
+                    // 点击底栏：按目标相对当前位置设置左右平移方向
+                    val fromIdx = orderedSlots.indexOf(currentBase)
+                    val toIdx = orderedSlots.indexOf(spec.route)
+                    lastTabSwipeDir.value = if (fromIdx >= 0 && toIdx >= 0 && toIdx < fromIdx) -1 else 1
+                    navTo(navController, spec.route, slots)
                 },
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+
+            // 日历页面右下角 FAB：补记/编辑
+            val isCalendarPage = currentBase == "calendar"
+            // 日历为一级页（在底栏）时由底栏中央记加班按钮承担记录入口，悬浮 FAB 仅二级页形态保留
+            val showCalendarFab = isCalendarPage && !inBar("calendar")
+            val fabBottomPadding = Spacing.page + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            val calFabFadeSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+            val calFabScaleSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
+            androidx.compose.animation.AnimatedVisibility(
+                visible = showCalendarFab,
+                enter = androidx.compose.animation.fadeIn(calFabFadeSpec) +
+                    androidx.compose.animation.scaleIn(calFabScaleSpec, initialScale = 0.8f),
+                exit = androidx.compose.animation.fadeOut(calFabFadeSpec) +
+                    androidx.compose.animation.scaleOut(calFabScaleSpec, targetScale = 0.8f),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = Spacing.page + fabSideInset, bottom = fabBottomPadding),
             ) {
-                Icon(painterResource(R.drawable.ic_ms_add), contentDescription = stringResource(R.string.nav_fab_cd))
+                FloatingActionButton(
+                    onClick = {
+                        // 工地模式：直接打开记工页（不走加班/请假弹窗）
+                        if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
+                            navTo(navController, Routes.SITE_RECORD, slots)
+                        } else {
+                            appVm.recordSheetController.open(calSelDate)
+                        }
+                    },
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
+                    Icon(painterResource(R.drawable.ic_ms_add), contentDescription = stringResource(R.string.nav_fab_cd))
+                }
             }
         }
 
         request?.let { req ->
             RecordSheet(
                 request = req,
+                visibleState = recordSheetVisible,
                 onDismiss = { appVm.recordSheetController.dismiss() },
             )
         }
@@ -620,9 +678,9 @@ private fun navTo(
         launchSingleTop = true
         when {
             clearStack -> popUpTo(0)
-            // 只有目标真的配置在底栏里才走 Tab 式切换（保存/恢复状态），
+            // 只有目标真的配置在底栏里、且调用方未要求二级页形态时才走 Tab 式切换（保存/恢复状态），
             // 否则一律入栈为二级页面（顶栏可返回）
-            route.substringBefore('?') in slots -> {
+            isTabSwitch -> {
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                 restoreState = true
             }
@@ -686,6 +744,62 @@ private fun RecordPillButton(
                 painterResource(R.drawable.ic_ms_more_time), null,
                 tint = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(24.dp),
+            )
+        }
+    }
+}
+
+/**
+ * 右侧独立圆形「记加班」按钮（v0.6.19 新增底栏布局）：**始终只显示图标、不显示文字**；
+ * 出入场/按压/阴影与中央胶囊按钮完全一致（只换布局，动效沿用原底栏）。
+ */
+@Composable
+private fun RecordCircleButton(
+    onRecord: () -> Unit,
+    /** 仅首次出现播放弹簧弹入；底栏隐藏→再现（组合销毁重建）时不重播 */
+    playEntrance: Boolean,
+    onEntranceDone: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val entrance = remember { Animatable(if (playEntrance) 0f else 1f) }
+    val entranceSpec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
+    LaunchedEffect(Unit) {
+        if (playEntrance) {
+            entrance.animateTo(1f, entranceSpec)
+            onEntranceDone()
+        }
+    }
+    val elevSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val elevation by animateFloatAsState(
+        targetValue = if (pressed) 1f else 3f,
+        animationSpec = elevSpec,
+        label = "recordCircleElevation",
+    )
+    val shape = androidx.compose.foundation.shape.CircleShape
+    Surface(
+        shape = shape,
+        color = MaterialTheme.colorScheme.primary,
+        shadowElevation = elevation.dp,
+        modifier = Modifier
+            .size(BottomBarSpec.height)
+            .graphicsLayer {
+                val e = entrance.value
+                alpha = e
+                val scale = 0.8f + 0.2f * e
+                scaleX = scale
+                scaleY = scale
+                translationY = (1f - e) * 24.dp.toPx()
+            }
+            .pressScale(interaction, pressedScale = 0.9f)
+            .clip(shape)
+            .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onRecord),
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Icon(
+                painterResource(R.drawable.ic_ms_more_time), null,
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(26.dp),
             )
         }
     }

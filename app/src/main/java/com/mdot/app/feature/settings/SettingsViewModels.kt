@@ -202,6 +202,11 @@ class AppearanceViewModel @Inject constructor(
     fun setDynamic(value: Boolean) = viewModelScope.launch {
         settings.setAppearance(appearance.value.copy(dynamicColor = value))
     }
+
+    /** 弹层背景效果：压暗 / 模糊 / 模糊缩小 */
+    fun setSheetBackdrop(mode: com.mdot.app.domain.model.SheetBackdropMode) = viewModelScope.launch {
+        settings.setAppearance(appearance.value.copy(sheetBackdropMode = mode))
+    }
 }
 
 @HiltViewModel
@@ -212,10 +217,18 @@ class BottomBarViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, BottomBarConfig())
 
     val iconOnly: StateFlow<Boolean> = settings.bottomBarIconOnlyFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /** 底栏布局：记加班按钮置右（右侧独立圆钮） */
+    val sideAction: StateFlow<Boolean> = settings.bottomBarSideActionFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     fun setIconOnly(value: Boolean) = viewModelScope.launch {
         settings.setBottomBarIconOnly(value)
+    }
+
+    fun setSideAction(value: Boolean) = viewModelScope.launch {
+        settings.setBottomBarSideAction(value)
     }
 
     val selectedSlot = MutableStateFlow(-1)

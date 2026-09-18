@@ -70,6 +70,28 @@ object Duration {
 }
 
 /**
+ * 弹层背景「模糊 + 缩小」规格（04 文档 §4.1：业务层禁用魔法值）。
+ * 底部弹层出现时，背景内容缩小成圆角卡片并模糊——用「背景后退」表达层级，
+ * 替代原先整屏压暗。四周露出的底衬 [backdropScrim] 负责空间感。
+ * ⚠️ 模糊依赖 RenderEffect（**Android 12 / API 31 起**）；更低版本 [blurRadius] 置 0
+ * 自动回退为纯压暗（[contentScrimNoBlur]），勿依赖模糊承担可读性。
+ */
+object SheetBackdrop {
+    /** 背景内容静止态缩放（缩小约 6%，边缘露出底衬形成卡片层级感） */
+    const val scale = 0.94f
+    /** 背景模糊半径 */
+    val blurRadius = 12.dp
+    /** 缩放后卡片圆角（与弹层自身圆角一致） */
+    val cornerRadius = Radius.sheet
+    /** 内容上方压暗（模糊生效时较轻：层级已由模糊区分） */
+    const val contentScrim = 0.25f
+    /** 无模糊能力（API<31）时的回退压暗强度（沿用改造前观感） */
+    const val contentScrimNoBlur = 0.4f
+    /** 四周底衬压暗（仅内容缩小后露出） */
+    const val backdropScrim = 0.6f
+}
+
+/**
  * M3 Expressive 弹簧动效：按下干脆利落（无过冲），松手带轻微弹性回弹。
  * 用于 pressScale、底栏指示胶囊滑动等位置/缩放动画。
  */
@@ -96,6 +118,8 @@ object BottomBarSpec {
     val slotWidth = 80.dp
     /** 仅图标模式单槽基准宽 */
     val slotWidthIconOnly = 60.dp
+    /** 「右侧圆形记加班」布局（v0.6.19）：胶囊与圆钮间距；圆钮直径 = 底栏高 */
+    val sideActionGap = 8.dp
 }
 
 /** 响应式断点与限宽（docs 03 §3.2：两档断点 600/840，宽屏限宽居中 + 一级页双栏） */

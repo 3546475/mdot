@@ -26,7 +26,6 @@
     <string name="paymonth_undo">撤销</string>
     <string name="paymonth_sync">同步本月考勤</string>
     <string name="paymonth_sync_confirm_action">确认同步</string>
-    <string name="paymonth_sync_hint">按本月加班/请假记录覆盖加班工资、事假、病假（已设底薪时含基本工资）</string>
     <!-- 记月添加条目预选项（参考主流记工记账 App 常见工资项） -->
     <string-array name="paymonth_subsidy_presets">
         <item>高温补贴</item>

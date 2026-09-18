@@ -3,4 +3,25 @@
     <style name="Theme.MdJiaban" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
+
+    <!--
+      Compose Dialog 的窗口主题：AndroidX Compose 的 DialogWrapper 用 ContextThemeWrapper
+      （宿主 context + 下列样式）包出弹窗窗口主题。decorFitsSystemWindows=false 的弹窗
+      （我们的 SiteBottomSheet 记工弹层即如此）会落到 FloatingDialogWindowTheme ——
+      它显式 `backgroundDimEnabled=true`，于是平台在**宿主窗口**上再叠一层 ~0.6 的压暗，
+      与弹层背景层（SheetBackdropLayer）的压暗/模糊叠乘会把画面整片压黑（实测等效 0.76）。
+
+      覆盖（重名资源按 AGP 合并规则以应用为准，库的 R.style.FloatingDialogWindowTheme 指向这里）：
+      关掉平台压暗，压暗/模糊/缩小全部交给 SheetBackdropLayer，保证与记录弹层观感一致。
+      注意：decorFitsSystemWindows=true 的弹窗（M3 AlertDialog/DatePicker 等）走 DialogWindowTheme，
+      其压暗来自继承链，此处不覆盖 —— 那些对话框仍保留平台默认压暗。
+    -->
+    <style name="FloatingDialogWindowTheme">
+        <item name="android:windowClipToOutline">false</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
+    <!-- 保持与库原样一致（避免重名覆盖时丢项）；decorFitsSystemWindows=true 的弹窗用它 -->
+    <style name="DialogWindowTheme">
+        <item name="android:windowClipToOutline">false</item>
+    </style>
 </resources>

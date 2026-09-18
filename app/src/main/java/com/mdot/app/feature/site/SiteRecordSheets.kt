@@ -69,7 +69,7 @@ internal fun MultiDateDialog(
 ) {
     val today = LocalDate.now()
     val days = (1..today.dayOfMonth).map { today.withDayOfMonth(it) }.filter { it != primary }
-    SiteBottomSheet(title = stringResource(R.string.site_multi_select), onDismiss = onDismiss) {
+    SiteBottomSheet(title = stringResource(R.string.site_multi_select), onDismiss = onDismiss) { dismiss ->
         Text(
             stringResource(R.string.site_multi_select_hint),
             style = MaterialTheme.typography.labelMedium,
@@ -86,7 +86,7 @@ internal fun MultiDateDialog(
             }
         }
         Spacer(Modifier.height(Spacing.m))
-        Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+        Button(onClick = dismiss, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.site_dialog_ok))
         }
     }
@@ -101,7 +101,7 @@ internal fun DayCountDialog(
     onPick: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    SiteBottomSheet(title = title, onDismiss = onDismiss) {
+    SiteBottomSheet(title = title, onDismiss = onDismiss) { _ ->
         DurationGrid(
             selectedHours = current.takeIf { it > 0 }?.let { it / unitMinutes.toDouble() },
             presetSteps = 6,
@@ -121,7 +121,7 @@ internal fun HourInputDialog(
     onDismiss: () -> Unit,
 ) {
     // 复用记加班弹窗的时长网格（预设 0.5–24 + 末位“…”自定义输入格），点格即生效并关窗
-    SiteBottomSheet(title = title, onDismiss = onDismiss) {
+    SiteBottomSheet(title = title, onDismiss = onDismiss) { _ ->
         DurationGrid(
             selectedHours = initialHours?.takeIf { it > 0.0 },
             onPreset = onPick,
@@ -133,7 +133,7 @@ internal fun HourInputDialog(
 @Composable
 internal fun NoteDialog(initial: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var text by remember { mutableStateOf(initial) }
-    SiteBottomSheet(title = stringResource(R.string.site_note), onDismiss = onDismiss) {
+    SiteBottomSheet(title = stringResource(R.string.site_note), onDismiss = onDismiss) { dismiss ->
         OutlinedTextField(
             value = text,
             onValueChange = { text = it.take(100) },
@@ -146,7 +146,7 @@ internal fun NoteDialog(initial: String, onDismiss: () -> Unit, onConfirm: (Stri
             horizontalArrangement = Arrangement.spacedBy(Spacing.m),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+            TextButton(onClick = dismiss, modifier = Modifier.weight(1f)) {
                 Text(stringResource(R.string.site_dialog_cancel))
             }
             Button(onClick = { onConfirm(text) }, modifier = Modifier.weight(1f)) {
@@ -164,7 +164,7 @@ internal fun NoteDialog(initial: String, onDismiss: () -> Unit, onConfirm: (Stri
 @Composable
 internal fun UnitPickerSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> Unit) {
     var pending by remember { mutableStateOf(current) }
-    SiteBottomSheet(title = stringResource(R.string.site_unit_picker_title), onDismiss = onDismiss) {
+    SiteBottomSheet(title = stringResource(R.string.site_unit_picker_title), onDismiss = onDismiss) { dismiss ->
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(Spacing.s),
             verticalArrangement = Arrangement.spacedBy(Spacing.s),
@@ -179,7 +179,7 @@ internal fun UnitPickerSheet(current: String, onSelect: (String) -> Unit, onDism
             horizontalArrangement = Arrangement.spacedBy(Spacing.m),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+            TextButton(onClick = dismiss, modifier = Modifier.weight(1f)) {
                 Text(stringResource(R.string.site_dialog_cancel))
             }
             Button(onClick = { onSelect(pending) }, modifier = Modifier.weight(1f)) {

@@ -60,5 +60,12 @@ enum class AdvancePurpose { WAGE, LIVING, LODGING, LODGING_ALLOW, MEALS, MEALS_A
 /** 深浅色三档 */
 enum class ThemeMode { LIGHT, DARK, SYSTEM }
 
+/**
+ * 弹层背景效果三档（外观页可选，v0.6.18）：
+ * [DIM]=整屏压暗（改造前观感）、[BLUR]=背景模糊、[BLUR_SCALE]=背景模糊 + 缩小成圆角卡片。
+ * 后两档在 Android 11 及以下无 RenderEffect，自动回退为压暗（见 SheetBackdropLayer）。
+ */
+enum class SheetBackdropMode { DIM, BLUR, BLUR_SCALE }
+
 /** 节假日库条目类型 */
 enum class HolidayKind { HOLIDAY, WORKDAY }

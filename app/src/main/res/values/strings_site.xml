@@ -121,7 +121,6 @@
     <string name="site_photo_hint">律师提醒：记工时最好能拍摄工作照片</string>
     <string name="site_add_photo">添加图片</string>
     <string name="site_photo_evidence">留证</string>
-    <string name="site_save_again">保存 并再记一笔</string>
     <string name="site_advance_amount_label">本次借支金额</string>
     <string name="site_sub_advance">借支</string>
     <string name="site_sub_settle">结算</string>

@@ -68,7 +68,7 @@ fun HomeCardsPane(
     val config by vm.config.collectAsStateWithLifecycle()
 
     // 本地编辑草稿：拖动实时换位先改草稿，松手一次性持久化（同底栏配置页）。
-    // 未配置时以 DEFAULT_CARDS 为基线（与首页实际显示一致：热点图/本周柱状默认隐藏）
+    // 未配置时以 DEFAULT_CARDS 为基线（与首页实际显示一致：数据区/收入卡/入口/本周柱状）
     var draft by remember { mutableStateOf(config.cards ?: HomeCardsConfig.DEFAULT_CARDS) }
     LaunchedEffect(config.cards) {
         val saved = config.cards

@@ -58,6 +58,7 @@ import com.mdot.app.core.designsystem.component.SettingRow
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.core.designsystem.paletteOptions
+import com.mdot.app.domain.model.SheetBackdropMode
 import com.mdot.app.domain.model.ThemeMode
 
 /** 外观（F7-6 + F7-7：深浅三档、4 套配色、动态取色开关、底栏槽位配置、首页卡片配置） */
@@ -156,6 +157,33 @@ fun AppearancePane(vm: AppearanceViewModel = hiltViewModel()) {
                             Switch(checked = appearance.dynamicColor, onCheckedChange = { vm.setDynamic(it) })
                         }
                     }
+
+                    // 弹层背景效果（v0.6.18）：压暗 / 模糊 / 模糊缩小
+                    Spacer(Modifier.height(Spacing.l))
+                    Text(
+                        stringResource(R.string.appearance_sheet_backdrop_heading),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Spacer(Modifier.height(Spacing.s))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            SheetBackdropMode.DIM to stringResource(R.string.appearance_sheet_backdrop_dim),
+                            SheetBackdropMode.BLUR to stringResource(R.string.appearance_sheet_backdrop_blur),
+                            SheetBackdropMode.BLUR_SCALE to stringResource(R.string.appearance_sheet_backdrop_blur_scale),
+                        ).forEach { (mode, label) ->
+                            FilterChip(
+                                selected = appearance.sheetBackdropMode == mode,
+                                onClick = { vm.setSheetBackdrop(mode) },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(Spacing.xs))
+                    Text(
+                        stringResource(R.string.appearance_sheet_backdrop_desc),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

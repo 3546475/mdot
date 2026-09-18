@@ -76,6 +76,11 @@ object SlotRegistry {
  * 悬浮胶囊底栏（M3 Expressive 导航形态）：功能槽位等宽排列；
  * 选中槽位由一枚「滑动胶囊」标示（secondaryContainer，弹簧滑动），图标切换为填充变体并弹性放大。
  * 仅图标模式只显示图标；点击无涟漪无阴影（保留按压缩放）。
+ *
+ * 两种布局（外观页可切换）：
+ * - 居中动作（[centerAction]，默认）：胶囊内为「左槽位 + 中央按钮 + 右槽位」；
+ * - 侧边圆钮（[sideAction]）：胶囊内只有槽位，右侧另放一个独立圆钮（如「记加班」，始终仅图标）。
+ *   两者互斥，调用方二选一传入。
  */
 @Composable
 fun JiabanBottomBar(
@@ -90,6 +95,9 @@ fun JiabanBottomBar(
     showIndicator: Boolean = true,
     /** 底栏中央固定操作（如「记加班」主按钮）；null = 无（配置页预览）。槽位左右分组让出中央位 */
     centerAction: (@Composable () -> Unit)? = null,
+    /** 右侧独立圆钮（v0.6.19「记加班按钮置右」布局）：与 [centerAction] 互斥；非空时胶囊只放槽位、
+     *  整组（胶囊 + 间距 + 圆钮）居中 */
+    sideAction: (@Composable () -> Unit)? = null,
 ) {
     // MD3E 出入场（双向对称）：一级→二级弹簧下沉退出、二级→一级弹簧浮入（defaultSpatialSpec）；
     // 进度归零且动画结束后跳过绘制。motionScheme 仅 composable 可调用——先取 spec 再传入（03 文档规则 7）
@@ -126,14 +134,23 @@ fun JiabanBottomBar(
     ) {
         val cellDp = if (iconOnly) BottomBarSpec.slotWidthIconOnly else BottomBarSpec.slotWidth
         val marginPx = with(density) { BottomBarSpec.horizontalMargin.toPx() }
-        val maxWpx = (screenW - 2 * marginPx).roundToInt().coerceAtLeast(0)
+        // 侧边圆钮占位（圆钮直径 + 间距）先从可用宽里扣掉，胶囊按剩余宽收窄
+        val sideReservePx = if (sideAction != null) {
+            with(density) { BottomBarSpec.sideActionGap.toPx() + BottomBarSpec.height.toPx() }
+        } else 0f
+        val maxWpx = (screenW - 2 * marginPx - sideReservePx).roundToInt().coerceAtLeast(0)
         val cells = slots.size + if (centerAction != null) 1 else 0
         val idealWpx = (cells * with(density) { cellDp.toPx() }).roundToInt()
         // 首帧 screenW 尚未测量：先按理想宽渲染，随后收进可用宽度
         val barWpx = if (screenW > 0) idealWpx.coerceAtMost(maxWpx) else idealWpx
+        // 有侧边圆钮时：胶囊左移、圆钮右移，等价于「胶囊 + 间距 + 圆钮」整组居中（无需改成 Row 结构）
+        val sideShiftPx = if (sideAction != null) {
+            with(density) { BottomBarSpec.sideActionGap.toPx() + BottomBarSpec.height.toPx() }
+        } else 0f
         Box(
             Modifier
                 .align(Alignment.BottomCenter)
+                .offset { IntOffset((-sideShiftPx / 2f).roundToInt(), 0) }
                 .width(with(density) { barWpx.toDp() })
                 .height(BottomBarSpec.height)
                 .clip(shape)
@@ -181,6 +198,21 @@ fun JiabanBottomBar(
                 slots.drop(leftCount).forEachIndexed { idx, slot ->
                     SlotCell(slot, leftCount + idx == selectedIndex, iconOnly) { onSlotClick(slot) }
                 }
+            }
+        }
+        if (sideAction != null) {
+            // 右侧独立圆钮（如记加班）：同底对齐、紧贴胶囊右侧，与胶囊一起构成居中组
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .offset {
+                        IntOffset(
+                            ((barWpx + with(density) { BottomBarSpec.sideActionGap.toPx() }) / 2f).roundToInt(),
+                            0,
+                        )
+                    },
+            ) {
+                sideAction()
             }
         }
     }

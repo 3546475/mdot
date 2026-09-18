@@ -41,8 +41,12 @@ class AppViewModel @Inject constructor(
     val bottomBar: StateFlow<BottomBarConfig> = settings.bottomBarFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, BottomBarConfig())
 
-    /** 底栏仅图标模式 */
+    /** 底栏仅图标模式（出厂默认开启） */
     val bottomBarIconOnly: StateFlow<Boolean> = settings.bottomBarIconOnlyFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /** 底栏布局：记加班按钮置右（右侧独立圆钮） */
+    val bottomBarSideAction: StateFlow<Boolean> = settings.bottomBarSideActionFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /** 当前工时制度（顶栏标签、记录弹层文案等使用） */

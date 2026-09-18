@@ -43,7 +43,8 @@ class HomeCardRegistryTest {
     fun `配置模型默认未配置`() {
         assertTrue(HomeCardsConfig().cards == null)
         assertEquals(6, HomeCardsConfig.POOL.size)
-        assertEquals(3, HomeCardsConfig.DEFAULT_CARDS.size)
+        // v0.6.18 出厂默认：数据区 → 收入卡 → 日历/统计入口 → 本周柱状（热点图/月柱状仍默认隐藏）
+        assertEquals(listOf("data", "income", "entries", "weekbar"), HomeCardsConfig.DEFAULT_CARDS)
         assertTrue(HomeCardsConfig.MIN_CARDS >= 1)
     }
 }

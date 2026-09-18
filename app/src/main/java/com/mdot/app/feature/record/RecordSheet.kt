@@ -59,7 +59,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
@@ -93,6 +92,9 @@ import kotlinx.coroutines.delay
 @Composable
 fun RecordSheet(
     request: RecordRequest,
+    /** 弹层可见性状态：由宿主（AppRoot）持有——背景「模糊 + 缩小」层与本弹层共享同一过渡状态，
+     *  进出场因此严格同步。本弹层只负责置 targetState（打开 true / 关闭 false）。 */
+    visibleState: MutableTransitionState<Boolean>,
     onDismiss: () -> Unit,
     vm: RecordSheetViewModel = hiltViewModel(),
 ) {
@@ -109,12 +111,13 @@ fun RecordSheet(
     LaunchedEffect(request.token) {
         expanded = false
         vm.bind(request)
+        // 每次打开重置过渡状态→true（放在 request.token 键下：
+        // 原写法在组合体内无条件置 true，退场途中任何一次重组都会把动画拉回，故改由此处一次性触发）
+        visibleState.targetState = true
     }
 
     // 自实现底部弹层（M3 ModalBottomSheet 在内容高度变化时锚点会误判滑出，故弃用）
     var dismissRequested by rememberSaveable { mutableStateOf(false) }
-    val visibleState = remember { MutableTransitionState(false) }
-    visibleState.targetState = true
     // B6-02：弹层进出场接入 motionScheme（原 tween(Duration.*) 绕过动效体系）
     val sheetEnterSpec = MaterialTheme.motionScheme.slowSpatialSpec<androidx.compose.ui.unit.IntOffset>()
     val sheetFadeSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
@@ -138,6 +141,8 @@ fun RecordSheet(
     // 遮罩与面板拆成两个 AnimatedVisibility（共享同一 visibleState）：遮罩原地淡入淡出、
     // 面板自下而上滑入/下滑淡出——避免遮罩跟随上推，且保证退出动画完整播放
     // （原外层 if 会在 dismiss 同帧移除组合，吞掉 exit 动画，导致弹层突兀消失）
+    // 遮罩本体已透明：压暗/模糊/缩小由宿主的 SheetBackdropLayer 负责，此处只保留「挡板」
+    // 职责（消费点击、拦截穿透），背景色留着会与背景层叠加成双重压暗
     AnimatedVisibility(
         visibleState = visibleState,
         enter = fadeIn(sheetFadeSpec),
@@ -146,7 +151,6 @@ fun RecordSheet(
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.4f))
                 .pointerInput(Unit) { detectTapGestures { requestDismiss() } }
         )
     }

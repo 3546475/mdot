@@ -1,5 +1,7 @@
 package com.mdot.app.feature.site
 
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
@@ -31,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import com.mdot.app.feature.record.rememberSaveWithHaptic
@@ -53,7 +57,10 @@ import com.mdot.app.R
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.DatePick
+import com.mdot.app.core.designsystem.component.LocalSheetBackdropState
 import com.mdot.app.core.designsystem.component.SegmentBar
+import com.mdot.app.core.designsystem.component.SheetBackdropLayer
+import com.mdot.app.core.designsystem.component.ShrinkFeedbackButton
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.navigation.bottomBarContentPaddingValues
 import java.time.LocalDate
@@ -90,11 +97,19 @@ fun SiteRecordScreen(
     // 日期选择弹窗：项目+日期卡上移为固定区（四种表单共用），弹窗随之提升到弹层级
     var showDatePicker by remember { mutableStateOf(false) }
     var showMultiDate by remember { mutableStateOf(false) }
-    // 保存打勾反馈：点保存后按钮短暂变 ✓ 再执行保存（成功后经 saved 状态返回）
+    // 保存反馈：单颗「保存」＝原地保存并留在本页（原「保存 并再记一笔」行为），
+    // 反馈动效＝按钮对称收缩成 ✓ 圆钮再展开（与工资页保存同款，实现在 ShrinkFeedbackButton）
     var saveFlash by remember { mutableStateOf(false) }
     val saveHaptic = rememberSaveWithHaptic()
     val scope = rememberCoroutineScope()
     LaunchedEffect(state.error) { if (state.error != null) saveFlash = false }
+    // ✓ 收起：本页不关闭，必须自行回退（停留一拍给足确认感）
+    LaunchedEffect(saveFlash) {
+        if (saveFlash) {
+            delay(900)
+            saveFlash = false
+        }
+    }
     // motionScheme 仅 composable 可调用：先取 spec 再传入 transitionSpec（非 Composable 上下文）
     val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntOffset>()
     val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
@@ -115,195 +130,148 @@ fun SiteRecordScreen(
         scope.launch { formPager.animateScrollToPage(targetPage) }
     }
 
-    /** 保存 + 触觉/打勾反馈：延迟极短一拍展示 ✓，再真正执行保存 */
-    fun saveWithFeedback(keepOpen: Boolean, onDone: () -> Unit = {}) {
+    /** 保存（原地保存并留在本页继续记）+ 反馈：触觉 + 收缩成 ✓ 再展开 */
+    fun saveWithFeedback() {
         saveHaptic()
-        if (keepOpen) {
-            saveCurrent(keepOpen = true)
-        } else {
-            saveFlash = true
-            scope.launch {
-                delay(350)
-                saveCurrent(keepOpen = false, onDone = onDone)
-            }
-        }
+        saveFlash = true
+        saveCurrent(keepOpen = true)
     }
 
+    // 弹层背景层：本页所有底部弹层（多选日期/工量单位/选工天/选小时/备注/点工标准）
+    // 都是独立窗口的 Dialog，状态经 LocalSheetBackdropState 下发与背景层共享、进出场同拍
+    val sheetVisible = remember { MutableTransitionState(false) }
     Box(
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface),
     ) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .padding(horizontal = Spacing.page),
-        ) {
-            RecordHeader(formPager, onBack = onBack, onSwitchTop = ::switchTop)
-
-            // 项目 + 日期：固定区（四种表单共用，横滑手势只发生在其下方）
-            ProjectDateCard(
-                state = state,
-                onOpenProjectPick = onOpenProjectPick,
-                onShowDatePicker = { showDatePicker = true },
-                onShowMultiDate = { showMultiDate = true },
-            )
-            Spacer(Modifier.height(Spacing.s))
-
-            // 子页签滑条：跟随表单分页（记账→点工/包工；记借支/结算→借支/结算），跨界时整组切换
-            val p = formPager.currentPage + formPager.currentPageOffsetFraction
-            val topTab = if (formPager.currentPage >= 2) 1 else 0
-            val subPos = (if (topTab == 0) p else p - 2f).coerceIn(0f, 1f)
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                SegmentBar(
-                    labels = if (topTab == 0) listOf(
-                        stringResource(R.string.site_sub_day),
-                        stringResource(R.string.site_sub_piece),
-                    ) else listOf(
-                        stringResource(R.string.site_sub_advance),
-                        stringResource(R.string.site_sub_settle),
-                    ),
-                    selected = formPager.currentPage % 2,
-                    onSelect = { target ->
-                        scope.launch { formPager.animateScrollToPage(topTab * 2 + target) }
-                    },
-                    segWidth = 112.dp,
-                    position = subPos,
-                )
-            }
-            Spacer(Modifier.height(Spacing.s))
-
-            // 表单分页：内容区横滑切子页签；子页签尽头继续滑自然联动上级页签（包工→借支、借支→包工）
-            HorizontalPager(
-                state = formPager,
-                modifier = Modifier.weight(1f),
-                beyondViewportPageCount = 3,
-            ) { page ->
+        CompositionLocalProvider(LocalSheetBackdropState provides sheetVisible) {
+            // 背景层只包「会被弹层压住的页面内容」（顶部固定区/表单分页/悬浮保存）——
+            // 弹层是独立窗口，留在层外更清晰（放里面也无影响，但语义上它们不属于背景）
+            SheetBackdropLayer(visible = sheetVisible.targetState) {
                 Column(
                     Modifier
                         .fillMaxSize()
-                        .verticalScroll(rememberScrollState()),
+                        .statusBarsPadding()
+                        .padding(horizontal = Spacing.page),
                 ) {
-                    if (state.loading) {
-                        Text(
-                            stringResource(R.string.site_settlement_loading),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = Spacing.xl),
-                        )
-                    } else when (page) {
-                        0 -> AttendanceForm(state, vm)
-                        1 -> PieceForm(state, vm, onOpenUnitSheet = { showUnitSheet = true })
-                        2 -> AdvanceForm(state, vm)
-                        else -> SettleForm(state, vm, onOpenSettlement)
-                    }
-                    // 表单与备注/照片卡之间留间距（此前缺失导致卡片贴边重叠观感）
-                    Spacer(Modifier.height(Spacing.s))
-                    val onCashPage = page >= 2
-                    NotePhotoSection(
-                        note = if (onCashPage) state.advanceNote else state.note,
-                        onNote = { if (onCashPage) vm.onAdvanceNote(it) else vm.onNote(it) },
-                        photos = state.photos,
-                        onAddPhotos = { vm.addPhotos(it) },
-                        onRemovePhoto = { vm.removePhoto(it) },
+                    RecordHeader(formPager, onBack = onBack, onSwitchTop = ::switchTop)
+
+                    // 项目 + 日期：固定区（四种表单共用，横滑手势只发生在其下方）
+                    ProjectDateCard(
+                        state = state,
+                        onOpenProjectPick = onOpenProjectPick,
+                        onShowDatePicker = { showDatePicker = true },
+                        onShowMultiDate = { showMultiDate = true },
                     )
-                    // 底部操作条避让：用全局标准值（底栏高 + 边距 + 导航条），且必须位于滚动内容内部
-                    Spacer(Modifier.height(bottomBarContentPaddingValues().calculateBottomPadding()))
+                    Spacer(Modifier.height(Spacing.s))
+
+                    // 子页签滑条：跟随表单分页（记账→点工/包工；记借支/结算→借支/结算），跨界时整组切换
+                    val p = formPager.currentPage + formPager.currentPageOffsetFraction
+                    val topTab = if (formPager.currentPage >= 2) 1 else 0
+                    val subPos = (if (topTab == 0) p else p - 2f).coerceIn(0f, 1f)
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        SegmentBar(
+                            labels = if (topTab == 0) listOf(
+                                stringResource(R.string.site_sub_day),
+                                stringResource(R.string.site_sub_piece),
+                            ) else listOf(
+                                stringResource(R.string.site_sub_advance),
+                                stringResource(R.string.site_sub_settle),
+                            ),
+                            selected = formPager.currentPage % 2,
+                            onSelect = { target ->
+                                scope.launch { formPager.animateScrollToPage(topTab * 2 + target) }
+                            },
+                            segWidth = 112.dp,
+                            position = subPos,
+                        )
+                    }
+                    Spacer(Modifier.height(Spacing.s))
+
+                    // 表单分页：内容区横滑切子页签；子页签尽头继续滑自然联动上级页签（包工→借支、借支→包工）
+                    HorizontalPager(
+                        state = formPager,
+                        modifier = Modifier.weight(1f),
+                        beyondViewportPageCount = 3,
+                    ) { page ->
+                        Column(
+                            Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState()),
+                        ) {
+                            if (state.loading) {
+                                Text(
+                                    stringResource(R.string.site_settlement_loading),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = Spacing.xl),
+                                )
+                            } else when (page) {
+                                0 -> AttendanceForm(state, vm)
+                                1 -> PieceForm(state, vm, onOpenUnitSheet = { showUnitSheet = true })
+                                2 -> AdvanceForm(state, vm)
+                                else -> SettleForm(state, vm, onOpenSettlement)
+                            }
+                            // 表单与备注/照片卡之间留间距（此前缺失导致卡片贴边重叠观感）
+                            Spacer(Modifier.height(Spacing.s))
+                            val onCashPage = page >= 2
+                            NotePhotoSection(
+                                note = if (onCashPage) state.advanceNote else state.note,
+                                onNote = { if (onCashPage) vm.onAdvanceNote(it) else vm.onNote(it) },
+                                photos = state.photos,
+                                onAddPhotos = { vm.addPhotos(it) },
+                                onRemovePhoto = { vm.removePhoto(it) },
+                            )
+                            // 底部操作条避让：用全局标准值（底栏高 + 边距 + 导航条），且必须位于滚动内容内部
+                            Spacer(Modifier.height(bottomBarContentPaddingValues().calculateBottomPadding()))
+                        }
+                    }
+                }
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(horizontal = Spacing.l)
+                        .padding(bottom = Spacing.m),
+                ) {
+                    // 单颗「保存」：尺寸对齐记月「同步本月考勤」（48dp 高 / 24dp 内边距 / 最小宽 144dp）；
+                    // 行为＝原「保存 并再记一笔」（原地保存并留在本页继续记）；反馈动效与工资页保存同款
+                    ShrinkFeedbackButton(
+                        text = stringResource(R.string.site_record_save),
+                        busy = saveFlash,
+                        onClick = ::saveWithFeedback,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
-        }
 
-        if (showDatePicker) {
-            DatePick(initial = state.date, onPick = { vm.onDate(it) }, onDismiss = { showDatePicker = false })
-        }
-        if (showMultiDate) {
-            MultiDateDialog(
-                primary = state.date,
-                selected = state.extraDates,
-                onToggle = { vm.onToggleExtraDate(it) },
-                onDismiss = { showMultiDate = false },
-            )
-        }
-
-        // 工量单位选择：自实现底部弹层（M3 ModalBottomSheet 锚点随内容高度变化会误判滑出，故不用）
-        if (showUnitSheet) {
-            UnitPickerSheet(
-                current = state.pieceUnit,
-                onSelect = {
-                    vm.onPieceUnit(it)
-                    showUnitSheet = false
-                },
-                onDismiss = { showUnitSheet = false },
-            )
-        }
-
-        // ---- 底部悬浮区：错误横幅（就近提示）+ 两颗保存药丸 ----
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(horizontal = Spacing.l)
-                .padding(bottom = Spacing.m),
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.m),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                FloatingSaveButton(
-                    text = stringResource(R.string.site_save_again),
-                    primary = false,
-                    onClick = { saveWithFeedback(keepOpen = true) },
-                )
-                FloatingSaveButton(
-                    text = stringResource(R.string.site_record_save),
-                    primary = true,
-                    flash = saveFlash,
-                    onClick = { saveWithFeedback(keepOpen = false, onDone = onBack) },
+            // ---- 弹层（独立窗口：DatePick 是 M3 DatePickerDialog，其余走 SiteBottomSheet）----
+            if (showDatePicker) {
+                DatePick(initial = state.date, onPick = { vm.onDate(it) }, onDismiss = { showDatePicker = false })
+            }
+            if (showMultiDate) {
+                MultiDateDialog(
+                    primary = state.date,
+                    selected = state.extraDates,
+                    onToggle = { vm.onToggleExtraDate(it) },
+                    onDismiss = { showMultiDate = false },
                 )
             }
-        }
-    }
-}
 
-/** 悬浮保存按钮：胶囊 + 阴影 + 按压缩放（M3E 动效走 motionScheme）；flash=true 时内容变 ✓ 表示已保存 */
-@Composable
-private fun FloatingSaveButton(text: String, primary: Boolean, flash: Boolean = false, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val elevSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-    val pressed by interaction.collectIsPressedAsState()
-    val elevation by animateFloatAsState(
-        targetValue = if (pressed) 3f else 10f,
-        animationSpec = elevSpec,
-        label = "saveFabElevation",
-    )
-    val shape = RoundedCornerShape(Radius.pill)
-    Surface(
-        shape = shape,
-        color = if (primary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
-        shadowElevation = elevation.dp,
-        modifier = Modifier
-            .pressScale(interaction, pressedScale = 0.94f)
-            .clip(shape)
-            .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick),
-    ) {
-        if (flash) {
-            Icon(
-                painterResource(R.drawable.ic_ms_check), null,
-                tint = if (primary) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier
-                    .padding(horizontal = Spacing.xl, vertical = 20.dp)
-                    .size(24.dp),
-            )
-        } else {
-            Text(
-                text,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = if (primary) FontWeight.SemiBold else FontWeight.Medium,
-                color = if (primary) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(horizontal = Spacing.xl, vertical = 20.dp),
-            )
+            // 工量单位选择：自实现底部弹层（M3 ModalBottomSheet 锚点随内容高度变化会误判滑出，故不用）
+            if (showUnitSheet) {
+                UnitPickerSheet(
+                    current = state.pieceUnit,
+                    onSelect = {
+                        vm.onPieceUnit(it)
+                        showUnitSheet = false
+                    },
+                    onDismiss = { showUnitSheet = false },
+                )
+            }
         }
     }
 }

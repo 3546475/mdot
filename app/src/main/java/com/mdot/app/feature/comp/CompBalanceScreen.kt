@@ -43,6 +43,7 @@ import com.mdot.app.core.designsystem.component.InlineConfirmStyle
 import com.mdot.app.core.designsystem.component.MessageSnackbarHost
 import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import com.mdot.app.core.designsystem.component.SectionCard
+import com.mdot.app.core.designsystem.component.ShrinkFeedbackButton
 import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.core.repository.RecordRepository
 import com.mdot.app.core.util.AppResult
@@ -147,6 +148,14 @@ fun CompBalancePane(
     var add by remember { mutableStateOf(true) }
     var hours by remember { mutableStateOf<Double?>(null) }
     var note by remember { mutableStateOf("") }
+    // 「增加/扣减」提交反馈：收缩成 ✓ 圆钮再展开（与工资页保存、记工页保存同款）
+    var addBusy by remember { mutableStateOf(false) }
+    LaunchedEffect(addBusy) {
+        if (addBusy) {
+            delay(900)
+            addBusy = false
+        }
+    }
 
     Box(Modifier.fillMaxSize()) {
     Column(
@@ -224,15 +233,21 @@ fun CompBalancePane(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Button(
+                ShrinkFeedbackButton(
+                    text = stringResource(if (add) R.string.comp_btn_add else R.string.comp_btn_deduct),
+                    busy = addBusy,
+                    enabled = hours != null && (hours ?: 0.0) > 0 && !addBusy,
                     onClick = {
-                        vm.submit(add, hours ?: return@Button, note)
-                        hours = null
-                        note = ""
+                        val h = hours
+                        if (h != null && h > 0) {
+                            vm.submit(add, h, note)
+                            hours = null
+                            note = ""
+                            addBusy = true
+                        }
                     },
-                    enabled = hours != null && (hours ?: 0.0) > 0,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text(stringResource(if (add) R.string.comp_btn_add else R.string.comp_btn_deduct)) }
+                )
             }
         }
 

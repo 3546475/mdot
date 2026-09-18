@@ -9,6 +9,15 @@ object Routes {
     /** 统计页带初始页签：tab=1 工地制度「明细」、tab=2 非工地「明细」；0=统计 */
     const val STATS_PATTERN = "stats?tab={tab}"
 
+    /**
+     * 统计页的「二级页实例」（首页统计卡 / 收入卡明细 / 工资页查看记录等入口专用）。
+     * 与底栏那个一级 Tab 实例彻底分开：本路由不在底栏→不显示固定顶栏/底栏、永远带返回；
+     * 也不再被当成一级页参与整页横滑（用户报告：曾误入底栏那个实例、没有返回）
+     */
+    const val STATS_DETAIL_PATTERN = "statsDetail?tab={tab}"
+
+    fun statsDetail(tab: Int): String = "statsDetail?tab=$tab"
+
     fun stats(tab: Int): String = if (tab <= 0) STATS else "stats?tab=$tab"
     const val PAYROLL = "payroll"
     const val EXPORT = "export"

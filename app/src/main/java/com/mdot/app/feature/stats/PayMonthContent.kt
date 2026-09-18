@@ -137,14 +137,6 @@ fun PayMonthContent(vm: PayMonthViewModel = hiltViewModel()) {
                                 onUndo = vm::undoSync,
                                 resetKey = month,
                             )
-                            Spacer(Modifier.height(Spacing.xs))
-                            // 覆盖范围说明：从旧确认弹窗正文改成常驻提示（点之前就能看到，信息不丢失）
-                            Text(
-                                stringResource(R.string.paymonth_sync_hint),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                            )
                         }
                     }
                 } else null,
