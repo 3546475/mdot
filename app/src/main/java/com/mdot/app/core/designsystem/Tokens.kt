@@ -118,8 +118,14 @@ object BottomBarSpec {
     val slotWidth = 80.dp
     /** 仅图标模式单槽基准宽 */
     val slotWidthIconOnly = 60.dp
-    /** 「右侧圆形记加班」布局（v0.6.19）：胶囊与圆钮间距；圆钮直径 = 底栏高 */
+    /** 「按钮右置」布局：胶囊与圆钮间距 */
     val sideActionGap = 8.dp
+    /** 「按钮右置」布局：右侧圆钮直径（与中央胶囊 52dp 一致；v0.6.19 初版为底栏高 64dp，太大） */
+    val sideActionSize = 52.dp
+    /** 底栏浮层效果：投影高度（让底栏看起来浮在页面内容之上） */
+    val barElevation = 6.dp
+    /** 底栏浮层效果：0.5dp outlineVariant 细描边 */
+    val barBorderWidth = 0.5.dp
 }
 
 /** 响应式断点与限宽（docs 03 §3.2：两档断点 600/840，宽屏限宽居中 + 一级页双栏） */

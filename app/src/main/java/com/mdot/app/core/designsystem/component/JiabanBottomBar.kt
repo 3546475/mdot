@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
@@ -136,7 +138,7 @@ fun JiabanBottomBar(
         val marginPx = with(density) { BottomBarSpec.horizontalMargin.toPx() }
         // 侧边圆钮占位（圆钮直径 + 间距）先从可用宽里扣掉，胶囊按剩余宽收窄
         val sideReservePx = if (sideAction != null) {
-            with(density) { BottomBarSpec.sideActionGap.toPx() + BottomBarSpec.height.toPx() }
+            with(density) { BottomBarSpec.sideActionGap.toPx() + BottomBarSpec.sideActionSize.toPx() }
         } else 0f
         val maxWpx = (screenW - 2 * marginPx - sideReservePx).roundToInt().coerceAtLeast(0)
         val cells = slots.size + if (centerAction != null) 1 else 0
@@ -145,7 +147,7 @@ fun JiabanBottomBar(
         val barWpx = if (screenW > 0) idealWpx.coerceAtMost(maxWpx) else idealWpx
         // 有侧边圆钮时：胶囊左移、圆钮右移，等价于「胶囊 + 间距 + 圆钮」整组居中（无需改成 Row 结构）
         val sideShiftPx = if (sideAction != null) {
-            with(density) { BottomBarSpec.sideActionGap.toPx() + BottomBarSpec.height.toPx() }
+            with(density) { BottomBarSpec.sideActionGap.toPx() + BottomBarSpec.sideActionSize.toPx() }
         } else 0f
         Box(
             Modifier
@@ -153,8 +155,11 @@ fun JiabanBottomBar(
                 .offset { IntOffset((-sideShiftPx / 2f).roundToInt(), 0) }
                 .width(with(density) { barWpx.toDp() })
                 .height(BottomBarSpec.height)
+                // 底栏浮层效果（v0.6.20）：投影 + 细描边，让底栏看起来浮在页面内容之上
+                .shadow(elevation = BottomBarSpec.barElevation, shape = shape)
                 .clip(shape)
                 .background(barColor)
+                .border(BottomBarSpec.barBorderWidth, MaterialTheme.colorScheme.outlineVariant, shape)
                 .onSizeChanged { barWidth = it.width },
         ) {
             // 滑动胶囊：M3 Expressive 活动指示，弹簧滑动到目标槽位

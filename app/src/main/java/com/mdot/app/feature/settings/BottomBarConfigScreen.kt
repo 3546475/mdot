@@ -126,11 +126,6 @@ fun BottomBarPane(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.appearance_side_action), style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        stringResource(R.string.appearance_side_action_desc),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
                 Switch(checked = sideAction, onCheckedChange = vm::setSideAction)
             }

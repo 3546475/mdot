@@ -790,7 +790,7 @@ private fun RecordCircleButton(
         color = MaterialTheme.colorScheme.primary,
         shadowElevation = elevation.dp,
         modifier = Modifier
-            .size(BottomBarSpec.height)
+            .size(BottomBarSpec.sideActionSize)
             .graphicsLayer {
                 val e = entrance.value
                 alpha = e
@@ -807,7 +807,7 @@ private fun RecordCircleButton(
             Icon(
                 painterResource(R.drawable.ic_ms_more_time), null,
                 tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(26.dp),
+                modifier = Modifier.size(24.dp),
             )
         }
     }

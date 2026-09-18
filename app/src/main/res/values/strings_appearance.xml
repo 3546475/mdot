@@ -22,8 +22,7 @@
     <!-- 底栏配置页 -->
     <string name="appearance_icon_only">仅图标</string>
     <string name="appearance_icon_only_desc">开启后底栏只显示图标，不显示文字</string>
-    <string name="appearance_side_action">记加班按钮置右</string>
-    <string name="appearance_side_action_desc">开启后底栏右侧为独立圆形记加班按钮（始终不显示文字）；关闭则仍居中显示</string>
+    <string name="appearance_side_action">按钮右置</string>
     <string name="appearance_preview">预览</string>
     <string name="appearance_drag_reorder">拖动排序</string>
 
