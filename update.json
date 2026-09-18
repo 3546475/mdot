@@ -1,16 +1,16 @@
 {
-  "versionName": "0.6.18",
-  "versionCode": 46,
-  "tag": "v0.6.18",
-  "releaseNotes": "## 更新内容\n\n- 弹层背景可自选：新增「外观 → 弹层背景」三档——压暗 / 模糊 / 模糊缩小（默认模糊），记加班弹窗与工地记工弹窗同步生效；旧版固定压暗\n- 新增底栏布局：可在「外观 → 底栏」把记加班按钮改为底栏**右侧独立圆钮**（只显示图标），与原来的居中胶囊二选一\n- 首页图表与统计页完全统一：本周柱状、月柱状、热力图都能**点击看浮窗、长按补记该日**，两页表现始终一致\n- 修复图表浮窗首次弹出时只显示左半边、右半边随后才出现的问题\n- 日历支持**长按后直接拖动连续多选**：一次手势划过的日期依次选中，批量记加班更快\n- 底部悬浮提示位置上移，不再贴着屏幕下缘\n- 记工页底部两颗按钮合并为**一颗「保存」**：原地保存并留在本页接着记（要离开点左上返回），保存时按钮收缩成对勾再展开；尺寸与记月页按钮一致\n- 工资页「保存」、调休余额「增加调休 / 扣减」改用同款收缩对勾反馈；调休页未选时长时按钮变灰不可点\n- 切换工时制度：撤销窗口缩短为 **0.5 秒**，倒计时一过**自动回首页**\n- 统计页在底栏时：页签条下移到固定顶栏下方（不再被顶栏遮住）；横滑先切页签，滑到尽头继续滑会自动切到相邻底栏页\n- 首页「统计」卡片、收入卡「明细」、工资页「查看记录」现在都进入**带返回的独立页**（不再跳到首页底栏的那个统计页）\n- 出厂默认调整：底栏默认**仅图标**、首页默认包含**本周柱状卡**、弹层背景默认**模糊**\n- 记月页「同步本月考勤」下方的说明文字已移除，页面更清爽\n\n\n系统要求：Android 10（API 29）及以上。",
+  "versionName": "0.6.19",
+  "versionCode": 47,
+  "tag": "v0.6.19",
+  "releaseNotes": "## 更新内容\n\n- 修复：切换工时制度后**不会自动返回首页**的问题 —— 现在确认切换、0.5 秒撤销窗口一过即自动回到首页（撤销仍留在本页继续选）\n\n\n系统要求：Android 10（API 29）及以上。",
   "apkUrl": {
-    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.6.18/MDOT-RELEASE-0.6.18-v8a.apk",
-    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.6.18/MDOT-RELEASE-0.6.18-v7a.apk",
-    "universal": "https://github.com/3546475/mdot/releases/download/v0.6.18/MDOT-RELEASE-0.6.18-dual.apk"
+    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.6.19/MDOT-RELEASE-0.6.19-v8a.apk",
+    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.6.19/MDOT-RELEASE-0.6.19-v7a.apk",
+    "universal": "https://github.com/3546475/mdot/releases/download/v0.6.19/MDOT-RELEASE-0.6.19-dual.apk"
   },
   "apkSha256": {
-    "arm64-v8a": "71e8c88a7138a9403bf2fa02b7737da1ea2b281641bd686539e57ee848450e50",
-    "armeabi-v7a": "a5cb7e8b04648c59b3408300a1368d5f3a11f3017a26d607ae0076be20c73570",
-    "universal": "01c4a26ee6cfbe30fccdb0e38f3a243e64984bd372dde7c05c5edd97f18b9374"
+    "arm64-v8a": "b9a23e9e0e39f8f190c9ccc0e3756888e84fa336147b9137e5f9fbef2cbbb889",
+    "armeabi-v7a": "ca51b3265f748513443ce77ed047f4a112d8b2b07cb75bf705db5f1deff4971b",
+    "universal": "fbc4983895236c6f3fe66862a5e79c412f36bf390feb771a8d1abbbeacce7d56"
   }
 }
