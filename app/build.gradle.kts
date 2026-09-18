@@ -1,4 +1,5 @@
-﻿import java.util.Properties
+﻿import java.net.URI
+import java.util.Properties
 
 // 签名信息（keystore/keystore.properties，不入库；缺失时 release 不签名）
 val keystoreProps = Properties().apply {
@@ -140,31 +141,39 @@ dependencies {
 }
 
 /**
- * Robolectric 运行期依赖（`android-all-instrumented` jar，单个 ~200MB）**改为构建期解析 + 离线目录**。
+ * Robolectric 运行期依赖（`android-all-instrumented` jar，合计 ~263MB）**构建期备好 + 持久离线目录**。
  *
- * 背景（v0.6.17 单测门禁事故，见 docs/11 035）：Robolectric 默认在**测试运行期**从
- * Maven Central 下载这些 jar（`MavenArtifactFetcher`），国内 CI 极不稳 →
- * `HttpURLConnection` IOException，挂掉最先跑的 RecordDaoTest，单测门禁随机失败。
- * 仅靠 `robolectric.dependency.repo.url` 指镜像在 CNB 容器上仍不够（大文件/路径原因，实测仍失败）。
+ * 背景（docs/11 035 修过一次、037/042 又栽一次）：Robolectric 默认在**测试运行期**从 Maven Central
+ * 下载这些 jar（`MavenArtifactFetcher`，无重试）→ 国内 runner 极不稳，挂最先跑的 RecordDaoTest。
+ * v0.6.17 改成「构建期解析 + 离线目录」后**新暴露一层**：解析本身要 263MB 走网络，而 runner 上
+ * `CI` 非空 → settings.gradle.kts 只列了 google/mavenCentral（**没走阿里云镜像**）→ Central 对共享
+ * CI IP 限流 **429 Too Many Requests** → `:app:prepareRobolectricDeps` 解析失败、单测门禁挂、CNB 半发布。
+ * **换镜像治标，缓存命中才是治本。**
  *
- * 做法：用 Gradle 自己的仓库配置（带镜像/重试/缓存）在**构建期**把这些 jar 解析下来，
- * 复制到扁平目录，再让 Robolectric 走**离线模式**只读该目录 —— **测试运行期零网络**。
- * 不把 jar 提交进仓库（避免 ~260MB 入库），Gradle 缓存（CI 已挂载）会跨构建复用。
+ * 做法（双保险）：
+ * 1. **持久离线目录**：jar 备在 `~/.gradle/mdot-robolectric-deps`（CI 已挂载该卷）——**不是 `app/build/`**
+ *    （构建目录会被清）。目录里已备齐 → `upToDateWhen` 直接 UP-TO-DATE：**不解析 configuration、零网络**；
+ * 2. **拿不到才联网**：先让 Gradle 按 settings 的镜像仓库解析；失败再**直连镜像**（阿里云 central →
+ *    阿里云 public → Central，各重试 3 次）+ 大小校验，避免单点故障把门禁打死。
  *
- * ⚠️ 版本名与 Robolectric / targetSdk 绑定：升 Robolectric 或 targetSdk 后需同步更新；
- *    离线模式下缺哪个 jar 会明确报出来（不会静默降级）。
+ * 不把 jar 提交进仓库（避免 263MB 入库）。测试运行期仍走 `robolectric.offline` 只读该目录。
+ * ⚠️ 版本名与 Robolectric / targetSdk 绑定：升级后需同步；离线模式缺 jar 会明确报错（不静默降级）。
  */
 /**
- * ⚠️ 每个 jar **各用一个 configuration**：它们同 group:artifact，放进同一个 configuration 会被
- * Gradle 冲突解析成单一版本（实测 `5.0.2_r3-... -> 15-...`），导致 API 21 的 jar 缺失，
- * 离线模式下 `LocalDependencyResolver` 直接抛「Path is not a file」。
+ * ⚠️ 每个 jar **各用一个 configuration**：同 group:artifact 放同一个 configuration 会被 Gradle 冲突解析
+ * 成单一版本（实测 `5.0.2_r3-… -> 15-…`），API 21 的 jar 缺失 → 离线模式 `LocalDependencyResolver`
+ * 抛「Path is not a file」。
  */
-val robolectricDeps: List<org.gradle.api.artifacts.Configuration> = listOf(
+val minRobolectricJarBytes = 20L * 1024 * 1024
+
+/** (configuration 名, 版本, 目标 jar 文件名) */
+val robolectricJarSpecs = listOf(
     // targetSdk 35 对应的 instrumented jar
-    "robolectricAndroidAll35" to "15-robolectric-12650502-i7",
+    Triple("robolectricAndroidAll35", "15-robolectric-12650502-i7", "android-all-instrumented-15-robolectric-12650502-i7.jar"),
     // Robolectric 初始化 SdkCollection 时还需要最低支持版本（API 21）的 jar
-    "robolectricAndroidAll21" to "5.0.2_r3-robolectric-r0-i7",
-).map { (cfgName, version) ->
+    Triple("robolectricAndroidAll21", "5.0.2_r3-robolectric-r0-i7", "android-all-instrumented-5.0.2_r3-robolectric-r0-i7.jar"),
+)
+val robolectricDeps: List<org.gradle.api.artifacts.Configuration> = robolectricJarSpecs.map { (cfgName, version, _) ->
     configurations.create(cfgName) {
         isCanBeConsumed = false
         isCanBeResolved = true
@@ -172,21 +181,65 @@ val robolectricDeps: List<org.gradle.api.artifacts.Configuration> = listOf(
     }
 }
 
-val robolectricDepsDir = layout.buildDirectory.dir("robolectric-deps")
-val prepareRobolectricDeps by tasks.registering(org.gradle.api.tasks.Copy::class) {
-    robolectricDeps.forEach { from(it) }
-    into(robolectricDepsDir)
+/** 持久离线目录（Gradle 用户目录，CI 已挂载该卷）：跨构建复用，构建目录被清也不丢 */
+val robolectricDepsDir: File = File(gradle.gradleUserHomeDir, "mdot-robolectric-deps")
+
+/** 镜像直连兜底顺序（阿里云 central 专代理 Central，排最前） */
+val robolectricMirrors = listOf(
+    "https://maven.aliyun.com/repository/central",
+    "https://maven.aliyun.com/repository/public",
+    "https://repo1.maven.org/maven2",
+)
+
+fun isReadyRobolectricJar(f: File): Boolean = f.isFile && f.length() > minRobolectricJarBytes
+
+val prepareRobolectricDeps = tasks.register("prepareRobolectricDeps") {
+    description = "把 Robolectric 的 android-all-instrumented jar 备到持久离线目录（测试运行期零网络）"
+    group = "build"
+    inputs.property("robolectricVersions", robolectricJarSpecs.map { it.second })
+    outputs.dir(robolectricDepsDir)
+    // 目录里已备齐 → 直接 UP-TO-DATE：不解析 configuration、不联网（CI 反复构建的关键）
+    outputs.upToDateWhen { robolectricJarSpecs.all { (_, _, fileName) -> isReadyRobolectricJar(File(robolectricDepsDir, fileName)) } }
+    doLast {
+        robolectricDepsDir.mkdirs()
+
+        fun fromGradleCache(cfgName: String, target: File): Boolean = runCatching {
+            val jar = configurations.getByName(cfgName).files.first { it.name.endsWith(".jar") }
+            jar.copyTo(target, overwrite = true)
+            isReadyRobolectricJar(target)
+        }.getOrDefault(false)
+
+        fun fromMirrors(version: String, target: File): Boolean {
+            val rel = "org/robolectric/android-all-instrumented/$version/android-all-instrumented-$version.jar"
+            for (mirror in robolectricMirrors) {
+                repeat(3) {
+                    val ok = runCatching {
+                        URI("$mirror/$rel").toURL().openStream().use { input ->
+                            target.outputStream().use { input.copyTo(it) }
+                        }
+                        isReadyRobolectricJar(target)
+                    }.getOrDefault(false)
+                    if (ok) return true
+                }
+            }
+            return false
+        }
+
+        robolectricJarSpecs.forEach { (cfgName, version, fileName) ->
+            val target = File(robolectricDepsDir, fileName)
+            if (isReadyRobolectricJar(target)) return@forEach
+            val ok = fromGradleCache(cfgName, target) || fromMirrors(version, target)
+            check(ok) { "Robolectric 运行期 jar 准备失败：$version（Gradle 解析与镜像直连均失败）" }
+            logger.lifecycle("✓ Robolectric jar 就绪：$fileName（${target.length() / 1048576} MB）")
+        }
+    }
 }
 
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     dependsOn(prepareRobolectricDeps)
-    // 离线：只从 prepareRobolectricDeps 拷出来的扁平目录取 jar，运行期不联网
+    // 离线：只从上面备好的扁平目录取 jar，运行期零网络
     systemProperty("robolectric.offline", "true")
-    systemProperty("robolectric.dependency.dir", robolectricDepsDir.get().asFile.absolutePath)
-    // 兜底：万一离线目录机制未生效，也别退回 Maven Central（源按 settings.gradle.kts 约定切）
-    val onCi = System.getenv("CI")?.isNotBlank() == true
-    systemProperty(
-        "robolectric.dependency.repo.url",
-        if (onCi) "https://repo1.maven.org/maven2" else "https://maven.aliyun.com/repository/public",
-    )
+    systemProperty("robolectric.dependency.dir", robolectricDepsDir.absolutePath)
+    // 兜底：就算离线目录机制未生效，也只用阿里云 central（别退回对 CI IP 限流的 Maven Central）
+    systemProperty("robolectric.dependency.repo.url", "https://maven.aliyun.com/repository/central")
 }
