@@ -1,16 +1,16 @@
 {
-  "versionName": "0.6.19",
-  "versionCode": 47,
-  "tag": "v0.6.19",
-  "releaseNotes": "## 更新内容\n\n- 修复：切换工时制度后**不会自动返回首页**的问题 —— 现在确认切换、0.5 秒撤销窗口一过即自动回到首页（撤销仍留在本页继续选）\n\n\n系统要求：Android 10（API 29）及以上。",
+  "versionName": "0.6.20",
+  "versionCode": 48,
+  "tag": "v0.6.20",
+  "releaseNotes": "## 更新内容\n\n- 底栏配置更清爽：「记加班按钮置右」更名为**「按钮右置」**，并去掉其下方的说明文字\n- **按钮右置**布局下的圆形记加班按钮缩小到与居中胶囊同尺寸（此前明显偏大）\n- 底栏新增**悬浮质感**：加上投影与细描边，页面内容从底栏下方滚过时层级更清楚\n\n\n系统要求：Android 10（API 29）及以上。",
   "apkUrl": {
-    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.6.19/MDOT-RELEASE-0.6.19-v8a.apk",
-    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.6.19/MDOT-RELEASE-0.6.19-v7a.apk",
-    "universal": "https://github.com/3546475/mdot/releases/download/v0.6.19/MDOT-RELEASE-0.6.19-dual.apk"
+    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.6.20/MDOT-RELEASE-0.6.20-v8a.apk",
+    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.6.20/MDOT-RELEASE-0.6.20-v7a.apk",
+    "universal": "https://github.com/3546475/mdot/releases/download/v0.6.20/MDOT-RELEASE-0.6.20-dual.apk"
   },
   "apkSha256": {
-    "arm64-v8a": "b9a23e9e0e39f8f190c9ccc0e3756888e84fa336147b9137e5f9fbef2cbbb889",
-    "armeabi-v7a": "ca51b3265f748513443ce77ed047f4a112d8b2b07cb75bf705db5f1deff4971b",
-    "universal": "fbc4983895236c6f3fe66862a5e79c412f36bf390feb771a8d1abbbeacce7d56"
+    "arm64-v8a": "4bc68177dc2445951f7c6e6414f9a583d26c97faa00143948935df9f41f7829a",
+    "armeabi-v7a": "236ce294f66911679e29b53f33d5aaa3fc2116e08f648f0768808fae0c80aceb",
+    "universal": "975628c8eb42c7f25f2afde65aefd5761565fa22aa0e0cb4c75d4521b260886a"
   }
 }
