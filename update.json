@@ -1,16 +1,16 @@
 {
-  "versionName": "0.6.20",
-  "versionCode": 48,
-  "tag": "v0.6.20",
-  "releaseNotes": "## 更新内容\n\n- 底栏配置更清爽：「记加班按钮置右」更名为**「按钮右置」**，并去掉其下方的说明文字\n- **按钮右置**布局下的圆形记加班按钮缩小到与居中胶囊同尺寸（此前明显偏大）\n- 底栏新增**悬浮质感**：加上投影与细描边，页面内容从底栏下方滚过时层级更清楚\n\n\n系统要求：Android 10（API 29）及以上。",
+  "versionName": "0.6.21",
+  "versionCode": 49,
+  "tag": "v0.6.21",
+  "releaseNotes": "## 更新内容\n\n- **底栏毛玻璃**（外观 → 底栏「更多选项」里开启）：底栏半透明并**模糊身后的页面内容**，只糊背景、图标文字保持清晰；Android 12 以下自动回退为半透明。**出厂默认关闭**\n- 底栏新增**固定长度**：开启后底栏固定为 4 个项目的长度，不随项目数自适应\n- 底栏配置页改版：原来 4 张开关卡合并成一张**可折叠的「更多选项」卡**（点标题行展开/收起；高度、内容淡入淡出、箭头转向走同一条动画曲线）\n- **底栏槽位与首页卡片的排序规则改版**：开关只控制**显示与否、不再改变顺序**，所有项目（含已关闭的）都能拖拽排序；「首页」「数据区」固定不可关闭\n- 出厂默认调整：底栏默认**只有「首页 + 我的」**（其余项留在列表里、开关为关）；「更多选项」四个开关默认全关；首页默认隐藏「月柱状」「热点图」\n- **固定顶栏新增「外观」入口**（齿轮左侧）：即使把「我的」从底栏移除，也能进入外观 / 首页 / 底栏 / 关于与设置\n- 「按钮右置」的记加班圆钮：**与居中胶囊垂直居中对齐**，尺寸调整为与底栏文字按钮相称；开启毛玻璃时它也是同一套玻璃质感\n- 底栏配置页的**预览与真实底栏完全一致**（含毛玻璃样式、宽度与位置；修正此前预览偏窄、已关闭的项也显示的问题）\n- 同步备份可作为底栏页面：页签不再被固定顶栏遮住，横滑到尽头会自动切到相邻底栏页\n- 修复：底栏/首页配置页的开关切换**没有过渡动画**；切换工时制度页的点击涟漪**超出卡片圆角**\n- 切换工时制度的撤销窗口 **0.5 秒 → 1 秒**（倒计时结束自动回首页）\n- 性能：修复底栏毛玻璃**空闲时每秒重绘 60 次**的问题，整体更顺、更省电\n- 升级兼容：原有底栏 / 首页配置会**自动迁移保留**；从未配置过的按新的出厂默认\n\n\n系统要求：Android 10（API 29）及以上。",
   "apkUrl": {
-    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.6.20/MDOT-RELEASE-0.6.20-v8a.apk",
-    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.6.20/MDOT-RELEASE-0.6.20-v7a.apk",
-    "universal": "https://github.com/3546475/mdot/releases/download/v0.6.20/MDOT-RELEASE-0.6.20-dual.apk"
+    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.6.21/MDOT-RELEASE-0.6.21-v8a.apk",
+    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.6.21/MDOT-RELEASE-0.6.21-v7a.apk",
+    "universal": "https://github.com/3546475/mdot/releases/download/v0.6.21/MDOT-RELEASE-0.6.21-dual.apk"
   },
   "apkSha256": {
-    "arm64-v8a": "4bc68177dc2445951f7c6e6414f9a583d26c97faa00143948935df9f41f7829a",
-    "armeabi-v7a": "236ce294f66911679e29b53f33d5aaa3fc2116e08f648f0768808fae0c80aceb",
-    "universal": "975628c8eb42c7f25f2afde65aefd5761565fa22aa0e0cb4c75d4521b260886a"
+    "arm64-v8a": "dc03bbc6e37377583d387e5421b98a692521aaaa60892b8d83be9eb3205dea03",
+    "armeabi-v7a": "efe63866f758575a979718002f8464ed2bb1c6f570c457069d3b570c796c3d3a",
+    "universal": "4959cf4f8460c06dac50eaba73910a993c88e4f246d4a58cd2bd5673d3be2f2f"
   }
 }
