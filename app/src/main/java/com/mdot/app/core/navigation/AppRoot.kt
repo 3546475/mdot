@@ -13,6 +13,8 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -69,6 +71,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.activity.compose.PredictiveBackHandler
+import kotlinx.coroutines.CancellationException
 import com.mdot.app.AppViewModel
 import com.mdot.app.core.designsystem.AdaptiveContainer
 import com.mdot.app.core.designsystem.AdaptiveSpecs
@@ -76,10 +80,17 @@ import com.mdot.app.core.designsystem.Duration
 import com.mdot.app.core.designsystem.BottomBarSpec
 import com.mdot.app.core.designsystem.LocalWindowSpec
 import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.PredictiveBackSpec
 import com.mdot.app.core.designsystem.WindowSpec
 import com.mdot.app.core.designsystem.rememberContentSideInset
 import com.mdot.app.core.designsystem.rememberWindowSpec
 import com.mdot.app.core.designsystem.component.JiabanBottomBar
+import com.mdot.app.core.designsystem.component.BackdropBlurState
+import com.mdot.app.core.designsystem.component.RecordCircleButton
+import com.mdot.app.core.designsystem.component.RecordPillButton
+import com.mdot.app.core.designsystem.component.backdropBlur
+import com.mdot.app.core.designsystem.component.backdropBlurSource
+import com.mdot.app.core.designsystem.component.rememberBackdropBlurState
 import com.mdot.app.core.designsystem.component.TopLevelBar
 import com.mdot.app.core.designsystem.component.SheetBackdropLayer
 import com.mdot.app.core.designsystem.component.SlotRegistry
@@ -143,6 +154,16 @@ private val lastTabSwipeDir = androidx.compose.runtime.mutableStateOf(1)
  * [dir]：-1 = 上一个槽位（向右滑），+1 = 下一个槽位（向左滑）；非一级页形态下为空实现。
  */
 val LocalPrimaryTabSwipe = compositionLocalOf<(Int) -> Unit> { {} }
+
+/**
+ * 页面级「返回优先」登记（预测性返回的让位开关）。
+ *
+ * 页面在自己需要优先处理返回时置位（目前仅日历页长按多选的「退出多选」），
+ * AppRoot 的 `PredictiveBackHandler` 据此禁用——**OnBackPressedDispatcher 后注册者优先，
+ * 应用级回调注册在 NavHost 之后会盖住页面内的 BackHandler**（否则多选时按返回会直接把页面 pop 掉）。
+ * 页面用 `DisposableEffect(状态) { 置位; onDispose { 复位 } }` 维护。
+ */
+val LocalPageBackInterception = compositionLocalOf { androidx.compose.runtime.mutableStateOf(false) }
 
 /**
  * 一级 Tab 页滑动切换：跟手平移 + 松手后按方向滑出并切换到相邻底栏槽位页。
@@ -251,8 +272,14 @@ fun AppRoot(firstLaunchDone: Boolean, appVm: AppViewModel) {
     // 记录弹层/FAB 等悬浮层各自跟随内容宽度对齐
     val windowSpec = rememberWindowSpec()
     val fabSideInset = rememberContentSideInset()
-    androidx.compose.runtime.CompositionLocalProvider(LocalWindowSpec provides windowSpec) {
-        AppRootContent(firstLaunchDone, appVm, fabSideInset)
+    // 页面级「返回优先」登记：既经 CompositionLocal 下发给各页（页面在自己需优先处理返回时置位，
+    // 如日历长按多选），又供应用级预测性返回判断是否让位——见 [LocalPageBackInterception]
+    val pageBackInterception = remember { mutableStateOf(false) }
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalWindowSpec provides windowSpec,
+        LocalPageBackInterception provides pageBackInterception,
+    ) {
+        AppRootContent(firstLaunchDone, appVm, fabSideInset, pageBackInterception)
     }
 }
 
@@ -261,15 +288,34 @@ private fun AppRootContent(
     firstLaunchDone: Boolean,
     appVm: AppViewModel,
     fabSideInset: androidx.compose.ui.unit.Dp,
+    pageBackInterception: androidx.compose.runtime.MutableState<Boolean>,
 ) {
     val navController = rememberNavController()
     val request by appVm.recordRequest.collectAsStateWithLifecycle()
     // 记录弹层可见性状态提升到此处：背景「模糊 + 缩小」层（SheetBackdropLayer）与弹层自身
     // 共享同一过渡状态，进出场严格同步（弹层内部负责置 targetState）
     val recordSheetVisible = remember { MutableTransitionState(false) }
+    // 底栏毛玻璃：导航宿主为「源」（录制内容层），底栏为「效果方」（模糊身后内容）
+    val backdropBlurState = rememberBackdropBlurState()
+    // 预测性返回（PredictiveBackHandler）：手势进度 0→1 映射为「当前页小幅右移」（不缩放），
+    // 主体留在屏上、侧边只露极窄一条；确认松手继续走右滑出屏的 pop 转场，中途取消弹簧回弹。
+    // 进度只在 graphicsLayer（绘制期）读取——组合期读会逐帧重组整棵树（同底栏 progress 的坑）
+    val backProgress = remember { Animatable(0f) }
+    val backCancelSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
+    // 松手衔接 spec：与 NavHost 的 popExitTransition（`tween(Duration.slow)` 右滑出屏）**同长**——
+    // 位移随转场一起衰减到 0，两段动画衔接成一段（页面级 NavHost 转场不受硬规则 7 约束）
+    val backHandoffSpec = tween<Float>(Duration.slow)
+    // 回弹/衔接动画跑在宿主作用域（而非 handler 协程）：弹栈会重建回调、取消时 handler 协程也可能被
+    // 取消，动画放进去会被中途掐断（位移停在半路，页面歪着不复位）
+    val backAnimScope = rememberCoroutineScope()
+    // 预测性进度事件仅 API33+ 提供；低版本只会一次性给 progress=1，会造成「跳到满位移再 pop」的闪动
+    val predictiveBackSupported =
+        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
     val bottomBar by appVm.bottomBar.collectAsStateWithLifecycle()
     val bottomBarIconOnly by appVm.bottomBarIconOnly.collectAsStateWithLifecycle()
     val bottomBarSideAction by appVm.bottomBarSideAction.collectAsStateWithLifecycle()
+    val bottomBarFixedWidth by appVm.bottomBarFixedWidth.collectAsStateWithLifecycle()
+    val bottomBarFrosted by appVm.bottomBarFrosted.collectAsStateWithLifecycle()
     val workSystem by appVm.workSystem.collectAsStateWithLifecycle()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -289,258 +335,320 @@ private fun AppRootContent(
             // 转场动画（03 文档 §7）：底栏 Tab=淡入淡出 200ms；层级跳转=水平滑入 300ms（返回反向）
             val isTabEntry: (androidx.navigation.NavBackStackEntry) -> Boolean =
                 { entry -> entry.destination.route?.substringBefore('?') in slots }
-            NavHost(
-                navController = navController,
-                startDestination = if (firstLaunchDone) Routes.HOME else Routes.ONBOARDING,
-                modifier = Modifier.fillMaxSize(),
-                enterTransition = {
-                    if (isTabEntry(targetState) && isTabEntry(initialState))
-                        slideInHorizontally(
-                            spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
-                        ) { it * lastTabSwipeDir.value } +
-                            fadeIn(tween(Duration.normal))
-                    else
-                        slideInHorizontally(tween(Duration.slow)) { it } +
-                            fadeIn(tween(Duration.slow)) +
-                            scaleIn(tween(Duration.slow), initialScale = 0.96f)
-                },
-                exitTransition = {
-                    if (isTabEntry(targetState))
-                        slideOutHorizontally(
-                            spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
-                        ) { -it * lastTabSwipeDir.value / 4 } +
-                            fadeOut(tween(Duration.normal))
-                    else
-                        slideOutHorizontally(tween(Duration.slow)) { -it / 4 } +
-                            fadeOut(tween(Duration.slow)) +
-                            scaleOut(tween(Duration.slow), targetScale = 0.96f)
-                },
-                popEnterTransition = {
-                    when {
-                        isTabEntry(targetState) && isTabEntry(initialState) ->
+            // 预测性返回：页面内容包一层（transform 必须在**独立节点**上）—— 与录制 draw 同节点时，
+            // 图层属性变更会连带重跑该节点的显示列表 → 每帧全屏重录（实测 60 次/秒，帧 p90 24ms 卡顿）；
+            // 放独立父节点后，位移变更只重新合成图层、不重建显示列表，录制次数降为 0 ✓
+            // （顶栏/底栏/FAB 是更外层的兄弟节点，不跟着动；效果关闭时不挂 graphicsLayer，避免多余图层）
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (PREDICTIVE_BACK_ENABLED) {
+                            Modifier.graphicsLayer {
+                                translationX = PredictiveBackSpec.translationFor(backProgress.value).toPx()
+                            }
+                        } else Modifier,
+                    ),
+            ) {
+                NavHost(
+                    navController = navController,
+                    startDestination = if (firstLaunchDone) Routes.HOME else Routes.ONBOARDING,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .backdropBlurSource(backdropBlurState),
+                    enterTransition = {
+                        if (isTabEntry(targetState) && isTabEntry(initialState))
                             slideInHorizontally(
                                 spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
                             ) { it * lastTabSwipeDir.value } +
                                 fadeIn(tween(Duration.normal))
-                        isTabEntry(targetState) ->
-                            fadeIn(tween(Duration.normal))
-                        else ->
-                            slideInHorizontally(tween(Duration.slow)) { -it / 4 } +
+                        else
+                            slideInHorizontally(tween(Duration.slow)) { it } +
                                 fadeIn(tween(Duration.slow)) +
-                                scaleIn(tween(Duration.slow), initialScale = 1.04f)
-                    }
-                },
-                popExitTransition = {
-                    if (isTabEntry(targetState) && isTabEntry(initialState))
-                        slideOutHorizontally(
-                            spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
-                        ) { -it * lastTabSwipeDir.value / 4 } +
-                            fadeOut(tween(Duration.normal))
-                    else
-                        slideOutHorizontally(tween(Duration.slow)) { it } +
-                            fadeOut(tween(Duration.slow)) +
-                            scaleOut(tween(Duration.slow), targetScale = 1.04f)
-                },
-            ) {
-                composable(Routes.ONBOARDING) {
-                    AdaptiveContainer {
-                        OnboardingScreen(onDone = { navTo(navController, Routes.HOME, slots, clearStack = true) })
-                    }
-                }
-                composable(Routes.HOME) {
-                    SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.HOME, onNavigate = { navTo(navController, it, slots) }) {
-                        HomeScreen(
-                            onOpenCalendar = { navTo(navController, Routes.CALENDAR_PATTERN, slots) },
-                            onOpenStats = { navTo(navController, Routes.statsDetail(0), slots) },
-                            onOpenDetail = { navTo(navController, Routes.statsDetail(if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) 1 else 2), slots) },
-                            onOpenRecord = {
-                                if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
-                                    navTo(navController, Routes.SITE_RECORD, slots)
-                                } else {
-                                    appVm.recordSheetController.open(java.time.LocalDate.now())
-                                }
-                            },
-                        )
-                    }
-                }
-                composable(
-                    Routes.CALENDAR_PATTERN,
-                    arguments = listOf(navArgument("month") {
-                        type = NavType.StringType
-                        defaultValue = ""
-                    }),
-                ) { entry ->
-                    SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.CALENDAR_PATTERN, onNavigate = { navTo(navController, it, slots) }) {
-                        CalendarScreen(
-                            initialMonth = entry.arguments?.getString("month"),
-                            canBack = !inBar("calendar"),
-                            onBack = { navController.popBackStack() },
-                        )
-                    }
-                }
-                composable(
-                    Routes.STATS_DETAIL_PATTERN,
-                    arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = 0 }),
-                ) { entry ->
-                    // 统计页二级页实例：不包 SwipeTabHost（不参与整页横滑），永远带返回
-                    AdaptiveContainer {
-                        StatsScreen(
-                            canBack = true,
-                            onBack = { navController.popBackStack() },
-                            initialTab = entry.arguments?.getInt("tab") ?: 0,
-                        )
-                    }
-                }
-                composable(
-                    Routes.STATS_PATTERN,
-                    arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = 0 }),
-                ) { entry ->
-                    SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.STATS, onNavigate = { navTo(navController, it, slots) }) {
-                        StatsScreen(
-                            canBack = !inBar("stats"),
-                            onBack = { navController.popBackStack() },
-                            initialTab = entry.arguments?.getInt("tab") ?: 0,
-                        )
-                    }
-                }
-                composable(Routes.PAYROLL) {
-                    SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.PAYROLL, onNavigate = { navTo(navController, it, slots) }) {
+                                scaleIn(tween(Duration.slow), initialScale = 0.96f)
+                    },
+                    exitTransition = {
+                        if (isTabEntry(targetState))
+                            slideOutHorizontally(
+                                spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
+                            ) { -it * lastTabSwipeDir.value / 4 } +
+                                fadeOut(tween(Duration.normal))
+                        else
+                            slideOutHorizontally(tween(Duration.slow)) { -it / 4 } +
+                                fadeOut(tween(Duration.slow)) +
+                                scaleOut(tween(Duration.slow), targetScale = 0.96f)
+                    },
+                    popEnterTransition = {
+                        when {
+                            isTabEntry(targetState) && isTabEntry(initialState) ->
+                                slideInHorizontally(
+                                    spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
+                                ) { it * lastTabSwipeDir.value } +
+                                    fadeIn(tween(Duration.normal))
+                            isTabEntry(targetState) ->
+                                fadeIn(tween(Duration.normal))
+                            else ->
+                                slideInHorizontally(tween(Duration.slow)) { -it / 4 } +
+                                    fadeIn(tween(Duration.slow)) +
+                                    scaleIn(tween(Duration.slow), initialScale = 1.04f)
+                        }
+                    },
+                    popExitTransition = {
+                        if (isTabEntry(targetState) && isTabEntry(initialState))
+                            slideOutHorizontally(
+                                spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
+                            ) { -it * lastTabSwipeDir.value / 4 } +
+                                fadeOut(tween(Duration.normal))
+                        else
+                            slideOutHorizontally(tween(Duration.slow)) { it } +
+                                fadeOut(tween(Duration.slow)) +
+                                scaleOut(tween(Duration.slow), targetScale = 1.04f)
+                    },
+                ) {
+                    composable(Routes.ONBOARDING) {
                         AdaptiveContainer {
-                            PayrollScreen(
-                                canBack = !inBar("payroll"),
-                                onBack = { navController.popBackStack() },
-                                onOpenSiteProjects = { navTo(navController, Routes.SITE_PROJECTS, slots) },
-                                onOpenSiteSettlement = { navTo(navController, Routes.SITE_SETTLEMENT, slots) },
+                            OnboardingScreen(onDone = { navTo(navController, Routes.HOME, slots, clearStack = true) })
+                        }
+                    }
+                    composable(Routes.HOME) {
+                        SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.HOME, onNavigate = { navTo(navController, it, slots) }) {
+                            HomeScreen(
+                                onOpenCalendar = { navTo(navController, Routes.CALENDAR_PATTERN, slots) },
+                                onOpenStats = { navTo(navController, Routes.statsDetail(0), slots) },
+                                onOpenDetail = { navTo(navController, Routes.statsDetail(if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) 1 else 2), slots) },
+                                onOpenRecord = {
+                                    if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
+                                        navTo(navController, Routes.SITE_RECORD, slots)
+                                    } else {
+                                        appVm.recordSheetController.open(java.time.LocalDate.now())
+                                    }
+                                },
                             )
                         }
                     }
-                }
-                composable(Routes.EXPORT) {
-                    SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.EXPORT, onNavigate = { navTo(navController, it, slots) }) {
-                        AdaptiveContainer {
-                            ExportScreen(
-                                canBack = !inBar("export"),
-                                onBack = { navController.popBackStack() },
-                                onViewRecords = { navTo(navController, Routes.statsDetail(if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) 1 else 2), slots) },
-                            )
-                        }
-                    }
-                }
-                composable(Routes.SYNC) {
-                    SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.SYNC, onNavigate = { navTo(navController, it, slots) }) {
-                        AdaptiveContainer {
-                            SyncScreen(
-                                canBack = !inBar("sync"),
+                    composable(
+                        Routes.CALENDAR_PATTERN,
+                        arguments = listOf(navArgument("month") {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        }),
+                    ) { entry ->
+                        SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.CALENDAR_PATTERN, onNavigate = { navTo(navController, it, slots) }) {
+                            CalendarScreen(
+                                initialMonth = entry.arguments?.getString("month"),
+                                canBack = !inBar("calendar"),
                                 onBack = { navController.popBackStack() },
                             )
                         }
                     }
-                }
-                composable(Routes.SYNC_STORAGE) {
-                    AdaptiveContainer {
-                        SyncScreen(canBack = true, initialTab = 1, onBack = { navController.popBackStack() })
-                    }
-                }
-                composable(Routes.PROFILE) {
-                    SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.PROFILE, onNavigate = { navTo(navController, it, slots) }) {
+                    composable(
+                        Routes.STATS_DETAIL_PATTERN,
+                        arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = 0 }),
+                    ) { entry ->
+                        // 统计页二级页实例：不包 SwipeTabHost（不参与整页横滑），永远带返回
                         AdaptiveContainer {
-                            ProfileScreen(
-                                canBack = !inBar("profile"),
+                            StatsScreen(
+                                canBack = true,
+                                onBack = { navController.popBackStack() },
+                                initialTab = entry.arguments?.getInt("tab") ?: 0,
+                            )
+                        }
+                    }
+                    composable(
+                        Routes.STATS_PATTERN,
+                        arguments = listOf(navArgument("tab") { type = NavType.IntType; defaultValue = 0 }),
+                    ) { entry ->
+                        SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.STATS, onNavigate = { navTo(navController, it, slots) }) {
+                            StatsScreen(
+                                canBack = !inBar("stats"),
+                                onBack = { navController.popBackStack() },
+                                initialTab = entry.arguments?.getInt("tab") ?: 0,
+                            )
+                        }
+                    }
+                    composable(Routes.PAYROLL) {
+                        SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.PAYROLL, onNavigate = { navTo(navController, it, slots) }) {
+                            AdaptiveContainer {
+                                PayrollScreen(
+                                    canBack = !inBar("payroll"),
+                                    onBack = { navController.popBackStack() },
+                                    onOpenSiteProjects = { navTo(navController, Routes.SITE_PROJECTS, slots) },
+                                    onOpenSiteSettlement = { navTo(navController, Routes.SITE_SETTLEMENT, slots) },
+                                )
+                            }
+                        }
+                    }
+                    composable(Routes.EXPORT) {
+                        SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.EXPORT, onNavigate = { navTo(navController, it, slots) }) {
+                            AdaptiveContainer {
+                                ExportScreen(
+                                    canBack = !inBar("export"),
+                                    onBack = { navController.popBackStack() },
+                                    onViewRecords = { navTo(navController, Routes.statsDetail(if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) 1 else 2), slots) },
+                                )
+                            }
+                        }
+                    }
+                    composable(Routes.SYNC) {
+                        SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.SYNC, onNavigate = { navTo(navController, it, slots) }) {
+                            AdaptiveContainer {
+                                SyncScreen(
+                                    canBack = !inBar("sync"),
+                                    onBack = { navController.popBackStack() },
+                                )
+                            }
+                        }
+                    }
+                    composable(Routes.SYNC_STORAGE) {
+                        AdaptiveContainer {
+                            SyncScreen(canBack = true, initialTab = 1, onBack = { navController.popBackStack() })
+                        }
+                    }
+                    composable(Routes.PROFILE) {
+                        SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.PROFILE, onNavigate = { navTo(navController, it, slots) }) {
+                            AdaptiveContainer {
+                                ProfileScreen(
+                                    canBack = !inBar("profile"),
+                                    onBack = { navController.popBackStack() },
+                                    onOpen = { route -> navTo(navController, route, slots) },
+                                )
+                            }
+                        }
+                    }
+                    composable(Routes.SYSTEM) {
+                        AdaptiveContainer {
+                            // 顶栏齿轮：当前工时制度的设定多页签页（原工时设置入口列表页移除）
+                            SystemSettingsScreen(
+                                onBack = { navController.popBackStack() },
+                                onOpenProject = { id -> navTo(navController, Routes.siteProjectEdit(id), slots) },
+                            )
+                        }
+                    }
+                    composable(Routes.SYSTEM_SWITCH) {
+                        AdaptiveContainer {
+                            SystemSwitchScreen(
+                                onBack = { navController.popBackStack() },
+                                // 切换确认生效（撤销倒计时结束）后自动回首页（Tab 式导航，恢复首页状态）
+                                onAutoHome = {
+                                    // 回首页用**纯弹栈**：实测 navigate(HOME) + popUpTo(start){saveState}+restoreState
+                                    // 在这里是 no-op（currentDestination 不变、界面不动，debug/release 一样，见 docs/11 043）——
+                                    // 弹栈不走那套 saved-state 机制，也不受 Tab 防抖影响。
+                                    if (!navController.popBackStack(Routes.HOME, inclusive = false)) {
+                                        // 万一首页不在栈里（异常状态）：直接重建到首页
+                                        navTo(navController, Routes.HOME, slots, clearStack = true)
+                                    }
+                                },
+                            )
+                        }
+                    }
+                    composable(Routes.APPEARANCE) {
+                        AdaptiveContainer {
+                            // 「外观」入口进入「外观 / 首页 / 底栏」合并页，默认落「外观」页签
+                            HomeBottomConfigScreen(initialTab = 0, onBack = { navController.popBackStack() })
+                        }
+                    }
+                    composable(Routes.BOTTOM_BAR) {
+                        AdaptiveContainer { HomeBottomConfigScreen(initialTab = 2, onBack = { navController.popBackStack() }) }
+                    }
+                    composable(Routes.HOME_CARDS) {
+                        AdaptiveContainer { HomeBottomConfigScreen(initialTab = 1, onBack = { navController.popBackStack() }) }
+                    }
+                    // ---- 工地记工（12 文档 F-S2/F-S6） ----
+                    composable(
+                        Routes.SITE_PROJECTS_PATTERN,
+                        arguments = listOf(navArgument("pick") {
+                            type = NavType.StringType
+                            defaultValue = "0"
+                        }),
+                    ) { entry ->
+                        AdaptiveContainer {
+                            SiteProjectsScreen(
+                                pickMode = entry.arguments?.getString("pick") == "1",
+                                onBack = { navController.popBackStack() },
+                                onOpenProject = { id -> navTo(navController, Routes.siteProjectEdit(id), slots) },
+                                onPicked = { navController.popBackStack() },
+                            )
+                        }
+                    }
+                    composable(Routes.SITE_PROJECT_EDIT_PATTERN) { entry ->
+                        AdaptiveContainer {
+                            SiteProjectEditScreen(onBack = { navController.popBackStack() })
+                        }
+                    }
+                    composable(Routes.SITE_SETTLEMENT) {
+                        AdaptiveContainer {
+                            SiteSettlementScreen(onBack = { navController.popBackStack() })
+                        }
+                    }
+                    composable(Routes.SITE_RECORD) {
+                        AdaptiveContainer {
+                            SiteRecordScreen(
+                                onBack = { navController.popBackStack() },
+                                onOpenProjectSettings = { id ->
+                                    navTo(navController, Routes.siteProjectEdit(id), slots)
+                                },
+                                onOpenProjectPick = {
+                                    navTo(navController, Routes.siteProjects(pick = true), slots)
+                                },
+                                onOpenSettlement = { navTo(navController, Routes.SITE_SETTLEMENT, slots) },
+                            )
+                        }
+                    }
+                    composable(Routes.DATASOURCE) {
+                        AdaptiveContainer { DataSourceScreen(onBack = { navController.popBackStack() }) }
+                    }
+                    composable(Routes.ABOUT) {
+                        AdaptiveContainer {
+                            AboutScreen(
                                 onBack = { navController.popBackStack() },
                                 onOpen = { route -> navTo(navController, route, slots) },
                             )
                         }
                     }
                 }
-                composable(Routes.SYSTEM) {
-                    AdaptiveContainer {
-                        // 顶栏齿轮：当前工时制度的设定多页签页（原工时设置入口列表页移除）
-                        SystemSettingsScreen(
-                            onBack = { navController.popBackStack() },
-                            onOpenProject = { id -> navTo(navController, Routes.siteProjectEdit(id), slots) },
-                        )
+            }
+
+            // ---- 预测性返回（v0.6.21/UIfix）----
+            // ⚠️ 必须注册在 NavHost **之后**：OnBackPressedDispatcher 后注册者优先，而 NavHost 自带的返回
+            // 回调在 NavHost 调用期间就已注册——本回调若先注册则永远收不到手势进度。
+            // 同理会盖住页面内的 BackHandler（如日历长按多选），故与页面级「返回优先」登记联动让位。
+            // 仅 API33+ 注册：低版本无预测性进度事件，返回交回 NavController 默认回调即可。
+            // ⚠️ 只在一级页之外的**二级页**启用位移：一级（底栏）页的返回转场是「按 Tab 方向滑出」，
+            // 与位移方向相反——页面会先右移 36dp 再反向滑走，看起来就是「卡一下」；
+            // 且一级页手势期间露出的只是背景（无信息量）。一级页交给 NavController 默认回调。
+            PredictiveBackHandler(
+                enabled = PREDICTIVE_BACK_ENABLED &&
+                    navController.previousBackStackEntry != null &&
+                    predictiveBackSupported &&
+                    !showBar &&
+                    !pageBackInterception.value,
+            ) { progressFlow ->
+                try {
+                    // 是否收到过「渐进」进度：非预测性返回（3 键导航 / 无障碍返回 / 硬件返回键）
+                    // 只会给一次 progress=1f——此时不应位移，否则页面会「凭空跳 36dp 再返回」。
+                    var sawPartialProgress = false
+                    // 手势起始时刻：位移前 ~60ms 不出，再在 120ms 内斜坡到满——
+                    // 快速甩手「只想直接返回」时进度会在几十毫秒内冲到 1，若照搬就会先跳 36dp 再返回（卡一下）。
+                    var gestureStartAt = 0L
+                    // 手势进行中：逐事件直接跟随（snapTo 不做动画，跟手）
+                    progressFlow.collect { event ->
+                        val p = event.progress
+                        if (p < 1f) sawPartialProgress = true
+                        if (sawPartialProgress) {
+                            if (gestureStartAt == 0L) gestureStartAt = android.os.SystemClock.uptimeMillis()
+                            val elapsed = android.os.SystemClock.uptimeMillis() - gestureStartAt
+                            val ramp = ((elapsed - 60f) / 120f).coerceIn(0f, 1f)
+                            backProgress.snapTo(p * ramp)
+                        }
                     }
-                }
-                composable(Routes.SYSTEM_SWITCH) {
-                    AdaptiveContainer {
-                        SystemSwitchScreen(
-                            onBack = { navController.popBackStack() },
-                            // 切换确认生效（撤销倒计时结束）后自动回首页（Tab 式导航，恢复首页状态）
-                            onAutoHome = {
-                                // 回首页用**纯弹栈**：实测 navigate(HOME) + popUpTo(start){saveState}+restoreState
-                                // 在这里是 no-op（currentDestination 不变、界面不动，debug/release 一样，见 docs/11 043）——
-                                // 弹栈不走那套 saved-state 机制，也不受 Tab 防抖影响。
-                                if (!navController.popBackStack(Routes.HOME, inclusive = false)) {
-                                    // 万一首页不在栈里（异常状态）：直接重建到首页
-                                    navTo(navController, Routes.HOME, slots, clearStack = true)
-                                }
-                            },
-                        )
-                    }
-                }
-                composable(Routes.APPEARANCE) {
-                    AdaptiveContainer {
-                        // 「外观」入口进入「外观 / 首页 / 底栏」合并页，默认落「外观」页签
-                        HomeBottomConfigScreen(initialTab = 0, onBack = { navController.popBackStack() })
-                    }
-                }
-                composable(Routes.BOTTOM_BAR) {
-                    AdaptiveContainer { HomeBottomConfigScreen(initialTab = 2, onBack = { navController.popBackStack() }) }
-                }
-                composable(Routes.HOME_CARDS) {
-                    AdaptiveContainer { HomeBottomConfigScreen(initialTab = 1, onBack = { navController.popBackStack() }) }
-                }
-                // ---- 工地记工（12 文档 F-S2/F-S6） ----
-                composable(
-                    Routes.SITE_PROJECTS_PATTERN,
-                    arguments = listOf(navArgument("pick") {
-                        type = NavType.StringType
-                        defaultValue = "0"
-                    }),
-                ) { entry ->
-                    AdaptiveContainer {
-                        SiteProjectsScreen(
-                            pickMode = entry.arguments?.getString("pick") == "1",
-                            onBack = { navController.popBackStack() },
-                            onOpenProject = { id -> navTo(navController, Routes.siteProjectEdit(id), slots) },
-                            onPicked = { navController.popBackStack() },
-                        )
-                    }
-                }
-                composable(Routes.SITE_PROJECT_EDIT_PATTERN) { entry ->
-                    AdaptiveContainer {
-                        SiteProjectEditScreen(onBack = { navController.popBackStack() })
-                    }
-                }
-                composable(Routes.SITE_SETTLEMENT) {
-                    AdaptiveContainer {
-                        SiteSettlementScreen(onBack = { navController.popBackStack() })
-                    }
-                }
-                composable(Routes.SITE_RECORD) {
-                    AdaptiveContainer {
-                        SiteRecordScreen(
-                            onBack = { navController.popBackStack() },
-                            onOpenProjectSettings = { id ->
-                                navTo(navController, Routes.siteProjectEdit(id), slots)
-                            },
-                            onOpenProjectPick = {
-                                navTo(navController, Routes.siteProjects(pick = true), slots)
-                            },
-                            onOpenSettlement = { navTo(navController, Routes.SITE_SETTLEMENT, slots) },
-                        )
-                    }
-                }
-                composable(Routes.DATASOURCE) {
-                    AdaptiveContainer { DataSourceScreen(onBack = { navController.popBackStack() }) }
-                }
-                composable(Routes.ABOUT) {
-                    AdaptiveContainer {
-                        AboutScreen(
-                            onBack = { navController.popBackStack() },
-                            onOpen = { route -> navTo(navController, route, slots) },
-                        )
-                    }
+                    // 滑到底松手（手势确认）：**不得瞬间复位**——瞬间复位会先「移回全屏」再播放返回动画，
+                    // 视觉上闪一下。此处先 pop（右滑出屏转场接上手势终态），位移再随转场同长衰减到 0。
+                    navController.popBackStack()
+                    backAnimScope.launch { backProgress.animateTo(0f, backHandoffSpec) }
+                } catch (e: CancellationException) {
+                    // 中途取消：平滑回弹（motionScheme 空间 spec，禁硬编码，硬规则 7）
+                    backAnimScope.launch { backProgress.animateTo(0f, backCancelSpec) }
+                    throw e
                 }
             }
 
@@ -562,6 +670,8 @@ private fun AppRootContent(
                         workSystem = workSystem,
                         onOpenWorkSystem = { navTo(navController, Routes.SYSTEM_SWITCH, slots) },
                         onOpenSettings = { navTo(navController, Routes.SYSTEM, slots) },
+                        // 设置入口兜底：不依赖底栏里是否存在「我的」（见 TopLevelBar 类注释）
+                        onOpenAppearance = { navTo(navController, Routes.APPEARANCE, slots) },
                     )
                 }
             }
@@ -595,6 +705,8 @@ private fun AppRootContent(
                     onRecord = recordAction,
                     playEntrance = !recordPillEntered,
                     onEntranceDone = { recordPillEntered = true },
+                    // 「按钮右置」布局下与底栏共用同一套毛玻璃源（开关关/API<31 时为 null → 实心主色）
+                    backdropBlur = if (bottomBarFrosted) backdropBlurState else null,
                 )
             }
             JiabanBottomBar(
@@ -604,6 +716,8 @@ private fun AppRootContent(
                 iconOnly = bottomBarIconOnly,
                 centerAction = if (bottomBarSideAction) null else recordPill,
                 sideAction = if (bottomBarSideAction) recordCircle else null,
+                backdropBlur = if (bottomBarFrosted) backdropBlurState else null,
+                fixedCells = if (bottomBarFixedWidth) BottomBarSpec.fixedCellCount else 0,
                 onSlotClick = { spec ->
                     // 点击底栏：按目标相对当前位置设置左右平移方向
                     val fromIdx = orderedSlots.indexOf(currentBase)
@@ -660,6 +774,16 @@ private fun AppRootContent(
 }
 
 /**
+ * 预测性返回手势效果总开关。
+ *
+ * ⚠️ 2026-09-20 暂时关闭（用户决定「先关掉、留待之后修改」）：手势过程的
+ * 「位移 + 松手衔接」体感未达预期（快速甩手时仍有顿感、与 pop 转场的方向/时长难以完全对齐），
+ * 实现与坑路已完整保留在下方与 docs/11 046，重新启用只需把本常量置 true。
+ * 关闭后返回交回 NavController 默认回调（与加此特性前一致）。
+ */
+private const val PREDICTIVE_BACK_ENABLED = false
+
+/**
  * 统一导航：
  * - 一级页面（底栏功能池路由）：Tab 式切换——弹回起始页之上、保存/恢复状态，永远落在固定页面；
  * - 二级/次级页面：普通入栈（系统返回可回退）。
@@ -695,120 +819,4 @@ private fun navTo(
         }
     }
     return true
-}
-
-/**
- * 底栏中央主操作按钮（记加班/记工）：主色圆形（M3 FAB 形态），M3E 动效——
- * 入场弹簧弹入（slowSpatialSpec）+ 按压 shape morph（圆形→超圆角方，fastSpatialSpec）+ 阴影贴合（fastEffectsSpec）。
- * spec 须先在 composable 上下文取出再传入动画 API（03 文档规则 7）。
- */
-@Composable
-private fun RecordPillButton(
-    onRecord: () -> Unit,
-    /** 仅首次出现播放弹簧弹入；底栏隐藏→再现（组合销毁重建）时不重播 */
-    playEntrance: Boolean,
-    onEntranceDone: () -> Unit,
-) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val entrance = remember { Animatable(if (playEntrance) 0f else 1f) }
-    val entranceSpec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
-    LaunchedEffect(Unit) {
-        if (playEntrance) {
-            entrance.animateTo(1f, entranceSpec)
-            onEntranceDone()
-        }
-    }
-    val elevSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-    val elevation by animateFloatAsState(
-        targetValue = if (pressed) 1f else 3f,
-        animationSpec = elevSpec,
-        label = "recordPillElevation",
-    )
-    // 方圆形 20dp，与底栏配置页预览完全一致（按压反馈由 pressScale 缩放 + 阴影贴合承担，无形状 morph）
-    val shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)
-    Surface(
-        shape = shape,
-        color = MaterialTheme.colorScheme.primary,
-        shadowElevation = elevation.dp,
-        modifier = Modifier
-            .graphicsLayer {
-                val e = entrance.value
-                alpha = e
-                val scale = 0.8f + 0.2f * e
-                scaleX = scale
-                scaleY = scale
-                translationY = (1f - e) * 24.dp.toPx()
-            }
-            .pressScale(interaction, pressedScale = 0.9f)
-            .clip(shape)
-            .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onRecord),
-    ) {
-        Box(
-            Modifier.size(52.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                painterResource(R.drawable.ic_ms_more_time), null,
-                tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(24.dp),
-            )
-        }
-    }
-}
-
-/**
- * 右侧独立圆形「记加班」按钮（v0.6.19 新增底栏布局）：**始终只显示图标、不显示文字**；
- * 出入场/按压/阴影与中央胶囊按钮完全一致（只换布局，动效沿用原底栏）。
- */
-@Composable
-private fun RecordCircleButton(
-    onRecord: () -> Unit,
-    /** 仅首次出现播放弹簧弹入；底栏隐藏→再现（组合销毁重建）时不重播 */
-    playEntrance: Boolean,
-    onEntranceDone: () -> Unit,
-) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val entrance = remember { Animatable(if (playEntrance) 0f else 1f) }
-    val entranceSpec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
-    LaunchedEffect(Unit) {
-        if (playEntrance) {
-            entrance.animateTo(1f, entranceSpec)
-            onEntranceDone()
-        }
-    }
-    val elevSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-    val elevation by animateFloatAsState(
-        targetValue = if (pressed) 1f else 3f,
-        animationSpec = elevSpec,
-        label = "recordCircleElevation",
-    )
-    val shape = androidx.compose.foundation.shape.CircleShape
-    Surface(
-        shape = shape,
-        color = MaterialTheme.colorScheme.primary,
-        shadowElevation = elevation.dp,
-        modifier = Modifier
-            .size(BottomBarSpec.sideActionSize)
-            .graphicsLayer {
-                val e = entrance.value
-                alpha = e
-                val scale = 0.8f + 0.2f * e
-                scaleX = scale
-                scaleY = scale
-                translationY = (1f - e) * 24.dp.toPx()
-            }
-            .pressScale(interaction, pressedScale = 0.9f)
-            .clip(shape)
-            .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onRecord),
-    ) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Icon(
-                painterResource(R.drawable.ic_ms_more_time), null,
-                tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(24.dp),
-            )
-        }
-    }
 }

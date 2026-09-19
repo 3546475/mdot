@@ -41,12 +41,20 @@ class AppViewModel @Inject constructor(
     val bottomBar: StateFlow<BottomBarConfig> = settings.bottomBarFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, BottomBarConfig())
 
-    /** 底栏仅图标模式（出厂默认开启） */
+    /** 底栏仅图标模式（v0.6.21 起出厂默认关闭） */
     val bottomBarIconOnly: StateFlow<Boolean> = settings.bottomBarIconOnlyFlow
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /** 底栏布局：记加班按钮置右（右侧独立圆钮） */
     val bottomBarSideAction: StateFlow<Boolean> = settings.bottomBarSideActionFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** 底栏固定长度（4 个槽位宽；默认关闭 = 随槽位数自适应） */
+    val bottomBarFixedWidth: StateFlow<Boolean> = settings.bottomBarFixedWidthFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** 底栏毛玻璃（v0.6.21 起默认关闭） */
+    val bottomBarFrosted: StateFlow<Boolean> = settings.bottomBarFrostedFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /** 当前工时制度（顶栏标签、记录弹层文案等使用） */

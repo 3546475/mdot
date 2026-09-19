@@ -79,14 +79,15 @@ class SettingsDataSource @Inject constructor(
 
     // ---- 底栏 ----
     val bottomBarFlow: Flow<BottomBarConfig> =
-        dataStore.data.map { decode(it[BOTTOM_BAR], BottomBarConfig()) }
+        // migrated()：旧格式（只有 slots/cards 的配置）自动补齐成新格式（order + disabled）
+        dataStore.data.map { decode(it[BOTTOM_BAR], BottomBarConfig()).migrated() }
 
     suspend fun setBottomBar(config: BottomBarConfig) =
         dataStore.edit { it[BOTTOM_BAR] = json.encodeToString(config) }
 
     // ---- 首页卡片（v0.6.0 首页卡片可编辑；cards=null=未配置走默认） ----
     val homeCardsFlow: Flow<HomeCardsConfig> =
-        dataStore.data.map { decode(it[HOME_CARDS], HomeCardsConfig()) }
+        dataStore.data.map { decode(it[HOME_CARDS], HomeCardsConfig()).migrated() }
 
     suspend fun setHomeCards(config: HomeCardsConfig) =
         dataStore.edit { it[HOME_CARDS] = json.encodeToString(config) }
@@ -159,8 +160,8 @@ class SettingsDataSource @Inject constructor(
         if (value == null) prefs.remove(AVATAR_PATH) else prefs[AVATAR_PATH] = value
     }
 
-    // ---- 底栏仅图标模式（出厂默认开启）----
-    val bottomBarIconOnlyFlow: Flow<Boolean> = dataStore.data.map { it[BOTTOM_BAR_ICON_ONLY] ?: true }
+    // ---- 底栏仅图标模式（v0.6.21 起**出厂默认关闭**：与「更多选项」其余三项一致，四个开关默认全关）----
+    val bottomBarIconOnlyFlow: Flow<Boolean> = dataStore.data.map { it[BOTTOM_BAR_ICON_ONLY] ?: false }
     suspend fun setBottomBarIconOnly(value: Boolean) =
         dataStore.edit { it[BOTTOM_BAR_ICON_ONLY] = value }
 
@@ -168,6 +169,16 @@ class SettingsDataSource @Inject constructor(
     val bottomBarSideActionFlow: Flow<Boolean> = dataStore.data.map { it[BOTTOM_BAR_SIDE_ACTION] ?: false }
     suspend fun setBottomBarSideAction(value: Boolean) =
         dataStore.edit { it[BOTTOM_BAR_SIDE_ACTION] = value }
+
+    // ---- 底栏固定长度（默认关闭 = 随槽位数自适应；开启后固定为 4 个槽位宽） ----
+    val bottomBarFixedWidthFlow: Flow<Boolean> = dataStore.data.map { it[BOTTOM_BAR_FIXED_WIDTH] ?: false }
+    suspend fun setBottomBarFixedWidth(value: Boolean) =
+        dataStore.edit { it[BOTTOM_BAR_FIXED_WIDTH] = value }
+
+    // ---- 底栏毛玻璃（v0.6.21 起**默认关闭**：用户定为出厂关；半透明 + 模糊身后内容，API<31 回退仅半透明）----
+    val bottomBarFrostedFlow: Flow<Boolean> = dataStore.data.map { it[BOTTOM_BAR_FROSTED] ?: false }
+    suspend fun setBottomBarFrosted(value: Boolean) =
+        dataStore.edit { it[BOTTOM_BAR_FROSTED] = value }
 
     // ---- SQLCipher raw key 迁移标记（旧库完成一次 byte[]→raw key 的 rekey 后置 true；
     //       新装/空库直接置 true）。未置 true 时按 byte[]（PBKDF2）打开，可正常打开旧库。 ----
@@ -218,6 +229,8 @@ class SettingsDataSource @Inject constructor(
         private val AVATAR_PATH = stringPreferencesKey("avatar_path")
         private val BOTTOM_BAR_ICON_ONLY = booleanPreferencesKey("bottom_bar_icon_only")
         private val BOTTOM_BAR_SIDE_ACTION = booleanPreferencesKey("bottom_bar_side_action")
+        private val BOTTOM_BAR_FIXED_WIDTH = booleanPreferencesKey("bottom_bar_fixed_width")
+        private val BOTTOM_BAR_FROSTED = booleanPreferencesKey("bottom_bar_frosted")
 
         const val DEFAULT_NICKNAME = "即兴生长"
     }

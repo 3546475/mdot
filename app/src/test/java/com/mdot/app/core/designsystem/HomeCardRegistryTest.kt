@@ -6,12 +6,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 首页卡片注册表解析（v0.6.0 首页卡片可编辑） */
+/** 首页卡片注册表解析（v0.6.0 首页卡片可编辑；v0.6.21 起单列表模型） */
 class HomeCardRegistryTest {
 
     @Test
-    fun `null 配置回退默认池顺序`() {
-        val specs = HomeCardRegistry.resolve(null)
+    fun `空列表回退整池顺序`() {
+        val specs = HomeCardRegistry.resolve(emptyList())
         assertEquals(HomeCardsConfig.POOL, specs.map { it.id })
     }
 
@@ -34,17 +34,50 @@ class HomeCardRegistryTest {
     }
 
     @Test
-    fun `少于最少张数回退默认`() {
-        val specs = HomeCardRegistry.resolve(emptyList())
-        assertEquals(HomeCardsConfig.POOL, specs.map { it.id })
+    fun `配置模型：出厂默认顺序与默认隐藏`() {
+        val cfg = HomeCardsConfig()
+        // 出厂默认顺序（用户定 2026-09-20）：数据区 - 收入卡 - 日历统计入口 - 周柱状 - 月柱状 - 热点图
+        assertEquals(
+            listOf("data", "income", "entries", "weekbar", "monthbar", "heatmap"),
+            cfg.order,
+        )
+        assertEquals(6, HomeCardsConfig.POOL.size)
+        // 出厂默认隐藏（保持既有首页布局）：月柱状 / 热点图
+        assertEquals(listOf("monthbar", "heatmap"), cfg.disabled)
+        assertEquals(listOf("data", "income", "entries", "weekbar"), cfg.enabledCards)
+        // 数据区不可隐藏
+        assertEquals("data", HomeCardsConfig.DATA)
     }
 
     @Test
-    fun `配置模型默认未配置`() {
-        assertTrue(HomeCardsConfig().cards == null)
-        assertEquals(6, HomeCardsConfig.POOL.size)
-        // v0.6.18 出厂默认：数据区 → 收入卡 → 日历/统计入口 → 本周柱状（热点图/月柱状仍默认隐藏）
-        assertEquals(listOf("data", "income", "entries", "weekbar"), HomeCardsConfig.DEFAULT_CARDS)
-        assertTrue(HomeCardsConfig.MIN_CARDS >= 1)
+    fun `开关不影响顺序：enabledCards 只是 order 去掉 disabled`() {
+        val cfg = HomeCardsConfig(
+            order = listOf("data", "income", "entries", "weekbar", "monthbar", "heatmap"),
+            disabled = listOf("income", "heatmap"),
+        )
+        assertEquals(listOf("data", "entries", "weekbar", "monthbar"), cfg.enabledCards)
+        // 顺序未被开关改动
+        assertEquals(listOf("data", "income", "entries", "weekbar", "monthbar", "heatmap"), cfg.order)
+    }
+
+    @Test
+    fun `数据区即使被写进 disabled 也始终显示`() {
+        val cfg = HomeCardsConfig(disabled = listOf("data", "income"))
+        assertTrue("data" in cfg.enabledCards)
+        assertEquals(
+            listOf("data", "entries", "weekbar", "monthbar", "heatmap"),
+            cfg.enabledCards,
+        )
+    }
+
+    @Test
+    fun `旧配置迁移：启用项在前、其余补后、未启用进 disabled`() {
+        // 旧格式显式配置过（cards 非空）
+        val legacy = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            .decodeFromString<HomeCardsConfig>("""{"cards":["data","income","entries","weekbar"]}""")
+        val migrated = legacy.migrated()
+        assertEquals(listOf("data", "income", "entries", "weekbar", "monthbar", "heatmap"), migrated.order)
+        assertEquals(listOf("monthbar", "heatmap"), migrated.disabled)
+        assertEquals(listOf("data", "income", "entries", "weekbar"), migrated.enabledCards)
     }
 }

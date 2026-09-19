@@ -27,6 +27,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -36,6 +38,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -67,12 +70,10 @@ fun HomeCardsPane(
 ) {
     val config by vm.config.collectAsStateWithLifecycle()
 
-    // 本地编辑草稿：拖动实时换位先改草稿，松手一次性持久化（同底栏配置页）。
-    // 未配置时以 DEFAULT_CARDS 为基线（与首页实际显示一致：数据区/收入卡/入口/本周柱状）
-    var draft by remember { mutableStateOf(config.cards ?: HomeCardsConfig.DEFAULT_CARDS) }
-    LaunchedEffect(config.cards) {
-        val saved = config.cards
-        if (saved != null && draft != saved) draft = saved
+    // 本地编辑草稿（**完整顺序**，含已隐藏项）：拖动实时换位先改草稿，松手一次性持久化（同底栏配置页）
+    var draft by remember { mutableStateOf(config.order) }
+    LaunchedEffect(config.order) {
+        if (draft != config.order) draft = config.order
     }
 
     Column(
@@ -91,9 +92,10 @@ fun HomeCardsPane(
         )
         Spacer(Modifier.height(Spacing.l))
 
-        // 卡片总表：显示中（可拖拽排序）在前、已隐藏在后——与底栏配置页同款单卡
+        // 卡片总表：单列表（对齐底栏配置页 / 班次卡片）——全部卡片同列，每行都能拖拽 + 开关
         HomeCardsConfigCard(
-            draft = draft,
+            order = draft,
+            disabled = config.disabled,
             // 把 from 处的卡片移动到 to（均为 0-based；先取后插，越界双向钳制）
             onSwap = { from, to ->
                 val next = draft.toMutableList()
@@ -104,20 +106,24 @@ fun HomeCardsPane(
                     draft = next
                 }
             },
-            onDragEnd = { vm.applyOrder(draft) },
-            onToggle = { id -> vm.toggle(id) },
+            onDragEnd = { vm.setOrder(draft) },
+            onToggle = { id, enabled -> vm.setEnabled(id, enabled) },
         )
         Spacer(Modifier.height(Spacing.xl))
     }
 }
 
-/** 显示中卡片：拖拽排序（手柄直接拖，无需长按）+ 开关；至少保留一张（VM 层兜底） */
+/**
+ * 卡片总表：**单列表**（对齐底栏配置页 / 班次管理页卡片）——全部卡片同列，每行都能拖拽排序 + 开关。
+ * 开关只影响是否显示（隐藏的只是不在首页出现），**不影响顺序**；「数据区」固定显示、不可隐藏。
+ */
 @Composable
 private fun HomeCardsConfigCard(
-    draft: List<String>,
+    order: List<String>,
+    disabled: List<String>,
     onSwap: (from: Int, to: Int) -> Unit,
     onDragEnd: () -> Unit,
-    onToggle: (id: String) -> Unit,
+    onToggle: (String, Boolean) -> Unit,
 ) {
     var dragFrom by remember { mutableIntStateOf(-1) }
     var draggingId by remember { mutableStateOf<String?>(null) }
@@ -127,13 +133,21 @@ private fun HomeCardsConfigCard(
 
     SectionCard {
         Column(Modifier.padding(vertical = 4.dp)) {
-            draft.forEachIndexed { index, id ->
+            Text(
+                stringResource(R.string.home_cards_data_fixed),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Spacing.l, vertical = 6.dp),
+            )
+            order.forEachIndexed { index, id ->
                 val spec = HomeCardRegistry.resolveSpec(id) ?: return@forEachIndexed
+                val isOn = id !in disabled
+                // 「数据区」固定显示、不可关闭（保证首页至少有一张卡）
+                val closable = id != HomeCardsConfig.DATA
                 key(id) {
                     val currentIndex by rememberUpdatedState(index)
-                    val currentSize by rememberUpdatedState(draft.size)
+                    val currentSize by rememberUpdatedState(order.size)
                     val isDragged = draggingId == id
-                    // M3E：拖拽放大走 motionScheme 弹簧（空间类）
                     val dragScale by animateFloatAsState(
                         targetValue = if (isDragged) 1.05f else 1f,
                         animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
@@ -214,33 +228,14 @@ private fun HomeCardsConfigCard(
                             },
                         contentAlignment = Alignment.CenterStart,
                     ) {
-                            HomeCardRow(
-                                spec = spec,
-                                isOn = true,
-                                draggable = true,
-                                onToggle = { onToggle(id) },
-                            )
+                        HomeCardRow(
+                            spec = spec,
+                            isOn = isOn,
+                            draggable = true,
+                            closable = closable,
+                            onToggle = { onToggle(id, !isOn) },
+                        )
                     }
-                }
-            }
-
-            // 已隐藏（POOL 中不在 draft 的项，顺序按 POOL；开关回开，不可拖）
-            val hidden = HomeCardsConfig.POOL.filter { it !in draft }
-            if (hidden.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-            }
-            hidden.forEach { id ->
-                val spec = HomeCardRegistry.resolveSpec(id) ?: return@forEach
-                Box(
-                    Modifier.fillMaxWidth().height(56.dp),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    HomeCardRow(
-                        spec = spec,
-                        isOn = false,
-                        draggable = false,
-                        onToggle = { onToggle(id) },
-                    )
                 }
             }
         }
@@ -253,12 +248,30 @@ private fun HomeCardRow(
     spec: HomeCardSpec,
     isOn: Boolean,
     draggable: Boolean,
+    /** 可关闭（「数据区」=false：开关置灰，保证首页至少一张卡） */
+    closable: Boolean,
     onToggle: () -> Unit,
 ) {
-    val contentColor = if (isOn) MaterialTheme.colorScheme.onSurface
-    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-    val handleColor = if (draggable) MaterialTheme.colorScheme.onSurfaceVariant
-    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+    // 颜色随开关切换过渡（原先瞬间跳变）
+    val colorSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Color>()
+    val contentColor by animateColorAsState(
+        targetValue = if (isOn) MaterialTheme.colorScheme.onSurface
+        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+        animationSpec = colorSpec,
+        label = "homeCardRowContent",
+    )
+    val handleColor by animateColorAsState(
+        targetValue = if (draggable) MaterialTheme.colorScheme.onSurfaceVariant
+        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+        animationSpec = colorSpec,
+        label = "homeCardRowHandle",
+    )
+    val iconBoxColor by animateColorAsState(
+        targetValue = if (isOn) MaterialTheme.colorScheme.secondaryContainer
+        else MaterialTheme.colorScheme.surfaceContainerHighest,
+        animationSpec = colorSpec,
+        label = "homeCardRowIconBox",
+    )
 
     Row(
         Modifier
@@ -277,11 +290,7 @@ private fun HomeCardRow(
         Box(
             modifier = Modifier
                 .size(34.dp)
-                .background(
-                    if (isOn) MaterialTheme.colorScheme.secondaryContainer
-                    else MaterialTheme.colorScheme.surfaceContainerHighest,
-                    RoundedCornerShape(Radius.small),
-                ),
+                .background(iconBoxColor, RoundedCornerShape(Radius.small)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -298,6 +307,6 @@ private fun HomeCardRow(
             color = contentColor,
             modifier = Modifier.weight(1f),
         )
-        Switch(checked = isOn, onCheckedChange = { onToggle() })
+        Switch(checked = isOn, onCheckedChange = if (closable) { { onToggle() } } else null, enabled = closable)
     }
 }

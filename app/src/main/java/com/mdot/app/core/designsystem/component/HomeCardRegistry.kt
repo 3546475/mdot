@@ -26,12 +26,10 @@ object HomeCardRegistry {
         "monthbar" to HomeCardSpec("monthbar", R.string.home_card_monthbar, R.drawable.ic_ms_bar_chart),
     )
 
-    /** 解析出有效显示序列：null/未配置 = POOL 默认；剔除未知 id；去重；不足 MIN_CARDS 回退默认 */
-    fun resolve(cards: List<String>?): List<HomeCardSpec> {
-        if (cards == null) return POOL_SPECS
+    /** 解析出有效显示序列（调用方传「已启用」列表，顺序即显示顺序）：剔除未知 id、去重；空则回退整池 */
+    fun resolve(cards: List<String>): List<HomeCardSpec> {
         val cleaned = cards.filter { ALL.containsKey(it) }.distinct()
-        return if (cleaned.size < HomeCardsConfig.MIN_CARDS) POOL_SPECS
-        else cleaned.mapNotNull { ALL[it] }
+        return if (cleaned.isEmpty()) POOL_SPECS else cleaned.mapNotNull { ALL[it] }
     }
 
     val POOL_SPECS: List<HomeCardSpec> = HomeCardsConfig.POOL.mapNotNull { ALL[it] }

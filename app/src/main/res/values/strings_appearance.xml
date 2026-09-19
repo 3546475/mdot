@@ -21,8 +21,11 @@
 
     <!-- 底栏配置页 -->
     <string name="appearance_icon_only">仅图标</string>
-    <string name="appearance_icon_only_desc">开启后底栏只显示图标，不显示文字</string>
+    <string name="appearance_frosted">毛玻璃</string>
     <string name="appearance_side_action">按钮右置</string>
+    <string name="appearance_fixed_width">固定长度</string>
+    <string name="appearance_options">更多选项</string>
+    <string name="appearance_slots_home_fixed">首页固定显示，不在此列表</string>
     <string name="appearance_preview">预览</string>
     <string name="appearance_drag_reorder">拖动排序</string>
 

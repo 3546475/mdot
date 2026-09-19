@@ -9,6 +9,13 @@
     <!-- allowBackup 必须 false：系统备份会带走 DataStore（含 KeyStore 包裹的库密钥密文）与 SQLCipher 库文件，
          但 AndroidKeyStore 主密钥设备绑定、不随备份迁移——云恢复后密文必解不开，曾致启动崩溃死循环
          （13 文档 B2-01；DbKeyManager 有换钥+旧库隔离兜底，但数据视同丢失）。应用内自有 WebDAV/S3 备份体系。 -->
+    <!-- ⚠️ 预测性返回手势效果当前**暂时关闭**（2026-09-20 用户决定，实现保留在 AppRoot，
+         由 PREDICTIVE_BACK_ENABLED 门控）。重新启用时必须在本 <application> 上加上
+         android:enableOnBackInvokedCallback="true"——targetSdk<36 时它**默认关闭**
+         （AOSP 仅在 targetSdk≥36 默认开），不开则收不到 BackEvent 进度、手势无动画。
+         开启后返回统一走 OnBackInvokedCallback 路径，页面内返回必须用 androidx BackHandler
+         （不得用已废弃的 onBackPressed 重写）——本仓返回拦截均为 BackHandler，已兼容。
+         为保持「关闭 = 与加此特性前一致」，本 flag 也已一并撤下；详见 docs/11 046。 -->
     <application
         android:name=".JiabanApplication"
         android:allowBackup="false"

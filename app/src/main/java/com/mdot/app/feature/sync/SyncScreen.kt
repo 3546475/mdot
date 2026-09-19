@@ -8,9 +8,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.pager.HorizontalPager
@@ -41,6 +44,8 @@ import com.mdot.app.R
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.SegmentBar
+import com.mdot.app.core.designsystem.component.TopBarHeight
+import com.mdot.app.core.navigation.primaryTabEdgeRelay
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.MessageSnackbarHost
 import com.mdot.app.core.designsystem.component.InlineLoadingButton
@@ -69,7 +74,6 @@ fun SyncScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val pagerState = rememberPagerState(initialPage = initialTab.coerceIn(0, 1), pageCount = { 2 })
-    val scope = rememberCoroutineScope()
 
     // 本地文件备份：导出选择位置 / 导入打开文件
     val createDoc = rememberLauncherForActivityResult(
@@ -86,25 +90,33 @@ fun SyncScreen(
     ) {
         Column(
             Modifier
-                .fillMaxSize(),
+                .fillMaxSize()
+                // 一级 Tab 形态的「边缘接力」：内层 pager 到尽头后把余量交给整页横滑切相邻一级 Tab
+                // （与统计页同款，见 docs/11 041）
+                .primaryTabEdgeRelay(pagerState),
         ) {
-            JiabanTopBar(
-                title = null,
-                titleContent = {
-                    SegmentBar(
-                        labels = listOf(
-                            stringResource(R.string.sync_tab_backup),
-                            stringResource(R.string.sync_tab_storage),
-                        ),
-                        selected = pagerState.currentPage,
-                        onSelect = { i -> scope.launch { pagerState.animateScrollToPage(i) } },
-                        segWidth = 112.dp,
-                        position = pagerState.currentPage + pagerState.currentPageOffsetFraction,
-                    )
-                },
-                showBack = canBack,
-                onBack = onBack,
-            )
+            if (canBack) {
+                // 二级页形态：本页自带顶栏 + 返回，页签条放顶栏 titleContent
+                JiabanTopBar(
+                    title = null,
+                    titleContent = { SyncTabBar(pagerState) },
+                    showBack = true,
+                    onBack = onBack,
+                )
+            } else {
+                // 一级 Tab 形态：AppRoot 的固定顶栏（工时制度 + 设置齿轮）压在本页之上，
+                // 故页签条下移一行（避让状态栏 + 固定顶栏高度），否则会被固定顶栏遮住（同统计页方案）
+                val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+                Spacer(Modifier.height(statusBar + TopBarHeight))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = Spacing.s),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    SyncTabBar(pagerState)
+                }
+            }
 
             // 页签用 Pager 横滑（与统计/外观合并页一致）；各页根必须 fillMaxSize 顶对齐——
             // Pager 会把不足一屏的页在视口内垂直居中（实测存储源页上方留白 ~330dp）。
@@ -202,6 +214,22 @@ fun SyncScreen(
         )
         MessageSnackbarHost(snackbarHostState, snackbarIsError, Modifier.align(Alignment.BottomCenter))
     }
+}
+
+/** 页签条（备份 / 存储源）：一级形态居中独立一行、二级形态放顶栏 titleContent —— 两处共用，避免两份定义漂移 */
+@Composable
+private fun SyncTabBar(pagerState: androidx.compose.foundation.pager.PagerState) {
+    val scope = rememberCoroutineScope()
+    SegmentBar(
+        labels = listOf(
+            stringResource(R.string.sync_tab_backup),
+            stringResource(R.string.sync_tab_storage),
+        ),
+        selected = pagerState.currentPage,
+        onSelect = { i -> scope.launch { pagerState.animateScrollToPage(i) } },
+        segWidth = 112.dp,
+        position = pagerState.currentPage + pagerState.currentPageOffsetFraction,
+    )
 }
 
 /** 页内容（备份 / 存储源）：pager 页与转场静态形态共用 */

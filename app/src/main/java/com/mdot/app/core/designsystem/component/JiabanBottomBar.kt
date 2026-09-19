@@ -83,6 +83,9 @@ object SlotRegistry {
  * - 居中动作（[centerAction]，默认）：胶囊内为「左槽位 + 中央按钮 + 右槽位」；
  * - 侧边圆钮（[sideAction]）：胶囊内只有槽位，右侧另放一个独立圆钮（如「记加班」，始终仅图标）。
  *   两者互斥，调用方二选一传入。
+ *
+ * 毛玻璃（[backdropBlur] 非空）：胶囊改半透明底色 + 模糊身后内容（API≥31；更低版本回退
+ * 高不透明底色 + 内高光 + 衬托渐变，见 BottomBarSpec.frosted* 系列令牌）。预览等无源场景传 null。
  */
 @Composable
 fun JiabanBottomBar(
@@ -100,6 +103,11 @@ fun JiabanBottomBar(
     /** 右侧独立圆钮（v0.6.19「记加班按钮置右」布局）：与 [centerAction] 互斥；非空时胶囊只放槽位、
      *  整组（胶囊 + 间距 + 圆钮）居中 */
     sideAction: (@Composable () -> Unit)? = null,
+    /** 背景模糊（毛玻璃）状态：非空时胶囊半透明 + 模糊身后内容；null = 实色底（配置页预览） */
+    backdropBlur: BackdropBlurState? = null,
+    /** 「固定长度」档：>0 时胶囊宽固定为该个数槽位宽（仍受可用宽上限约束），槽位在固定宽内等分；
+     *  0 = 随槽位数自适应（默认）。见 BottomBarSpec.fixedCellCount */
+    fixedCells: Int = 0,
 ) {
     // MD3E 出入场（双向对称）：一级→二级弹簧下沉退出、二级→一级弹簧浮入（defaultSpatialSpec）；
     // 进度归零且动画结束后跳过绘制。motionScheme 仅 composable 可调用——先取 spec 再传入（03 文档规则 7）
@@ -115,8 +123,34 @@ fun JiabanBottomBar(
     }
     if (!visible && fullyHidden) return
     val shape = RoundedCornerShape(Radius.bar)
-    val barColor = MaterialTheme.colorScheme.surfaceContainer
-    val pillColor = MaterialTheme.colorScheme.secondaryContainer
+    val cs = MaterialTheme.colorScheme
+    // 毛玻璃：半透明渐变底色透出模糊内容；无模糊能力（API<31）回退高不透明保证可读性
+    val frosted = backdropBlur != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+    val barColor = cs.surfaceContainer
+    val tintTop = cs.surfaceContainer.copy(alpha = BottomBarSpec.frostedAlphaTop)
+    val tintBottom = cs.surfaceContainer.copy(alpha = BottomBarSpec.frostedAlphaBottom)
+    val tintFallback = cs.surfaceContainer.copy(alpha = BottomBarSpec.frostedFallbackAlpha)
+    // 底色画刷：毛玻璃=垂直渐变（上缘更透、下缘更实）；无模糊能力（API<31）=高不透明回退；非毛玻璃=实色
+    val tintBrush = when {
+        frosted -> androidx.compose.ui.graphics.Brush.verticalGradient(listOf(tintTop, tintBottom))
+        backdropBlur == null -> androidx.compose.ui.graphics.SolidColor(barColor)
+        else -> androidx.compose.ui.graphics.SolidColor(tintFallback)
+    }
+    // 内高光：上缘内侧白色渐变（模拟玻璃边缘反光）；衬托渐变：模糊层内淡色（空内容时给玻璃可糊之物）
+    val highlightBrush = remember {
+        androidx.compose.ui.graphics.Brush.verticalGradient(
+            listOf(androidx.compose.ui.graphics.Color.White.copy(alpha = BottomBarSpec.frostedHighlightAlpha), androidx.compose.ui.graphics.Color.Transparent),
+        )
+    }
+    val scrimBrush = remember(cs) {
+        androidx.compose.ui.graphics.Brush.verticalGradient(
+            listOf(
+                androidx.compose.ui.graphics.Color.Transparent,
+                cs.surfaceContainerHighest.copy(alpha = BottomBarSpec.frostedScrimAlpha),
+            ),
+        )
+    }
+    val pillColor = cs.secondaryContainer
     val selectedIndex = slots.indexOfFirst { it.route == selectedRoute }
     var barWidth by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var screenW by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
@@ -141,8 +175,10 @@ fun JiabanBottomBar(
             with(density) { BottomBarSpec.sideActionGap.toPx() + BottomBarSpec.sideActionSize.toPx() }
         } else 0f
         val maxWpx = (screenW - 2 * marginPx - sideReservePx).roundToInt().coerceAtLeast(0)
-        val cells = slots.size + if (centerAction != null) 1 else 0
-        val idealWpx = (cells * with(density) { cellDp.toPx() }).roundToInt()
+        // 宽度档：固定长度（fixedCells>0）按固定槽位数取宽；自适应按实际槽位数（含中央按钮位）
+        val actualCells = slots.size + if (centerAction != null) 1 else 0
+        val widthCells = if (fixedCells > 0) fixedCells else actualCells
+        val idealWpx = (widthCells * with(density) { cellDp.toPx() }).roundToInt()
         // 首帧 screenW 尚未测量：先按理想宽渲染，随后收进可用宽度
         val barWpx = if (screenW > 0) idealWpx.coerceAtMost(maxWpx) else idealWpx
         // 有侧边圆钮时：胶囊左移、圆钮右移，等价于「胶囊 + 间距 + 圆钮」整组居中（无需改成 Row 结构）
@@ -155,16 +191,47 @@ fun JiabanBottomBar(
                 .offset { IntOffset((-sideShiftPx / 2f).roundToInt(), 0) }
                 .width(with(density) { barWpx.toDp() })
                 .height(BottomBarSpec.height)
-                // 底栏浮层效果（v0.6.20）：投影 + 细描边，让底栏看起来浮在页面内容之上
-                .shadow(elevation = BottomBarSpec.barElevation, shape = shape)
+                // 底栏浮层效果（v0.6.20）：投影 + 细描边；毛玻璃开启时**去投影**（玻璃不投影，
+                // 空白背景时阴影光晕观感差）+ 描边降档弱化硬边
+                .shadow(elevation = if (frosted) BottomBarSpec.frostedElevation else BottomBarSpec.barElevation, shape = shape)
                 .clip(shape)
-                .background(barColor)
-                .border(BottomBarSpec.barBorderWidth, MaterialTheme.colorScheme.outlineVariant, shape)
+                .border(
+                    BottomBarSpec.barBorderWidth,
+                    if (frosted) cs.outlineVariant.copy(alpha = BottomBarSpec.frostedBorderAlpha) else cs.outlineVariant,
+                    shape,
+                )
                 .onSizeChanged { barWidth = it.width },
         ) {
+            // 毛玻璃采样层（胶囊最底层子层）：只画「身后内容」窗口并整层模糊；
+            // 模糊层内叠衬托渐变（空内容时给玻璃可糊之物）；底色与图标在兄弟层 → 图标保持锐利
+            if (frosted) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .backdropBlur(backdropBlur!!, BottomBarSpec.frostBlurRadius, backdrop = scrimBrush),
+                )
+            }
+            // 底色：叠在模糊之上、图标之下（毛玻璃渐变 / 非毛玻璃实色 / API<31 高不透明回退）
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(tintBrush),
+            )
+            // 内高光（仅毛玻璃）：上缘内侧白色渐变，模拟玻璃边缘反光
+            if (frosted) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .background(highlightBrush),
+                )
+            }
+
             // 滑动胶囊：M3 Expressive 活动指示，弹簧滑动到目标槽位
             if (showIndicator && barWidth > 0 && selectedIndex >= 0 && slots.isNotEmpty()) {
-                val centerW = if (centerAction != null) barWidth.toFloat() / cells else 0f
+                // 胶囊数学用实际槽位数（固定长度档下槽位在固定宽内等分，与 Row 的 weight 一致）
+                val centerW = if (centerAction != null) barWidth.toFloat() / actualCells else 0f
                 val cellPx = (barWidth.toFloat() - centerW) / slots.size
                 val pillW = cellPx - with(density) { 12.dp.toPx() }
                 val pillH = with(density) { (if (iconOnly) 44.dp else 54.dp).toPx() }
@@ -206,16 +273,19 @@ fun JiabanBottomBar(
             }
         }
         if (sideAction != null) {
-            // 右侧独立圆钮（如记加班）：同底对齐、紧贴胶囊右侧，与胶囊一起构成居中组
+            // 右侧独立圆钮（如记加班）：容器与胶囊同高、内容居中 → 圆钮与胶囊垂直居中对齐；
+            // 水平紧贴胶囊右侧，与胶囊一起构成居中组
             Box(
                 Modifier
                     .align(Alignment.BottomCenter)
+                    .height(BottomBarSpec.height)
                     .offset {
                         IntOffset(
                             ((barWpx + with(density) { BottomBarSpec.sideActionGap.toPx() }) / 2f).roundToInt(),
                             0,
                         )
                     },
+                contentAlignment = Alignment.Center,
             ) {
                 sideAction()
             }

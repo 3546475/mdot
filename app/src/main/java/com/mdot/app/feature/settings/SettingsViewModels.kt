@@ -179,17 +179,15 @@ class AppearanceViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppearanceConfig())
 
     val bottomBarCount: StateFlow<Int> = settings.bottomBarFlow
-        .map { it.slots.size }
+        .map { it.slots.count { id -> id != BottomBarConfig.HOME } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, 2)
 
     /** 首页卡片数（清洗未知 id 后的实际张数；未配置时显示出厂默认张数，与首页一致） */
     val homeCardsCount: StateFlow<Int> = settings.homeCardsFlow
         .map {
-            val pool = com.mdot.app.domain.model.HomeCardsConfig.POOL
-            it.cards?.filter { c -> c in pool }?.distinct()?.size
-                ?: com.mdot.app.domain.model.HomeCardsConfig.DEFAULT_CARDS.size
+            it.enabledCards.size
         }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, com.mdot.app.domain.model.HomeCardsConfig.DEFAULT_CARDS.size)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, HomeCardsConfig().enabledCards.size)
 
     fun setMode(mode: ThemeMode) = viewModelScope.launch {
         settings.setAppearance(appearance.value.copy(themeMode = mode))
@@ -217,10 +215,18 @@ class BottomBarViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, BottomBarConfig())
 
     val iconOnly: StateFlow<Boolean> = settings.bottomBarIconOnlyFlow
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /** 底栏布局：记加班按钮置右（右侧独立圆钮） */
     val sideAction: StateFlow<Boolean> = settings.bottomBarSideActionFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** 底栏固定长度（4 个槽位宽；默认关闭 = 随槽位数自适应） */
+    val fixedWidth: StateFlow<Boolean> = settings.bottomBarFixedWidthFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** 底栏毛玻璃（半透明 + 模糊身后内容；v0.6.21 起默认关闭） */
+    val frosted: StateFlow<Boolean> = settings.bottomBarFrostedFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     fun setIconOnly(value: Boolean) = viewModelScope.launch {
@@ -231,81 +237,28 @@ class BottomBarViewModel @Inject constructor(
         settings.setBottomBarSideAction(value)
     }
 
-    val selectedSlot = MutableStateFlow(-1)
-
-    fun selectSlot(index: Int) {
-        selectedSlot.value = if (selectedSlot.value == index) -1 else index
+    fun setFixedWidth(value: Boolean) = viewModelScope.launch {
+        settings.setBottomBarFixedWidth(value)
     }
 
-    /** 功能池点选：已选则移除，未选则追加（超过上限忽略） */
-    fun toggle(slotId: String) = viewModelScope.launch {
-        val slots = config.value.slots.toMutableList()
-        if (slotId in slots) {
-            slots.remove(slotId)
-        } else {
-            if (slots.size >= BottomBarConfig.MAX_SLOTS) return@launch
-            slots.add(slotId)
-        }
-        settings.setBottomBar(BottomBarConfig(slots.distinct()))
-        selectedSlot.value = -1
+    fun setFrosted(value: Boolean) = viewModelScope.launch {
+        settings.setBottomBarFrosted(value)
     }
 
-    /** 功能池点选：填充到选中槽位，否则追加到第一个空位 */
-    fun assign(slotId: String) = viewModelScope.launch {
-        val slots = config.value.slots.toMutableList()
-        val sel = selectedSlot.value
-        when {
-            sel in slots.indices -> slots[sel] = slotId
-            slots.size < BottomBarConfig.MAX_SLOTS -> slots.add(slotId)
-            else -> return@launch
-        }
-        settings.setBottomBar(BottomBarConfig(slots))
+    /** 打开/关闭某个槽位：**只改 disabled，不动 order**（开关不影响顺序，对齐班次卡片） */
+    fun setEnabled(slotId: String, enabled: Boolean) = viewModelScope.launch {
+        if (slotId == BottomBarConfig.HOME) return@launch // 首页固定不可关
+        val cfg = config.value
+        val disabled = cfg.disabled.toMutableList()
+        if (enabled) disabled.remove(slotId) else if (slotId !in disabled) disabled.add(slotId)
+        settings.setBottomBar(cfg.copy(disabled = disabled.distinct()))
     }
 
-    fun removeAt(index: Int) = viewModelScope.launch {
-        val slots = config.value.slots.toMutableList()
-        if (index in slots.indices) {
-            slots.removeAt(index)
-            settings.setBottomBar(BottomBarConfig(slots))
-            selectedSlot.value = -1
-        }
-    }
-
-    fun moveSlot(index: Int, up: Boolean) = viewModelScope.launch {
-        val slots = config.value.slots.toMutableList()
-        val target = if (up) index - 1 else index + 1
-        if (index !in slots.indices || target !in slots.indices) return@launch
-        val tmp = slots[index]; slots[index] = slots[target]; slots[target] = tmp
-        settings.setBottomBar(BottomBarConfig(slots))
-    }
-
-    /** 预览拖拽排序：把 index 处的槽移到 to 处（首页固定 index0，不与其它槽交换） */
-    fun reorder(index: Int, to: Int) = viewModelScope.launch {
-        val slots = config.value.slots.toMutableList()
-        if (index !in slots.indices) return@launch
-        // 首页固定在首位：不把它当作可拖源，也禁止别的槽插入到 0
-        if (slots[index] == "home") return@launch
-        val to2 = to.coerceIn(if (slots.getOrNull(0) == "home") 1 else 0, slots.lastIndex)
-        if (to2 == index) return@launch
-        val item = slots.removeAt(index)
-        slots.add(to2, item)
-        settings.setBottomBar(BottomBarConfig(slots))
-    }
-
-    /** 拖拽排序后的顺序提交 */
-    fun applySlots(slots: List<String>) = viewModelScope.launch {
-        settings.setBottomBar(
-            BottomBarConfig(slots.distinct().take(BottomBarConfig.MAX_SLOTS))
-        )
-    }
-
-    fun preset(efficient: Boolean) = viewModelScope.launch {
-        settings.setBottomBar(
-            BottomBarConfig(
-                if (efficient) BottomBarConfig.EFFICIENT_SLOTS else BottomBarConfig.DEFAULT_SLOTS
-            )
-        )
-        selectedSlot.value = -1
+    /** 拖拽排序后的顺序提交（disabled 原样保留；池内其余项补在后面，不丢项） */
+    fun setOrder(order: List<String>) = viewModelScope.launch {
+        val cfg = config.value
+        val cleaned = order.filter { it in BottomBarConfig.CONFIGURABLE }.distinct()
+        settings.setBottomBar(cfg.copy(order = cleaned + BottomBarConfig.DEFAULT_ORDER.filter { it !in cleaned }))
     }
 }
 
@@ -520,24 +473,20 @@ class HomeCardsViewModel @Inject constructor(
     val config: StateFlow<HomeCardsConfig> = settings.homeCardsFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, HomeCardsConfig())
 
-    /** 点选开关：显示中→隐藏（至少保留一张，否则忽略）；隐藏→追加到显示序列末尾 */
-    fun toggle(id: String) = viewModelScope.launch {
-        // 未配置基线 = DEFAULT_CARDS（与配置页草稿/首页实际显示一致，避免 POOL 下点开变关闭）
-        val current = config.value.cards ?: HomeCardsConfig.DEFAULT_CARDS
-        val next = if (id in current) {
-            if (current.size <= HomeCardsConfig.MIN_CARDS) return@launch
-            current - id
-        } else {
-            current + id
-        }
-        settings.setHomeCards(HomeCardsConfig(next))
+    /** 显示/隐藏某张卡片：**只改 disabled，不动 order**（开关不影响顺序，对齐班次卡片） */
+    fun setEnabled(id: String, enabled: Boolean) = viewModelScope.launch {
+        if (id == HomeCardsConfig.DATA) return@launch // 数据区固定不可隐藏
+        val cfg = config.value
+        val disabled = cfg.disabled.toMutableList()
+        if (enabled) disabled.remove(id) else if (id !in disabled) disabled.add(id)
+        settings.setHomeCards(cfg.copy(disabled = disabled.distinct()))
     }
 
-    /** 拖拽排序后的顺序提交（持久化为显式配置，此后不再走底栏联动的默认推导） */
-    fun applyOrder(cards: List<String>) = viewModelScope.launch {
-        val cleaned = cards.filter { it in HomeCardsConfig.POOL }.distinct()
-        if (cleaned.size < HomeCardsConfig.MIN_CARDS) return@launch
-        settings.setHomeCards(HomeCardsConfig(cleaned))
+    /** 拖拽排序后的顺序提交（disabled 原样保留；池内其余项补在后面，不丢项） */
+    fun setOrder(order: List<String>) = viewModelScope.launch {
+        val cfg = config.value
+        val cleaned = order.filter { it in HomeCardsConfig.POOL }.distinct()
+        settings.setHomeCards(cfg.copy(order = cleaned + HomeCardsConfig.DEFAULT_ORDER.filter { it !in cleaned }))
     }
 }
 

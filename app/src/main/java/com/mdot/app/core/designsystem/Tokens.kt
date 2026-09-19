@@ -120,12 +120,50 @@ object BottomBarSpec {
     val slotWidthIconOnly = 60.dp
     /** 「按钮右置」布局：胶囊与圆钮间距 */
     val sideActionGap = 8.dp
-    /** 「按钮右置」布局：右侧圆钮直径（与中央胶囊 52dp 一致；v0.6.19 初版为底栏高 64dp，太大） */
-    val sideActionSize = 52.dp
+    /** 「按钮右置」布局：右侧圆钮直径（用户定：约与底栏内「带文字按钮」等高，比底栏高矮 6dp；
+     *  演进：v0.6.19 初版 64dp（当时仅图标底栏，显大）→ v0.6.20 缩到 52dp（与居中胶囊同尺寸）
+     *  → 当前 58dp（52dp 在带文字底栏旁偏小）） */
+    val sideActionSize = 58.dp
     /** 底栏浮层效果：投影高度（让底栏看起来浮在页面内容之上） */
     val barElevation = 6.dp
     /** 底栏浮层效果：0.5dp outlineVariant 细描边 */
     val barBorderWidth = 0.5.dp
+    /** 底栏毛玻璃（背景模糊）：模糊半径（API≥31 生效，与弹层背景模糊同量级） */
+    val frostBlurRadius = 20.dp
+    /** 毛玻璃底色垂直渐变：上缘不透明度（更透，配合内高光） */
+    val frostedAlphaTop = 0.50f
+    /** 毛玻璃底色垂直渐变：下缘不透明度（更实，衔接页面、消除色块感） */
+    val frostedAlphaBottom = 0.68f
+    /** 毛玻璃底色不透明度回退（API<31 无模糊能力：保持可读性的高不透明） */
+    val frostedFallbackAlpha = 0.9f
+    /** 毛玻璃内高光：上缘内侧白色高光不透明度（空内容时也呈现玻璃质感） */
+    val frostedHighlightAlpha = 0.12f
+    /** 毛玻璃衬托渐变（模糊层内）：下缘淡色不透明度（空内容时给模糊「有物可糊」） */
+    val frostedScrimAlpha = 0.10f
+    /** 毛玻璃开启时的投影高度（玻璃不投影：空白背景时阴影光晕观感差；非毛玻璃仍 [barElevation] 6dp） */
+    val frostedElevation = 0.dp
+    /** 毛玻璃开启时的描边透明度（弱化硬边；非毛玻璃仍全不透明 outlineVariant） */
+    val frostedBorderAlpha = 0.35f
+    /** 「固定长度」档：胶囊固定为该个数槽位宽（仍受可用宽上限约束） */
+    val fixedCellCount = 4
+}
+
+/**
+ * 预测性返回（PredictiveBackHandler）手势规格：进度 0→1 映射为**小幅横向偏移**（不缩放）。
+ *
+ * ⚠️ 不做缩放：缩放会在松手衔接 pop 转场时多出一段「缩回全屏」的视觉（闪一下）；
+ * 位移与二级页 pop 的右滑出屏**同向**，可直接与转场衔接成一段动画（见 AppRoot 的衔接衰减）。
+ */
+object PredictiveBackSpec {
+    /** 手势滑到底（progress=1）时当前页向右的最大位移：仅小幅偏移，主体留在屏上、侧边只露极窄一条 */
+    val maxTranslationX = 36.dp
+
+    /** 进度钳制到 [0,1]（系统事件偶尔给出越界值） */
+    fun clampProgress(progress: Float): Float = progress.coerceIn(0f, 1f)
+
+    /** 进度 → 横向位移（progress=1 时为 [maxTranslationX]） */
+    fun translationFor(progress: Float): androidx.compose.ui.unit.Dp =
+        maxTranslationX * clampProgress(progress)
 }
 
 /** 响应式断点与限宽（docs 03 §3.2：两档断点 600/840，宽屏限宽居中 + 一级页双栏） */

@@ -40,7 +40,11 @@ val TopBarHeight = 56.dp
 
 /**
  * 一级页面统一顶栏（M3 Expressive）：无标题；
- * 左侧「标准工时 ⇄」tonal 胶囊入口，右侧圆形 tonal 图标按钮（设置）。
+ * 左侧「标准工时 ⇄」tonal 胶囊入口，右侧两个圆形 tonal 图标按钮（**外观**、设置）。
+ *
+ * ⚠️ 右侧「外观」按钮是**设置入口的兜底**：外观/首页卡片/底栏/同步/关于 原本只挂在「我的」页，
+ * 而「我的」可以从底栏移除 → 一旦移除就再也进不去设置。首页不可从底栏移除、一级页顶栏恒在，
+ * 故把入口挂在顶栏即可保证永远可达（用户所选方案，2026-09-20）。
  * 挂在 AppRoot 的 NavHost 之外，页面切换时不参与转场动画、保持不动。
  * 不透底：使用 surface 实底，滚动内容从下方穿过时被遮住。
  */
@@ -49,6 +53,8 @@ fun TopLevelBar(
     workSystem: WorkSystem = WorkSystem.STANDARD,
     onOpenWorkSystem: () -> Unit,
     onOpenSettings: () -> Unit,
+    /** 外观与首页/底栏配置（设置入口兜底：不依赖底栏里是否存在「我的」） */
+    onOpenAppearance: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // 响应式：背景（AppRoot 提供）全宽，内容限宽居中与页面内容对齐（docs 03 §3.2）
@@ -94,6 +100,22 @@ fun TopLevelBar(
             }
         }
         Spacer(Modifier.weight(1f))
+        // 外观：圆形 tonal 图标按钮（与齿轮同款；设置入口兜底，见类注释 ⚠️）
+        val appearanceInteraction = remember { MutableInteractionSource() }
+        FilledTonalIconButton(
+            onClick = onOpenAppearance,
+            modifier = Modifier
+                .size(40.dp)
+                .pressScale(appearanceInteraction, pressedScale = 0.9f),
+        ) {
+            Icon(
+                painterResource(R.drawable.ic_ms_palette),
+                contentDescription = stringResource(R.string.ds_topbar_appearance_cd),
+                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Spacer(Modifier.size(Spacing.s))
         // 设置：圆形 tonal 图标按钮（M3E 改造：换 FilledTonalIconButton，涟漪/尺寸由组件自带）
         val settingsInteraction = remember { MutableInteractionSource() }
         FilledTonalIconButton(

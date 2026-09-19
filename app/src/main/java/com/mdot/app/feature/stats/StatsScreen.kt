@@ -39,15 +39,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.drawText
@@ -59,8 +55,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -88,6 +82,7 @@ import com.mdot.app.core.designsystem.component.modeValueText
 import com.mdot.app.core.designsystem.component.DatePick
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.TopBarHeight
+import com.mdot.app.core.navigation.primaryTabEdgeRelay
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
@@ -118,7 +113,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 enum class StatsDimension(val labelRes: Int) {
@@ -517,55 +511,6 @@ fun StatsScreen(
             }
         }
     }
-}
-
-/**
- * 一级 Tab「边缘接力」：pager 已在第一/最后一页时，继续拖动的横向余量累计超过阈值就把
- * 「继续滑」交给整页横滑（LocalPrimaryTabSwipe）；同一次手势只触发一次（甩动结束时复位）。
- * 用 nestedScroll 的 **post 阶段**取余量：内层能滚就内层滚，只有到尽头才轮到外层（docs 11 026/027）。
- */
-@Composable
-private fun Modifier.primaryTabEdgeRelay(pagerState: PagerState): Modifier {
-    val swipe = rememberUpdatedState(com.mdot.app.core.navigation.LocalPrimaryTabSwipe.current)
-    val thresholdPx = with(LocalDensity.current) { 28.dp.toPx() }
-    val acc = remember { mutableStateOf(0f) }
-    val fired = remember { mutableStateOf(false) }
-    return this.nestedScroll(
-        remember {
-            object : NestedScrollConnection {
-                override fun onPostScroll(
-                    consumed: Offset,
-                    available: Offset,
-                    source: NestedScrollSource,
-                ): Offset {
-                    if (available.x == 0f) return Offset.Zero
-                    // 只看「当前页 + 拖动方向」：向右拖（available.x > 0）且已在第一页 → 上一个一级 Tab；
-                    // 向左拖且已在末页 → 下一个。不用 currentPageOffsetFraction 的符号（约定易搞反，反而静默失效）
-                    val atFirst = pagerState.currentPage == 0
-                    val atLast = pagerState.currentPage == pagerState.pageCount - 1
-                    val dir = when {
-                        available.x > 0f && atFirst -> -1
-                        available.x < 0f && atLast -> 1
-                        else -> return Offset.Zero
-                    }
-                    // 方向反了就重新累计
-                    if (acc.value != 0f && (acc.value > 0f) != (available.x > 0f)) acc.value = 0f
-                    acc.value += available.x
-                    if (!fired.value && abs(acc.value) >= thresholdPx) {
-                        fired.value = true
-                        swipe.value(dir)
-                    }
-                    return Offset(available.x, 0f) // 消费余量：不再上抛
-                }
-
-                override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                    acc.value = 0f // 一次手势只接力一次
-                    fired.value = false
-                    return Velocity.Zero
-                }
-            }
-        }
-    )
 }
 
 /** 统计页第 0 页：原统计内容（维度行→汇总→热点图→柱状→饼图） */

@@ -77,16 +77,41 @@ data class AppearanceConfig(
 /** 底栏配置：槽位从功能池选择，首页固定不可移（记录入口统一在首页大按钮，不占底栏） */
 @Serializable
 data class BottomBarConfig(
-    val slots: List<String> = DEFAULT_SLOTS,
+    /**
+     * **完整顺序**（含已关闭项；对齐班次卡片：开关只影响是否显示、**不影响顺序**）。
+     * 不含固定的「首页」——它恒在底栏首位、不可关闭（保证导航与设置入口永远可达）。
+     */
+    val order: List<String> = DEFAULT_ORDER,
+    /** 已关闭（不在底栏显示）的槽位 id；缺省 = 出厂默认（除「我的」外全关 → 底栏默认只有 首页 + 我的） */
+    val disabled: List<String> = DEFAULT_DISABLED,
+    /** 旧字段（≤v0.6.21）：只有「已启用列表」。仅用于读取旧配置/旧备份时迁移，见 [migrated] */
+    @kotlinx.serialization.SerialName("slots")
+    private val legacySlots: List<String>? = null,
 ) {
+    /** 底栏**实际显示**的槽位：固定的首页 + 未关闭项（顺序取自 [order]） */
+    val slots: List<String>
+        get() = listOf(HOME) + order.filter { it in CONFIGURABLE && it !in disabled }
+
+    /** 旧格式 → 新格式：旧启用项按原顺序在前，其余按出厂默认顺序补后；未启用的进 [disabled] */
+    fun migrated(): BottomBarConfig {
+        val legacy = legacySlots ?: return this
+        val enabled = legacy.filter { it in CONFIGURABLE }.distinct()
+        val order = enabled + DEFAULT_ORDER.filter { it !in enabled }
+        // disabled 按最终顺序派生（成员判断与顺序无关，但存起来规整、便于比对）
+        return BottomBarConfig(order = order, disabled = order.filter { it !in enabled })
+    }
+
     companion object {
-        /** 功能池（设置、工资固定为二级页面，不入底栏） */
+        /** 固定首位、不可关闭（首页恒在 ⇒ 一级页顶栏恒在 ⇒ 设置永远进得去） */
+        const val HOME = "home"
+        /** 功能池（含固定首页；设置/工资固定为二级页面，不入底栏） */
         val POOL = listOf("home", "calendar", "stats", "export", "sync", "profile")
-        /** 简洁方案（出厂默认） */
-        val DEFAULT_SLOTS = listOf("home", "profile")
-        /** 高效方案 */
-        val EFFICIENT_SLOTS = listOf("home", "calendar", "stats", "profile")
-        const val MAX_SLOTS = 4
+        /** 可配置槽位（除固定首页） */
+        val CONFIGURABLE = POOL.filter { it != HOME }
+        /** 出厂默认顺序（用户定 2026-09-20，**列表顺序、与开关无关**）：同步 - 统计 - 日历 - 导出（分析）- 我的 */
+        val DEFAULT_ORDER = listOf("sync", "stats", "calendar", "export", "profile")
+        /** 出厂默认**关闭**：除「我的」外全部关闭 —— 底栏默认只有 首页 + 我的（出厂默认行为，勿改） */
+        val DEFAULT_DISABLED = DEFAULT_ORDER.filter { it != "profile" }
     }
 }
 
@@ -97,15 +122,41 @@ data class BottomBarConfig(
  */
 @Serializable
 data class HomeCardsConfig(
-    val cards: List<String>? = null,
+    /** **完整顺序**（含已隐藏项；开关只影响是否显示、**不影响顺序**，对齐班次卡片）。缺省 = 出厂默认顺序 */
+    val order: List<String> = DEFAULT_ORDER,
+    /** 已隐藏（不在首页显示）的卡片 id；缺省 = 出厂默认隐藏（月柱状 / 热点图） */
+    val disabled: List<String> = DEFAULT_DISABLED,
+    /** 旧字段（≤v0.6.21）：null=未配置、非 null=显式启用列表。仅迁移用，见 [migrated] */
+    @kotlinx.serialization.SerialName("cards")
+    private val legacyCards: List<String>? = null,
 ) {
+    /** 首页**实际显示**的卡片（顺序取自 [order]；「数据区」固定显示、不可隐藏） */
+    val enabledCards: List<String>
+        get() {
+            val on = order.filter { it in POOL && it !in disabled }
+            return if (DATA in on) on else listOf(DATA) + on
+        }
+
+    /** 旧格式 → 新格式：显式配置过的按原顺序在前、其余按默认顺序补后；未启用的进 [disabled]。
+     *  旧格式 `cards == null`（未配置 = 出厂默认布局）→ 原样返回。 */
+    fun migrated(): HomeCardsConfig {
+        val legacy = legacyCards ?: return this
+        val enabled = legacy.filter { it in POOL }.distinct()
+        return HomeCardsConfig(
+            order = enabled + DEFAULT_ORDER.filter { it !in enabled },
+            disabled = POOL.filter { it !in enabled },
+        )
+    }
+
     companion object {
-        /** 卡片功能池（含默认隐藏的统计卡；「记加班」主按钮为固定悬浮胶囊，不参与配置） */
-        val POOL = listOf("data", "income", "entries", "heatmap", "weekbar", "monthbar")
-        /** 出厂默认显示顺序：数据区 → 收入卡 → 日历/统计入口 → 本周柱状（热点图/月柱状默认隐藏，可在配置页开启） */
-        val DEFAULT_CARDS = listOf("data", "income", "entries", "weekbar")
-        /** 至少保留的卡片数（防整页清空无从下手） */
-        const val MIN_CARDS = 1
+        /** 固定显示、不可隐藏（保证首页至少有一张卡） */
+        const val DATA = "data"
+        /** 卡片功能池（v0.6.21 起顺序 = 出厂默认顺序） */
+        val POOL = listOf("data", "income", "entries", "weekbar", "monthbar", "heatmap")
+        /** 出厂默认顺序（用户定 2026-09-20）：数据区（不可关闭）- 收入卡 - 日历统计入口 - 周柱状 - 月柱状 - 热点图 */
+        val DEFAULT_ORDER = POOL
+        /** 出厂默认隐藏（保持既有首页默认布局）：月柱状 / 热点图 */
+        val DEFAULT_DISABLED = listOf("monthbar", "heatmap")
     }
 }
 

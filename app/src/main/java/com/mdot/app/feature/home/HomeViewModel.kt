@@ -38,7 +38,7 @@ data class HomeUiState(
     val monthIncomeCents: Long? = null,
     val compBalanceMinutes: Int = 0,
     /** 首页卡片显示序列（v0.6.0 首页卡片可编辑；未配置时经旧逻辑推导） */
-    val cards: List<String> = com.mdot.app.domain.model.HomeCardsConfig.DEFAULT_CARDS,
+    val cards: List<String> = HomeCardsConfig().enabledCards,
     // ---- 工地记工（12 文档 F-S6）----
     val siteLoading: Boolean = false,
     val siteProjectName: String = "",
@@ -126,13 +126,10 @@ class HomeViewModel @Inject constructor(
             com.mdot.app.domain.model.SalaryMode.MANUAL ->
                 salary.hasBaseSalary || salary.manualRatesCents.values.any { it > 0 }
         }
-        // 卡片序列：用户配置过（cards!=null）按配置；未配置走旧行为——
-        // 底栏已放日历/统计时入口卡自动隐藏（等价于 entries 关），其余全显
-        // 旧配置可能含已移除的 id："record"（记加班改固定悬浮胶囊）、"daily"（每日时长卡已删）
-        val legacyFiltered = homeCards.cards?.filter { it != "record" && it != "daily" }
-        val cards = legacyFiltered ?: HomeCardsConfig.DEFAULT_CARDS.filter { id ->
-            !(id == "entries" && ("calendar" in bar.slots || "stats" in bar.slots))
-        }
+        // 卡片序列 = 配置里的「完整顺序」去掉已隐藏项（v0.6.21 起单列表模型：
+        // 开关只影响显隐、不影响顺序；旧配置由 HomeCardsConfig.migrated() 自动迁移）。
+        // 不再有「底栏放了日历/统计就隐藏入口卡」的旧联动——默认顺序已由用户定死。
+        val cards = homeCards.enabledCards
         HomeUiState(
             loading = false,
             period = period,

@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -98,8 +99,8 @@ fun SystemSwitchScreen(
     val currentSystem = salary.workSystem
     var pendingSystem by remember { mutableStateOf<WorkSystem?>(null) }
     val scope = rememberCoroutineScope()
-    /** 撤销窗口 = 自动回首页的延时（用户指定 0.5s）；两处共用同一常量 */
-    val undoWindowMs = 500L
+    /** 撤销窗口 = 自动回首页的延时（v0.6.21 用户指定 1s；此前 0.5s）；两处共用同一常量 */
+    val undoWindowMs = 1_000L
     /** 自动回首页任务：确认后启动，撤销/离开页面时取消（不依赖组件的回调时机） */
     val autoHomeJob = remember { mutableStateOf<Job?>(null) }
     DisposableEffect(Unit) {
@@ -166,7 +167,7 @@ fun SystemSwitchScreen(
                         onSettled = { pendingSystem = null },
                         resetOnSettle = false,
                         resetKey = sys,
-                        // 撤销窗口 0.5s（v0.6.19 用户指定）：与上面的自动回首页延时同一常量
+                        // 撤销窗口 1s（v0.6.21 用户指定；此前 0.5s）：与上面的自动回首页延时同一常量
                         undoWindowMs = undoWindowMs,
                         modifier = Modifier.align(Alignment.CenterHorizontally),
                     )
@@ -230,11 +231,16 @@ private fun SystemCard(
         shape = RoundedCornerShape(Radius.card),
         color = containerColor,
         border = BorderStroke(borderWidth, borderColor),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(Spacing.l)) {
+        // ⚠️ 涟漪必须裁进卡片圆角：写在 Surface 的 modifier 上时涟漪在 Surface 裁剪之外，
+        // 方形涟漪四角会溢出圆角卡片（用户反馈像「直角阴影」）。放到内容层、clip 之后即可。
+        Column(
+            Modifier
+                .clip(RoundedCornerShape(Radius.card))
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(Spacing.l),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     title,

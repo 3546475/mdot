@@ -424,6 +424,13 @@ fun CalendarScreen(
     val saveHaptic = rememberSaveWithHaptic()
     // 多选模式下系统返回先退出多选，不退出日历页
     androidx.activity.compose.BackHandler(enabled = batchSelecting) { vm.exitBatchSelect() }
+    // 同步登记到应用级：预测性返回手势默认会盖住本页 BackHandler（OnBackPressedDispatcher 后注册者优先），
+    // 多选期间让位给它（否则按返回会把整页 pop 掉，见 LocalPageBackInterception 注释）
+    val pageBackInterception = com.mdot.app.core.navigation.LocalPageBackInterception.current
+    androidx.compose.runtime.DisposableEffect(batchSelecting) {
+        pageBackInterception.value = batchSelecting
+        onDispose { pageBackInterception.value = false }
+    }
     val colorScheme = MaterialTheme.colorScheme
     val twoPane = LocalWindowSpec.current == WindowSpec.EXPANDED
 

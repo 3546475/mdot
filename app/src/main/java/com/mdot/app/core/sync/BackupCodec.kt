@@ -338,9 +338,9 @@ class BackupCodec @Inject constructor(
                 }
         )
         settings.setAppearance(st.appearance)
-        settings.setBottomBar(st.bottomBar)
+        settings.setBottomBar(st.bottomBar.migrated())
         // 首页卡片：旧备份无此键（null）→ 保留本机配置不覆盖
-        st.homeCards?.let { settings.setHomeCards(it) }
+        st.homeCards?.let { settings.setHomeCards(it.migrated()) }
         settings.touch()
     }
 

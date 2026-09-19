@@ -48,6 +48,7 @@
     <string name="ds_palette_warm_orange">暖橙</string>
     <string name="ds_palette_violet">紫罗兰</string>
     <string name="ds_topbar_switch_cd">切换工时制度</string>
+    <string name="ds_topbar_appearance_cd">外观</string>
     <string name="ds_topbar_settings_cd">设置</string>
     <string name="crash_dialog_title">上次异常退出</string>
     <string name="crash_dialog_text">应用上次意外退出，已在本机记录错误日志（不会自动上传）。</string>
