@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -188,6 +189,8 @@ fun JiabanButton(
                     } else {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
+                            // minWidth 保护下盒子比文字宽：内容必须居中排列，否则短文案（如「保存」）贴左
+                            horizontalArrangement = Arrangement.Center,
                             modifier = Modifier
                                 .defaultMinSize(minWidth = minWidth)
                                 .padding(horizontal = hPadding)

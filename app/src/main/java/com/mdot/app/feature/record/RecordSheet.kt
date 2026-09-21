@@ -6,9 +6,13 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
@@ -84,6 +88,11 @@ import com.mdot.app.domain.model.RecordType
 import com.mdot.app.domain.model.WorkSystem
 import com.mdot.app.domain.util.Money
 import com.mdot.app.domain.util.TimeUtils
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
+import com.mdot.app.core.designsystem.component.JiabanButton
+import com.mdot.app.core.designsystem.component.JiabanButtonRole
+import com.mdot.app.core.designsystem.component.JiabanButtonSize
 import java.time.LocalDate
 import java.time.ZoneOffset
 import kotlinx.coroutines.delay
@@ -311,8 +320,18 @@ fun RecordSheet(
                             }
                         }
 
-                        // ---- 完整面板区域（展开后显示） ----
-                        if (expanded) {
+                        // ---- 完整面板区域（展开后显示；半开⇄全开带高度展开/收起动画） ----
+                        AnimatedVisibility(
+                            visible = expanded,
+                            enter = expandVertically(
+                                animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                                expandFrom = Alignment.Top,
+                            ) + fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
+                            exit = shrinkVertically(
+                                animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                                shrinkTowards = Alignment.Top,
+                            ) + fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
+                        ) {
                             Column {
                                 Spacer(Modifier.height(Spacing.m))
                                 Text(stringResource(R.string.record_shift_pick_title), style = MaterialTheme.typography.labelMedium,
@@ -471,19 +490,35 @@ fun RecordSheet(
                         Spacer(Modifier.height(Spacing.m))
 
                         // ---- 操作区（两态共用；编辑态展开时含删除） ----
+                        // 间距不走 spacedBy：删除钮与取消之间的间距放在 AnimatedVisibility
+                        // 内容内部（随收合一起归零）——否则收合完成后子项移除、spacedBy 间隙
+                        // 消失，取消/保存会再跳一截（用户反馈的迟滞位移）
                         Row(
                             Modifier.fillMaxWidth().padding(bottom = Spacing.l),
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.m),
                         ) {
-                            if (state.editing && expanded) {
-                                OutlinedButton(
-                                    onClick = { showDeleteConfirm = true },
-                                    modifier = Modifier.weight(1f),
-                                ) { Text(stringResource(R.string.record_delete), color = MaterialTheme.colorScheme.error) }
+                            // 删除钮随面板展开/收起同拍进出（水平展开/收合 + 淡入淡出，
+                            // 与上方面板同一 motionScheme 弹簧）：出现/消失都不再瞬时跳变
+                            if (state.editing) {
+                                AnimatedVisibility(
+                                    visible = expanded,
+                                    enter = expandHorizontally(
+                                        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                                        expandFrom = Alignment.Start,
+                                    ) + fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
+                                    exit = shrinkHorizontally(
+                                        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                                        shrinkTowards = Alignment.Start,
+                                    ) + fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
+                                ) {
+                                    OutlinedButton(
+                                        onClick = { showDeleteConfirm = true },
+                                        modifier = Modifier.padding(end = Spacing.m),
+                                    ) { Text(stringResource(R.string.record_delete), color = MaterialTheme.colorScheme.error) }
+                                }
                             }
                             OutlinedButton(
                                 onClick = { requestDismiss() },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1f).padding(end = Spacing.m),
                             ) { Text(stringResource(R.string.record_cancel)) }
                             Button(
                                 onClick = {
@@ -508,23 +543,50 @@ fun RecordSheet(
                     utcTimeMillis <= todayUtc
             },
         )
+        val density = LocalDensity.current
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
-                TextButton(onClick = {
-                    pickerState.selectedDateMillis?.let { millis ->
-                        vm.onDateChange(
-                            java.time.Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
-                        )
-                    }
-                    showDatePicker = false
-                }) { Text(stringResource(R.string.record_ok)) }
+                // 与记加班弹窗操作行同款（docs 03 §13 形态）：确定 PRIMARY、取消 GHOST
+                JiabanButton(
+                    text = stringResource(R.string.record_ok),
+                    onClick = {
+                        pickerState.selectedDateMillis?.let { millis ->
+                            vm.onDateChange(
+                                java.time.Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+                            )
+                        }
+                        showDatePicker = false
+                    },
+                    role = JiabanButtonRole.PRIMARY,
+                    size = JiabanButtonSize.M,
+                )
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text(stringResource(R.string.record_cancel)) }
+                JiabanButton(
+                    text = stringResource(R.string.record_cancel),
+                    onClick = { showDatePicker = false },
+                    role = JiabanButtonRole.GHOST,
+                    size = JiabanButtonSize.M,
+                )
             },
         ) {
-            DatePicker(state = pickerState)
+            // 手动输入模式切换与标题均已移除（用户定稿）：无模式切换即无尺寸动画，
+            // 也无 M3 alpha18 缺失中文翻译的「Select date」标题
+            // 标题槽传空：压掉 M3 默认英文「Select date」
+            // layout 裁掉标题槽残留的空内容+内边距（约 40dp），消除大标题上方留白
+            DatePicker(
+                state = pickerState,
+                showModeToggle = false,
+                title = {},
+                modifier = Modifier.layout { measurable, constraints ->
+                    val p = measurable.measure(constraints)
+                    val trim = with(density) { 40.dp.roundToPx() }
+                    layout(p.width, (p.height - trim).coerceAtLeast(0)) {
+                        p.place(0, -trim)
+                    }
+                },
+            )
         }
     }
 
