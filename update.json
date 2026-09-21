@@ -1,16 +1,16 @@
 {
-  "versionName": "0.7.1",
-  "versionCode": 51,
-  "tag": "v0.7.1",
-  "releaseNotes": "## 更新内容\n\n**修复与打磨**\n\n- 修复记加班弹窗分钟滚轮滚动时，中间数字左右被裁切的问题\n- 修复记加班弹窗两个滚轮联动时的异常跳动与时长显示短暂不一致\n- 修复日历农历宽字（如「初」「廿」「秋」）右侧被裁掉一小条的问题\n- 记加班弹窗时长选择区新增凹陷底座，层级更清晰\n- 底部导航栏投影调淡，整体更轻盈\n- 分段选择控件（外观/统计等页）统一为凹陷轨道样式\n- 同步备份页优化：未配置存储源时一键直达添加；自动备份并入云端卡片；\n  本地导出/恢复按钮并排；存储源页切换页签不再跳动、断开按钮移至页底\n- 「立即备份」「导出」等按钮统一为收缩 ✓ 反馈，与保存按钮一致\n- 底部导航栏恢复原投影与按钮样式（前两项为本版内试验后的定稿回退）\n\n\n系统要求：Android 10（API 29）及以上。",
+  "versionName": "0.7.2",
+  "versionCode": 52,
+  "tag": "v0.7.2",
+  "releaseNotes": "## 更新内容\n\n**记加班弹窗与日期选择器打磨**\n\n- 记加班弹窗半开⇄全开增加平滑的展开/收起动画，编辑态删除按钮随动画进出（不再瞬时跳变）\n- 日期选择器精简：移除手动输入切换（同时修复切换时动画抽搐数秒的问题）与英文标题，收紧标题区留白\n- 修复「保存」「取消」等短文案按钮文字未在按钮内居中的问题（工资页 / 记工页 / 记加班弹窗等）\n- 存储源页：切换 WebDAV/S3 页签不再跳动；移除「当前使用」文字；断开按钮移至页底\n\n\n系统要求：Android 10（API 29）及以上。",
   "apkUrl": {
-    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.7.1/MDOT-RELEASE-0.7.1-v8a.apk",
-    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.7.1/MDOT-RELEASE-0.7.1-v7a.apk",
-    "universal": "https://github.com/3546475/mdot/releases/download/v0.7.1/MDOT-RELEASE-0.7.1-dual.apk"
+    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.7.2/MDOT-RELEASE-0.7.2-v8a.apk",
+    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.7.2/MDOT-RELEASE-0.7.2-v7a.apk",
+    "universal": "https://github.com/3546475/mdot/releases/download/v0.7.2/MDOT-RELEASE-0.7.2-dual.apk"
   },
   "apkSha256": {
-    "arm64-v8a": "186e8a734467c0257199ca1ba0141e06ce30b16ea248abca577804e53998f964",
-    "armeabi-v7a": "934fc2c819fa0b1e3255f60a36bc62ece14f1e1721130a9962049441cdcdb1c5",
-    "universal": "30e44284889fb6577bd092904e25f47288bc447f2ca3de13bf70f704f5232e8b"
+    "arm64-v8a": "17f90f1f7caf2cc5502d13eac281bbb1b8855fd358cd864830d253b0df4aa117",
+    "armeabi-v7a": "651b0cd08f08cd20de7e2fb55e2f6ab725a3781a78aaab5a0fe4804aadfc0ffa",
+    "universal": "272b213a30d3d24b2b1109ce7cd5bf31d736dd2892a1807dd6065a07642906e7"
   }
 }
