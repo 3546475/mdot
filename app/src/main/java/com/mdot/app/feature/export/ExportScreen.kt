@@ -28,9 +28,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,9 +51,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.DatePick
+import com.mdot.app.core.designsystem.component.JiabanButton
+import com.mdot.app.core.designsystem.component.JiabanButtonRole
+import com.mdot.app.core.designsystem.component.JiabanButtonSize
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.MessageSnackbarHost
-import com.mdot.app.core.designsystem.component.InlineLoadingButton
 import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.navigation.contentBottomPadding
@@ -127,12 +127,18 @@ fun ExportScreen(
             val fromDefault = stringResource(R.string.export_custom_from_default)
             val toDefault = stringResource(R.string.export_custom_to_default)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { picking = "from" }) {
-                    Text(stringResource(R.string.export_custom_from_label, state.customFrom?.let { "$it" } ?: fromDefault))
-                }
-                OutlinedButton(onClick = { picking = "to" }) {
-                    Text(stringResource(R.string.export_custom_to_label, state.customTo?.let { "$it" } ?: toDefault))
-                }
+                JiabanButton(
+                    text = stringResource(R.string.export_custom_from_label, state.customFrom?.let { "$it" } ?: fromDefault),
+                    onClick = { picking = "from" },
+                    role = JiabanButtonRole.SECONDARY,
+                    size = JiabanButtonSize.M,
+                )
+                JiabanButton(
+                    text = stringResource(R.string.export_custom_to_label, state.customTo?.let { "$it" } ?: toDefault),
+                    onClick = { picking = "to" },
+                    role = JiabanButtonRole.SECONDARY,
+                    size = JiabanButtonSize.M,
+                )
             }
         }
 
@@ -147,25 +153,30 @@ fun ExportScreen(
 
         SectionCard {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.m)) {
-                OutlinedButton(
+                JiabanButton(
+                    text = stringResource(R.string.export_import_csv),
                     onClick = { openDoc.launch(arrayOf("text/*", "text/csv", "*/*")) },
+                    role = JiabanButtonRole.SECONDARY,
+                    size = JiabanButtonSize.L,
                     enabled = !state.busy,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text(stringResource(R.string.export_import_csv)) }
-                InlineLoadingButton(
-                    busy = state.busyAction == ExportBusyAction.CSV,
+                )
+                JiabanButton(
                     text = stringResource(R.string.export_csv_detail),
                     onClick = { vm.prepareCsvPreview() },
+                    role = JiabanButtonRole.PRIMARY,
+                    size = JiabanButtonSize.L,
+                    loading = state.busyAction == ExportBusyAction.CSV,
                     enabled = !state.busy && state.range != null,
-                    filled = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                InlineLoadingButton(
-                    busy = state.busyAction == ExportBusyAction.PAYSLIP,
+                JiabanButton(
                     text = stringResource(R.string.export_payslip_generate),
                     onClick = { vm.preparePayslipPreview(payslipPalette) },
+                    role = JiabanButtonRole.SECONDARY,
+                    size = JiabanButtonSize.L,
+                    loading = state.busyAction == ExportBusyAction.PAYSLIP,
                     enabled = !state.busy && state.range != null,
-                    filled = false,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -299,14 +310,27 @@ private fun ExportPreviewDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                createDoc.launch(fileName)
-            }) { Text(stringResource(R.string.export_action_save)) }
+            JiabanButton(
+                text = stringResource(R.string.export_action_save),
+                onClick = { createDoc.launch(fileName) },
+                role = JiabanButtonRole.PRIMARY,
+                size = JiabanButtonSize.M,
+            )
         },
         dismissButton = {
             Row {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.export_action_close)) }
-                TextButton(onClick = { share(context, uriFor(context, artifact.file), mime, shareLabel) }) { Text(shareLabel) }
+                JiabanButton(
+                    text = stringResource(R.string.export_action_close),
+                    onClick = onDismiss,
+                    role = JiabanButtonRole.GHOST,
+                    size = JiabanButtonSize.M,
+                )
+                JiabanButton(
+                    text = shareLabel,
+                    onClick = { share(context, uriFor(context, artifact.file), mime, shareLabel) },
+                    role = JiabanButtonRole.GHOST,
+                    size = JiabanButtonSize.M,
+                )
             }
         },
     )

@@ -19,12 +19,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,6 +38,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.ConfirmDialog
+import com.mdot.app.core.designsystem.component.EmptyState
+import com.mdot.app.core.designsystem.component.IconGhostButton
+import com.mdot.app.core.designsystem.component.JiabanButton
+import com.mdot.app.core.designsystem.component.JiabanButtonRole
+import com.mdot.app.core.designsystem.component.JiabanButtonSize
 import com.mdot.app.core.designsystem.component.FloatingLabelTextField
 import com.mdot.app.core.designsystem.component.SegmentBar
 import com.mdot.app.core.designsystem.component.SectionCard
@@ -95,23 +97,32 @@ fun SyncStoragePane(
                 position = kindPager.currentPage + kindPager.currentPageOffsetFraction,
             )
             Spacer(Modifier.weight(1f))
-            IconButton(
+            IconGhostButton(
+                painter = painterResource(R.drawable.ic_ms_add),
+                contentDescription = stringResource(R.string.sync_storage_add),
                 onClick = vm::openAddDialog,
                 enabled = state.kind != ProviderKind.NONE && !state.adding,
-            ) {
-                Icon(painterResource(R.drawable.ic_ms_add), contentDescription = stringResource(R.string.sync_storage_add))
-            }
+            )
         }
 
         Spacer(Modifier.height(Spacing.m))
 
-        // 内容横滑切类型；页内禁套垂直滚动（垂直滚动归外层 SyncTabPage，高度随内容自适应）
-        HorizontalPager(state = kindPager, modifier = Modifier.fillMaxWidth()) { page ->
+        // 内容横滑切类型；页内禁套垂直滚动（垂直滚动归外层 SyncTabPage，高度随内容自适应）。
+        // 使用中/断开/提示都在**页内**：两页数量不同时 Pager 高度变化只影响自身，
+        // 不会让页外元素上下跳动（用户反馈：切换时各元素跳来跳去）
+        // 页面顶部对齐（Pager 默认垂直居中）：两页高度不同时，切换过渡中内容不居中漂浮、
+        // 不在上方留出空白（用户反馈：切到 WebDAV 源卡片上方有空白然后消失）
+        HorizontalPager(
+            state = kindPager,
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+        ) { page ->
+            val kind = if (page == 1) ProviderKind.S3 else ProviderKind.WEBDAV
             Column {
-                when (if (page == 1) ProviderKind.S3 else ProviderKind.WEBDAV) {
+                when (kind) {
                     ProviderKind.WEBDAV -> {
                         if (state.sources.webdav.isEmpty()) {
-                            EmptySourcesText(stringResource(R.string.sync_storage_empty_webdav))
+                            EmptySourcesState(title = stringResource(R.string.sync_storage_empty_webdav))
                         } else {
                             state.sources.webdav.forEach { source ->
                                 SourceCard(
@@ -130,7 +141,7 @@ fun SyncStoragePane(
 
                     ProviderKind.S3 -> {
                         if (state.sources.s3.isEmpty()) {
-                            EmptySourcesText(stringResource(R.string.sync_storage_empty_s3))
+                            EmptySourcesState(title = stringResource(R.string.sync_storage_empty_s3))
                         } else {
                             state.sources.s3.forEach { source ->
                                 SourceCard(
@@ -149,34 +160,30 @@ fun SyncStoragePane(
 
                     ProviderKind.NONE -> Unit
                 }
+
+                // 断开当前存储源：页面底部（选中状态已由源卡的圆点表达，不再另加「当前使用」文字）
+                val inUseName = selectedSourceIn(state, kind)
+
+                Text(
+                    stringResource(R.string.sync_storage_tip),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = Spacing.m),
+                )
+                if (inUseName != null) {
+                    JiabanButton(
+                        text = stringResource(R.string.sync_storage_disconnect),
+                        onClick = vm::requestDisconnect,
+                        role = JiabanButtonRole.SECONDARY,
+                        size = JiabanButtonSize.L,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = Spacing.m),
+                    )
+                }
+                Spacer(Modifier.height(Spacing.xl))
             }
         }
-
-        // 当前使用中的存储源
-        val selectedName = selectedSourceName(state)
-        if (selectedName != null) {
-            Text(
-                stringResource(R.string.sync_storage_in_use, selectedName),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = Spacing.m),
-            )
-            OutlinedButton(
-                onClick = vm::requestDisconnect,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = Spacing.m),
-            ) { Text(stringResource(R.string.sync_storage_disconnect)) }
-        }
-
-
-        Text(
-            stringResource(R.string.sync_storage_tip),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = Spacing.m),
-        )
-        Spacer(Modifier.height(Spacing.xl))
     }
 
     // 新增存储源弹窗
@@ -224,19 +231,25 @@ fun SyncStoragePane(
     }
 }
 
-private fun selectedSourceName(state: SyncUiState): String? {
+/** 指定类型下、当前选中（使用中）的存储源名（null = 未选中或选中源不属于该类型） */
+private fun selectedSourceIn(state: SyncUiState, kind: ProviderKind): String? {
     val selected = state.sources.selectedId ?: return null
-    return state.sources.webdav.firstOrNull { it.id == selected }?.name
-        ?: state.sources.s3.firstOrNull { it.id == selected }?.name
+    return when (kind) {
+        ProviderKind.WEBDAV -> state.sources.webdav.firstOrNull { it.id == selected }?.name
+        ProviderKind.S3 -> state.sources.s3.firstOrNull { it.id == selected }?.name
+        ProviderKind.NONE -> null
+    }
 }
 
+/**
+ * 存储源空态：居中图标 + 一句话（新增入口 = 右上角 +，不另设按钮）。
+ */
 @Composable
-private fun EmptySourcesText(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(vertical = Spacing.m),
+private fun EmptySourcesState(title: String) {
+    EmptyState(
+        icon = painterResource(R.drawable.ic_ms_cloud_sync),
+        title = title,
+        hint = stringResource(R.string.sync_storage_empty_hint),
     )
 }
 
@@ -271,22 +284,16 @@ private fun SourceCard(
                     strokeWidth = 2.dp,
                 )
             } else {
-                IconButton(onClick = onEdit) {
-                    Icon(
-                        painterResource(R.drawable.ic_ms_edit),
-                        contentDescription = stringResource(R.string.sync_storage_edit),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        painterResource(R.drawable.ic_ms_delete),
-                        contentDescription = stringResource(R.string.sync_storage_delete),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
+                IconGhostButton(
+                    painter = painterResource(R.drawable.ic_ms_edit),
+                    contentDescription = stringResource(R.string.sync_storage_edit),
+                    onClick = onEdit,
+                )
+                IconGhostButton(
+                    painter = painterResource(R.drawable.ic_ms_delete),
+                    contentDescription = stringResource(R.string.sync_storage_delete),
+                    onClick = onDelete,
+                )
             }
             Icon(
                 if (selected) painterResource(R.drawable.ic_ms_radio_button_checked) else painterResource(R.drawable.ic_ms_radio_button_unchecked),
@@ -423,18 +430,23 @@ private fun AddSourceDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onConfirm, enabled = !saving) {
-                if (saving) {
-                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.size(Spacing.s))
-                }
-                Text(stringResource(R.string.sync_storage_save))
-            }
+            JiabanButton(
+                text = stringResource(R.string.sync_storage_save),
+                onClick = onConfirm,
+                role = JiabanButtonRole.PRIMARY,
+                size = JiabanButtonSize.M,
+                loading = saving,
+                enabled = !saving,
+            )
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !saving) {
-                Text(stringResource(R.string.sync_storage_cancel))
-            }
+            JiabanButton(
+                text = stringResource(R.string.sync_storage_cancel),
+                onClick = onDismiss,
+                role = JiabanButtonRole.GHOST,
+                size = JiabanButtonSize.M,
+                enabled = !saving,
+            )
         },
     )
 }

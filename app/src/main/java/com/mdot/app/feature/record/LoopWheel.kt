@@ -20,10 +20,10 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -89,12 +89,22 @@ fun LoopWheel(
 
     // 停止滚动时把中心格换算成取值回调；#9：每次用户滚动定档触发一次轻触觉
     // （snapshotFlow 降沿一次性；首次 collect 的初始化定位不振动）
+    // ⚠️ 本 LaunchedEffect 生命周期内只 launch 一次，必须经 rememberUpdatedState 读
+    // 最新 value/onValueChange——直接捕获会在闭包里永久留下首次组合的值：
+    // ① 滚回初始值时 v == 旧 safeValue，回调不触发，两轮/摘要失同步；
+    // ② 联动另一轮时用过期 totalMinutes 计算，出现自行扫动（实测分钟轮被小时轮
+    //    联动后从 30 全轮扫到 00）。
+    // 另：初始化定位（scrollToItem）完成前不回调——首帧 layout 未就绪时 centerIndex
+    // 兕底为 0，会把 value=0 误报给外部。
     val haptic = LocalHapticFeedback.current
     var firstIdle by remember { mutableStateOf(true) }
+    val currentSafeValue by rememberUpdatedState(safeValue)
+    val currentOnValueChange by rememberUpdatedState(onValueChange)
     LaunchedEffect(listState) {
         snapshotFlowIsIdle(listState) {
+            if (!initialized) return@snapshotFlowIsIdle
             val v = ((centerIndex % itemCount) + itemCount) % itemCount
-            if (v != safeValue) onValueChange(v)
+            if (v != currentSafeValue) currentOnValueChange(v)
             if (firstIdle) firstIdle = false
             else haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         }
@@ -123,12 +133,15 @@ fun LoopWheel(
                     kotlin.math.abs((it.offset + it.size / 2) - viewportCenter).toFloat() /
                         it.size.toFloat().coerceAtLeast(1f)
                 } ?: 2f
+                // 字号恒定 22sp，大小变化全由 scale 连续驱动（中心 22×1.18≈26sp，
+                // 相邻格 22×0.82≈18sp）。此前 fontSize 在 18↔22 间随 selected 阈值
+                // 瞬时跳变（宽 +22%），滚动中数字左右笔画一帧内消失/出现，
+                // 视觉上像被切割；静止不跨阈值故只在滚动时出现。
                 val scale by animateFloatAsState(
-                    targetValue = if (distance < 0.5f) 1.18f
-                    else (1.18f - 0.22f * distance).coerceAtLeast(0.8f),
+                    targetValue = (1.18f - 0.36f * distance).coerceAtLeast(0.7f),
                     animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(), label = "wheelScale",
                 )
-                val alpha by animateFloatAsState(
+                val fadeAlpha by animateFloatAsState(
                     targetValue = (1f - 0.45f * distance).coerceIn(0.25f, 1f),
                     animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(), label = "wheelAlpha",
                 )
@@ -142,13 +155,12 @@ fun LoopWheel(
                 ) {
                     Text(
                         text = label(v),
-                        fontSize = if (selected) 22.sp else 18.sp,
+                        fontSize = 22.sp,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                         color = if (selected) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
-                            .alpha(alpha)
-                            .graphicsLayer { scaleX = scale; scaleY = scale },
+                            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = fadeAlpha },
                     )
                 }
             }

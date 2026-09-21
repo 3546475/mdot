@@ -74,6 +74,7 @@ import com.mdot.app.core.designsystem.Duration
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.ConfirmDialog
+import com.mdot.app.core.designsystem.component.SunkenWell
 import com.mdot.app.core.designsystem.component.TierRow
 import com.mdot.app.domain.PayrollCalculator
 import com.mdot.app.domain.HourlyPayrollStrategy
@@ -292,9 +293,10 @@ fun RecordSheet(
                         }
 
                         Spacer(Modifier.height(Spacing.s))
-                        // 两种输入态容器等高（小时网格可视 3 行 ×44+间距 ≈144dp，预设已扩至 24h、
-                        // 更多的行在网格内部滚动），切换不引起弹层高度跳动
-                        Box(Modifier.fillMaxWidth().height(144.dp)) {
+                        // 两种输入态容器等高（凹陷托盘 156dp：内层 144dp 可视 3 行 ×44+间距，
+                        // 外圈 6dp 凹面留边；预设已扩至 24h、更多的行在网格内部滚动），
+                        // 切换不引起弹层高度跳动
+                        SunkenWell(Modifier.fillMaxWidth().height(156.dp)) {
                             if (state.durationMode == DurationInputMode.MINUTES) {
                                 MinutesWheels(
                                     totalMinutes = state.pendingMinutes,

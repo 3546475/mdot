@@ -20,10 +20,9 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -46,7 +46,11 @@ import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.SegmentBar
 import com.mdot.app.core.designsystem.component.TopBarHeight
 import com.mdot.app.core.navigation.primaryTabEdgeRelay
+import com.mdot.app.core.designsystem.component.JiabanButton
+import com.mdot.app.core.designsystem.component.JiabanButtonRole
+import com.mdot.app.core.designsystem.component.JiabanButtonSize
 import com.mdot.app.core.designsystem.component.SectionCard
+import com.mdot.app.core.designsystem.component.EmptyState
 import com.mdot.app.core.designsystem.component.MessageSnackbarHost
 import com.mdot.app.core.designsystem.component.InlineLoadingButton
 import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
@@ -73,6 +77,7 @@ fun SyncScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = initialTab.coerceIn(0, 1), pageCount = { 2 })
 
     // 本地文件备份：导出选择位置 / 导入打开文件
@@ -134,6 +139,7 @@ fun SyncScreen(
                     canBack = canBack,
                     createDoc = createDoc,
                     openDoc = openDoc,
+                    onGoToStorage = { scope.launch { pagerState.animateScrollToPage(1) } },
                 )
             }
         }
@@ -153,10 +159,20 @@ fun SyncScreen(
                             )
                         },
                         confirmButton = {
-                            Button(onClick = vm::confirmRestore) { Text(stringResource(R.string.sync_action_restore)) }
+                            JiabanButton(
+                                text = stringResource(R.string.sync_action_restore),
+                                onClick = vm::confirmRestore,
+                                role = JiabanButtonRole.PRIMARY,
+                                size = JiabanButtonSize.M,
+                            )
                         },
                         dismissButton = {
-                            OutlinedButton(onClick = vm::cancelRestore) { Text(stringResource(R.string.sync_action_cancel)) }
+                            JiabanButton(
+                                text = stringResource(R.string.sync_action_cancel),
+                                onClick = vm::cancelRestore,
+                                role = JiabanButtonRole.GHOST,
+                                size = JiabanButtonSize.M,
+                            )
                         },
                     )
                 }
@@ -177,12 +193,18 @@ fun SyncScreen(
                             )
                         },
                         confirmButton = {
+                            // 危险确认（error 色）暂留原样：危险色按钮变体随第三批对话框统一收敛
                             TextButton(
                                 onClick = vm::confirmLocalRestore,
                             ) { Text(stringResource(R.string.sync_local_restore_confirm_action), color = MaterialTheme.colorScheme.error) }
                         },
                         dismissButton = {
-                            TextButton(onClick = vm::cancelLocalRestore) { Text(stringResource(R.string.sync_action_cancel)) }
+                            JiabanButton(
+                                text = stringResource(R.string.sync_action_cancel),
+                                onClick = vm::cancelLocalRestore,
+                                role = JiabanButtonRole.GHOST,
+                                size = JiabanButtonSize.M,
+                            )
                         },
                     )
                 }
@@ -196,13 +218,23 @@ fun SyncScreen(
                             Text(stringResource(R.string.sync_restart_text))
                         },
                         confirmButton = {
-                            TextButton(onClick = {
-                                vm.dismissRestart()
-                                restartApp(context)
-                            }) { Text(stringResource(R.string.sync_restart_now)) }
+                            JiabanButton(
+                                text = stringResource(R.string.sync_restart_now),
+                                onClick = {
+                                    vm.dismissRestart()
+                                    restartApp(context)
+                                },
+                                role = JiabanButtonRole.PRIMARY,
+                                size = JiabanButtonSize.M,
+                            )
                         },
                         dismissButton = {
-                            TextButton(onClick = vm::dismissRestart) { Text(stringResource(R.string.sync_action_later)) }
+                            JiabanButton(
+                                text = stringResource(R.string.sync_action_later),
+                                onClick = vm::dismissRestart,
+                                role = JiabanButtonRole.GHOST,
+                                size = JiabanButtonSize.M,
+                            )
                         },
                     )
                 }
@@ -241,6 +273,7 @@ private fun SyncTabPage(
     canBack: Boolean,
     createDoc: androidx.activity.compose.ManagedActivityResultLauncher<String, android.net.Uri?>,
     openDoc: androidx.activity.compose.ManagedActivityResultLauncher<Array<String>, android.net.Uri?>,
+    onGoToStorage: () -> Unit,
 ) {
     Column(
         Modifier
@@ -258,25 +291,39 @@ private fun SyncTabPage(
                 CircularProgressIndicator(Modifier.padding(Spacing.xl))
             }
         } else if (page == 0) {
-                // ---- 备份页签：备份与恢复（状态展示移入提示位）+ 自动备份 + 本地文件 ----
-                SectionCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.m)) {
-                        Text(stringResource(R.string.sync_section_backup_restore), style = MaterialTheme.typography.titleSmall)
+            // ---- 备份页签：备份与恢复（云端，未配置时收敛为空态直达）+ 本地文件 ----
+            // （自动备份并入云端卡尾部：它只对云端生效，不单独占卡；未配置时不展示，
+            //   避免出现「开着却没在跑」的说谎开关，设置值仍保留、配好源即恢复）
+            SectionCard {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.m)) {
+                    Text(stringResource(R.string.sync_section_backup_restore), style = MaterialTheme.typography.titleSmall)
+                    if (!state.status.configured) {
+                        // 未配置：空态 + 直达 CTA（不再展示两个不可点的死按钮）
+                        EmptyState(
+                            icon = painterResource(R.drawable.ic_ms_cloud_sync),
+                            title = stringResource(R.string.sync_backup_empty_title),
+                            hint = stringResource(R.string.sync_status_not_configured),
+                        )
+                        JiabanButton(
+                            text = stringResource(R.string.sync_backup_go_storage),
+                            onClick = onGoToStorage,
+                            role = JiabanButtonRole.PRIMARY,
+                            size = JiabanButtonSize.L,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    } else {
                         // 备份状态（原独立状态卡内容移此展示）
-                        if (state.status.configured) {
-                            val srcName = selectedSourceName2(state)
-                            if (srcName != null) {
-                                Text(
-                                    stringResource(R.string.sync_status_source, srcName),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                                Spacer(Modifier.height(Spacing.xs))
-                            }
+                        val srcName = selectedSourceName2(state)
+                        if (srcName != null) {
+                            Text(
+                                stringResource(R.string.sync_status_source, srcName),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Spacer(Modifier.height(Spacing.xs))
                         }
                         Text(
                             when {
-                                !state.status.configured -> stringResource(R.string.sync_status_not_configured)
                                 state.status.busy -> when (state.status.phase) {
                                     SyncPhase.UPLOADING -> stringResource(R.string.sync_status_uploading)
                                     SyncPhase.RESTORING -> stringResource(R.string.sync_status_restoring)
@@ -304,27 +351,29 @@ private fun SyncTabPage(
                             Text(it, style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.error)
                         }
-                        InlineLoadingButton(
-                            busy = state.status.busy,
-                            text = stringResource(R.string.sync_backup_now_cloud),
-                            onClick = vm::backupNow,
-                            enabled = state.status.configured && !state.status.busy,
-                            filled = true,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        OutlinedButton(
-                            onClick = vm::prepareRestore,
-                            enabled = state.status.configured && !state.status.busy,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text(stringResource(R.string.sync_restore_from_cloud)) }
-                    }
-                }
+                        // 同组并排同高（docs/03 §13.1）：weight 等分外壳——单个收缩✓在自身
+                        // 外壳内完成，不挤占邻居
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                            JiabanButton(
+                                text = stringResource(R.string.sync_backup_now_cloud),
+                                onClick = vm::backupNow,
+                                role = JiabanButtonRole.PRIMARY,
+                                size = JiabanButtonSize.L,
+                                loading = state.status.busy,
+                                enabled = !state.status.busy,
+                                modifier = Modifier.weight(1f),
+                            )
+                            JiabanButton(
+                                text = stringResource(R.string.sync_restore_from_cloud),
+                                onClick = vm::prepareRestore,
+                                role = JiabanButtonRole.SECONDARY,
+                                size = JiabanButtonSize.L,
+                                enabled = !state.status.busy,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
 
-                Spacer(Modifier.height(Spacing.m))
-
-                // ---- 自动备份 ----
-                SectionCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.m)) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(stringResource(R.string.sync_auto_backup_title), style = MaterialTheme.typography.bodyMedium)
@@ -335,33 +384,40 @@ private fun SyncTabPage(
                         }
                     }
                 }
+            }
 
-                Spacer(Modifier.height(Spacing.m))
+            Spacer(Modifier.height(Spacing.m))
 
-                // ---- 本地文件备份 / 恢复（不依赖网盘） ----
-                SectionCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.m)) {
-                        Text(stringResource(R.string.sync_local_backup_title), style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            stringResource(R.string.sync_local_backup_desc),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        InlineLoadingButton(
-                            busy = state.localBusy,
+            // ---- 本地文件备份 / 恢复（不依赖网盘）；两钮并排压卡高 ----
+            SectionCard {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.m)) {
+                    Text(stringResource(R.string.sync_local_backup_title), style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        stringResource(R.string.sync_local_backup_desc),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                        JiabanButton(
                             text = stringResource(R.string.sync_local_export),
                             onClick = { createDoc.launch(SyncViewModel.defaultLocalFileName()) },
+                            role = JiabanButtonRole.PRIMARY,
+                            size = JiabanButtonSize.L,
+                            loading = state.localBusy,
                             enabled = !state.localBusy && !state.status.busy,
-                            filled = true,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.weight(1f),
                         )
-                        OutlinedButton(
+                        JiabanButton(
+                            text = stringResource(R.string.sync_local_restore),
                             onClick = { openDoc.launch(arrayOf("application/zip", "*/*")) },
+                            role = JiabanButtonRole.SECONDARY,
+                            size = JiabanButtonSize.L,
                             enabled = !state.localBusy && !state.status.busy,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text(stringResource(R.string.sync_local_restore)) }
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                 }
+            }
 
             } else {
                 // ---- 存储源页签 ----

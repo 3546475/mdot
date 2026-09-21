@@ -28,7 +28,8 @@ import com.mdot.app.core.designsystem.Radius
 
 /**
  * 滑块式分段控件（统计页顶栏 统计/记月、工地记工顶栏 记账/记借支结算、及其子页签共用）：
- * tonal 轨道 + primaryContainer 浮动滑块，滑块 offset 跟随 [position] 连续位移
+ * 凹槽轨道 + primaryContainer 浮动滑块（用户 2026-09-21 定稿：轨道整体凹陷，滑块在凹槽里浮起），
+ * 滑块 offset 跟随 [position] 连续位移
  * （pager 传 currentPage+offsetFraction 可随手势实时跟随；纯页签传动画值即得弹簧滑动）。
  * 按压反馈即滑块位移本身，不叠涟漪。
  *
@@ -39,6 +40,9 @@ import com.mdot.app.core.designsystem.Radius
  * @param position 连续选中位置（0 起；如 0.35 表示滑在 0/1 段之间）
  * @param fillWidth true = 撑满可用宽度、把宽度**等分**给各段（段宽由测量得出，忽略 [segWidth]）；
  *   用于设置页那种「整行等分、右边界与卡片对齐」的场景
+ * @param trackSunken 轨道整体凹陷（用户 2026-09-21 定稿规格，默认开）：tonal 轨道换成
+ *   凹槽光影（[sunkenWell]），选中滑块保持 primaryContainer 浮起——「凹槽里浮起一颗」
+ *   成为全 app 分段控件的统一形态；如某处确需回归平铺轨道可显式传 false
  */
 @Composable
 fun SegmentBar(
@@ -49,13 +53,18 @@ fun SegmentBar(
     segWidth: Dp = 96.dp,
     position: Float = selected.toFloat(),
     fillWidth: Boolean = false,
+    trackSunken: Boolean = true,
 ) {
     val gap = 4.dp
+    val pillShape = RoundedCornerShape(Radius.pill)
     Box(
         modifier
             .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
-            .clip(RoundedCornerShape(Radius.pill))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clip(pillShape)
+            .then(
+                if (trackSunken) Modifier.sunkenWell(pillShape)
+                else Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            )
             .padding(gap),
     ) {
         // 等分模式下段宽取自「轨道实测宽 - 段间距」再均分：BoxWithConstraints 在布局前就给出，
@@ -67,12 +76,13 @@ fun SegmentBar(
             } else {
                 segWidth
             }
+            val pillShape = RoundedCornerShape(Radius.pill)
             Box(
                 Modifier
                     .width(seg)
                     .height(34.dp)
                     .offset(x = (seg + gap) * position)
-                    .clip(RoundedCornerShape(Radius.pill))
+                    .clip(pillShape)
                     .background(MaterialTheme.colorScheme.primaryContainer),
             )
             Row(

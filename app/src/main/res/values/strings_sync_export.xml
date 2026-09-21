@@ -3,7 +3,9 @@
     <!-- feature/sync/SyncScreen.kt -->
     <string name="sync_tab_backup">备份</string>
     <string name="sync_tab_storage">存储源</string>
-    <string name="sync_status_not_configured">未配置存储源 · 到「存储源」页签添加</string>
+    <string name="sync_status_not_configured">先添加一个网盘存储源，才能使用云端备份与恢复</string>
+    <string name="sync_backup_empty_title">云端备份还没就绪</string>
+    <string name="sync_backup_go_storage">去添加存储源</string>
     <string name="sync_status_source">存储源：%1$s</string>
     <string name="sync_status_uploading">正在备份…</string>
     <string name="sync_status_restoring">正在恢复…</string>
@@ -17,7 +19,7 @@
     <string name="sync_auto_backup_title">自动备份</string>
     <string name="sync_auto_backup_desc">数据变更 30 秒后自动上传</string>
     <string name="sync_local_backup_title">本地文件备份</string>
-    <string name="sync_local_backup_desc">把全部记录与设置保存成一个备份文件，可存到手机或你自己的网盘；换机/重装后可从文件恢复。与网盘备份同格式（明文 ZIP），不含网盘账号等敏感凭据。</string>
+    <string name="sync_local_backup_desc">把全部记录与设置存成一个备份文件，可存到手机或你自己的网盘；与网盘备份同格式。</string>
     <string name="sync_local_export">导出备份文件</string>
     <string name="sync_local_restore">从文件恢复…</string>
     <string name="sync_restore_confirm_title">从云端恢复？</string>
@@ -45,14 +47,15 @@
     <string name="sync_storage_delete">删除</string>
     <string name="sync_storage_delete_confirm_title">删除存储源</string>
     <string name="sync_storage_delete_confirm_text">删除后该配置无法恢复，确定删除「%1$s」？</string>
-    <string name="sync_storage_empty_webdav">还没有 WebDAV 存储源，点右上角 + 新增</string>
-    <string name="sync_storage_empty_s3">还没有 S3 存储源，点右上角 + 新增</string>
+    <string name="sync_storage_empty_webdav">还没有 WebDAV 存储源</string>
+    <string name="sync_storage_empty_s3">还没有 S3 存储源</string>
+    <string name="sync_storage_empty_hint">点右上角 + 新增</string>
     <string name="sync_storage_in_use">当前使用：%1$s</string>
     <string name="sync_storage_disconnect">断开当前存储源</string>
     <string name="sync_storage_disconnect_confirm_title">断开存储源</string>
     <string name="sync_storage_disconnect_confirm_text">断开后自动备份将停止，配置会保留，可随时重新切换。确定断开？</string>
     <string name="sync_storage_disconnect_confirm_btn">断开</string>
-    <string name="sync_storage_tip">提示：备份包为明文 ZIP（含全部记录与设置，不含网盘账号）。请确保你的网盘账号安全；同一时间只在一台设备上开启自动备份。切换存储源时会先检测连接，通过后才生效。</string>
+    <string name="sync_storage_tip">备份包为明文 ZIP，不含网盘账号等敏感凭据；自动备份请只在一台常用设备开启。</string>
     <string name="sync_storage_trust_title">信任自签名证书</string>
     <string name="sync_storage_trust_desc">仅 HTTPS 自建服务（NAS/MinIO）证书无法验证时开启；首次连接将记录服务器证书指纹，之后仅信任该证书（防劫持）。服务器换证后需删除存储源重新添加</string>
     <string name="sync_storage_webdav_url_label">服务器地址</string>

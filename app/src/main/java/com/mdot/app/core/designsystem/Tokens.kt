@@ -152,8 +152,8 @@ object BottomBarSpec {
      *  演进：v0.6.19 初版 64dp（当时仅图标底栏，显大）→ v0.6.20 缩到 52dp（与居中胶囊同尺寸）
      *  → 当前 58dp（52dp 在带文字底栏旁偏小）） */
     val sideActionSize = 58.dp
-    /** 底栏浮层效果：投影高度（让底栏看起来浮在页面内容之上） */
-    val barElevation = 6.dp
+    /** 底栏浮层效果：投影高度（让底栏看起来浮在页面内容之上；6dp → 3dp → 2dp 逐次调淡） */
+    val barElevation = 2.dp
     /** 底栏浮层效果：0.5dp outlineVariant 细描边 */
     val barBorderWidth = 0.5.dp
     /** 底栏毛玻璃（背景模糊）：模糊半径（API≥31 生效，与弹层背景模糊同量级） */
@@ -174,6 +174,33 @@ object BottomBarSpec {
     val frostedBorderAlpha = 0.35f
     /** 「固定长度」档：胶囊固定为该个数槽位宽（仍受可用宽上限约束） */
     val fixedCellCount = 4
+}
+
+/**
+ * 按钮规格（按钮规范化第一批，docs/03 §按钮）：feature 层禁止手写按钮高度/内边距，
+ * 统一从 [ButtonSpec] 取值（组件 [com.mdot.app.core.designsystem.component.JiabanButton]）。
+ *
+ * - **L（48dp）**：页面级主操作——保存/提交/新增/下一步，与 ShrinkFeedbackButton、
+ *   InlineConfirmButton Standalone 同一量纲（它们的默认值就是本档）
+ * - **M（40dp）**：M3 默认档——描边次要操作、弹窗内按钮
+ * - 高度之外零手写：圆角统一 pill（[Radius.pill]），字重统一 labelLarge，
+ *   按压反馈统一 pressScale + 涟漪叠加（工资设置保存按钮基准）
+ */
+object ButtonSpec {
+    /** L 档高度：页面级主操作（对齐 ShrinkFeedbackButton.pillHeight = Spacing.xl*2） */
+    val heightL = 48.dp
+
+    /** M 档高度：M3 默认（描边次要操作/弹窗内按钮） */
+    val heightM = 40.dp
+
+    /** L 档文案态最小宽（对齐 ShrinkFeedbackButton.minWidth = Spacing.xl*6）：避免短文案被压窄 */
+    val minWidthL = 144.dp
+
+    /** L 档水平内边距（对齐 ShrinkFeedbackButton.contentPadding = Spacing.xl） */
+    val contentPaddingL = 24.dp
+
+    /** 图标按钮的图标尺寸（热区另由 IconButton 默认 48dp 保证） */
+    val iconSize = 20.dp
 }
 
 /**
@@ -237,8 +264,12 @@ object CalendarCellSpec {
      *
      * 左右等宽是「日期恒定居中、与表头星期对齐」的前提：主行整体居中时，只有两侧占位相等
      * 才能把日期顶到列中心，而日期本身不必知道列宽。
+     *
+     * ⚠️ 必须盖住 `sideLabelGap(2dp) + 9sp 汉字全宽(9dp) + 余量`：槽内文字可用宽 =
+     * slot - gap，旧值 10dp 时只剩 8dp < 9dp，宽字（初/廿/秋等）右侧被裁掉约 3px，
+     * 表现为「有些农历日期有一点点裁切」（窄字一/二/十/八看不出）。
      */
-    val sideSlotWidth = 10.dp
+    val sideSlotWidth = 13.dp
 
     /**
      * 左槽「休/班」与日期的间距——**紧贴**。
