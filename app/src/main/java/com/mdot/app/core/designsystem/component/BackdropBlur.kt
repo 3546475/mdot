@@ -1,6 +1,7 @@
 package com.mdot.app.core.designsystem.component
 
 import android.os.Build
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -38,6 +39,12 @@ import androidx.compose.ui.unit.toIntSize
  * ⚠️ 必须用 DrawScope 作用域内的 `record(size) { drawContent() }` 重载（虚拟分发到
  * LayoutNodeDrawScope 的重定向实现）；直接调 `GraphicsLayer.record(density, layoutDirection, size)`
  * 4 参成员会把 `drawContent()` 画到屏幕而层保持为空。
+ *
+ * ⚠️⚠️ **录制层必须自带不透明实底**（见 [backdropBlurSource]）：页面自身背景是**透明**的
+ * （浅色底由 MainActivity 的 Surface 提供，在导航宿主**之外**）。不补实底时录制层绝大部分像素
+ * alpha=0，模糊后仍是「半透明、且颜色与身后内容完全相同」的一层 —— 把它盖在锐利的页面之上
+ * **等于什么都没盖**，毛玻璃会呈现为「只有底色 tint、完全没糊」。这与弹层背景模糊当年踩的是同一个
+ * 坑（`SheetBackdropLayer` 内部的「不透明实底」处理，docs/11 036）。
  *
  * 效果方必须作为独立**子层**使用（在胶囊里位于半透明底色之下、图标之上）：`Modifier.blur`
  * 语义是模糊节点的整层内容，若直接挂在含图标的整条胶囊链上，图标也会一起糊掉。
@@ -79,11 +86,16 @@ fun rememberBackdropBlurState(): BackdropBlurState = remember { BackdropBlurStat
 /** 背景模糊源：每帧把自身内容录进共享 [BackdropBlurState.layer] 并上屏。挂在「会被效果方盖住」的内容上（如导航宿主） */
 fun Modifier.backdropBlurSource(state: BackdropBlurState): Modifier = composed {
     val graphicsLayer = rememberGraphicsLayer()
+    // 录制层实底色 = 宿主 Surface 同色（MainActivity `Surface(color = colorScheme.background)`）。
+    // 缺了它 → 层里只有透明像素 + 内容元素，模糊后压不住身后锐利页面（见类注释 ⚠️⚠️）。
+    val backdropColor = MaterialTheme.colorScheme.background
     this
         .onGloballyPositioned { state.sourceCoords = it }
         .drawWithContent {
             // DrawScope 作用域内的 record 重载：重定向绘制上下文到录制 canvas（见类注释 ⚠️）
             graphicsLayer.record(size.toIntSize()) {
+                // ⚠️ 先铺不透明实底，再画内容：否则层是透明的，模糊层盖不住身后锐利页面
+                drawRect(color = backdropColor, size = this.size)
                 this@drawWithContent.drawContent()
             }
             state.layer = graphicsLayer

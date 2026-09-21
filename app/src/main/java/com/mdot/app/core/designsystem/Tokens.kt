@@ -5,7 +5,9 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /** 设计令牌（04 文档 §4.1：feature 层禁用魔法值）；M3 Expressive：形状整体加圆、动效弹簧化 */
 object Spacing {
@@ -90,6 +92,32 @@ object SheetBackdrop {
     /** 四周底衬压暗（仅内容缩小后露出） */
     const val backdropScrim = 0.6f
 }
+
+/**
+ * 外观页色卡（配色方案）规格。
+ *
+ * ⚠️ **选中环必须画在外层、彩色圆尺寸恒定**：早先把环画在 40dp 圆自己身上
+ * （`border` 是节点**内侧**描边），选中时彩色圆实际从 38dp 缩到 34dp——选中反而让色卡「变小」，
+ * 且四张色卡大小不一。现在外层固定 48dp 只负责画环，内层彩色圆恒定 40dp。
+ */
+object SwatchSpec {
+    /** 外层方框：环的绘制范围，同时是触达区（≥48dp 无障碍最小尺寸） */
+    val ringBox = 48.dp
+    /** 彩色圆直径——**恒定**，不随选中/覆盖状态变化 */
+    val disc = 40.dp
+    /** 当前生效配色的环宽（未选中不画环，理由见 `PaletteSwatch`） */
+    val ringWidth = 2.dp
+    /** 勾选图标尺寸（选中态的第二条线索：不依赖环的粗细/颜色，色弱可辨） */
+    val checkIcon = 18.dp
+    /** 动态取色开启时彩色圆的不透明度（此时**不画任何选中标记**，只降权） */
+    const val overriddenAlpha = 0.38f
+    /** 色卡行的纵向间距：色卡 → 标签 */
+    val labelGap = Spacing.xs
+}
+
+/** 在给定底色上取可读的前景色（亮度阈值 0.5）——色卡勾选用，四个色卡深浅不一 */
+fun onColorFor(background: Color): Color =
+    if (background.luminance() > 0.5f) Color(0xFF1A1B21) else Color.White
 
 /**
  * M3 Expressive 弹簧动效：按下干脆利落（无过冲），松手带轻微弹性回弹。
@@ -178,4 +206,50 @@ object AdaptiveSpecs {
     val twoPaneMaxWidth = 720.dp
     /** 记录弹层限宽（宽屏下底部弹层居中，不全宽拉通） */
     val sheetMaxWidth = 640.dp
+}
+
+/**
+ * 日历格子规格（04 文档 §4.1：feature 层禁用魔法值）。
+ *
+ * 一格的可用宽只有约 45dp（手机单列 7 等分），一行里要放下「休/班 + 日期 + 节日/农历」。
+ * 主行用 Box 三段定位（日期居中、两侧贴边），**不是按内容拼接**——所以宽度约束是
+ * 「日期居中块 + 两侧各一个字」互不重叠即可，而不是三者相加：
+ * 日期 ≈ 日期字号 × 1.1（两位数字），每个汉字 ≈ 侧栏字号 × 1.0。
+ * 侧栏字号低于 M3 字号表最小档（labelSmall 11sp）是刻意的，改大前先算一遍。
+ */
+object CalendarCellSpec {
+    /** 格子宽高比（宽 / 高）；长按拖动按日期定位时也用它换算行高，改这里即可 */
+    const val aspectRatio = 0.95f
+
+    /**
+     * 日期字号——**格子里的主体**（用户 2026-09-20 二轮规格：比侧栏明显大，且居中于本列与表头星期对齐）。
+     * M3 titleMedium = 16sp 同档。
+     */
+    val dateFontSize = 16.sp
+    val dateLineHeight = 18.sp
+
+    /** 左槽「休/班」与右槽「节日/农历」字号（低于字号表最小档，见类注释）——挂靠信息，不争主次 */
+    val sideFontSize = 9.sp
+    val sideLineHeight = 11.sp
+
+    /**
+     * 两侧槽位的**固定宽度**（一个汉字宽 + 余量）。
+     *
+     * 左右等宽是「日期恒定居中、与表头星期对齐」的前提：主行整体居中时，只有两侧占位相等
+     * 才能把日期顶到列中心，而日期本身不必知道列宽。
+     */
+    val sideSlotWidth = 10.dp
+
+    /**
+     * 左槽「休/班」与日期的间距——**紧贴**。
+     * 早先两侧贴的是格子边缘（离日期约 20dp），视觉上「休」反而更靠近左边那一格的农历，
+     * 像是旁边日期的信息（用户 2026-09-20 第四轮规格）。
+     */
+    val sideBadgeGap = 0.5.dp
+
+    /** 右槽节日/农历与日期的间距——允许一点点，但远小于贴边缘的做法 */
+    val sideLabelGap = 2.dp
+
+    /** 第一行（休/班 + 日期 + 节日）与第二行（+小时 / N 工）之间的纵向间距 */
+    val lineGap = 1.dp
 }

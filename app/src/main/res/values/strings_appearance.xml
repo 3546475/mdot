@@ -8,12 +8,16 @@
     <string name="appearance_theme_system">跟随系统</string>
     <string name="appearance_palette_heading">配色方案</string>
     <string name="appearance_dynamic_color">动态取色</string>
-    <string name="appearance_dynamic_color_desc">跟随壁纸配色（Android 12+），关闭则使用所选配色</string>
+    <string name="appearance_dynamic_color_desc">跟随壁纸配色</string>
     <string name="appearance_sheet_backdrop_heading">弹层背景</string>
     <string name="appearance_sheet_backdrop_dim">压暗</string>
     <string name="appearance_sheet_backdrop_blur">模糊</string>
     <string name="appearance_sheet_backdrop_blur_scale">模糊缩小</string>
-    <string name="appearance_sheet_backdrop_desc">底部弹层弹出时背景的表现：压暗为整屏渐暗；模糊缩小会让背景退后成圆角卡片。Android 11 及以下无模糊能力，将自动回退为压暗</string>
+    <string name="appearance_sheet_backdrop_desc">压暗：整屏变暗；模糊：背景失焦；模糊缩小：退后成卡片</string>
+    <string name="appearance_sheet_backdrop_no_blur">Android 11 及以下无模糊能力，将自动回退为压暗</string>
+    <string name="appearance_calendar_heading">日历</string>
+    <string name="appearance_hide_lunar">隐藏农历日期</string>
+    <string name="appearance_hide_lunar_desc">开启后日历格只显示节日名，不再显示农历日期</string>
 
     <!-- 首页卡片 + 底栏配置合并页（v0.6.7 双页签） -->
     <string name="home_bottom_tab_home">首页</string>
@@ -28,7 +32,4 @@
     <string name="appearance_slots_home_fixed">首页固定显示，不在此列表</string>
     <string name="appearance_preview">预览</string>
     <string name="appearance_drag_reorder">拖动排序</string>
-
-    <!-- 首页卡片配置页（v0.6.0） -->
-    <string name="home_cards_desc">控制首页各卡片的显示与排列顺序，至少保留一张</string>
 </resources>

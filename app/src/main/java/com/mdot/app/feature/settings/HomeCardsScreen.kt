@@ -85,13 +85,6 @@ fun HomeCardsPane(
     ) {
         Spacer(Modifier.height(Spacing.s))
 
-        Text(
-            stringResource(R.string.home_cards_desc),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(Spacing.l))
-
         // 卡片总表：单列表（对齐底栏配置页 / 班次卡片）——全部卡片同列，每行都能拖拽 + 开关
         HomeCardsConfigCard(
             order = draft,
@@ -133,12 +126,8 @@ private fun HomeCardsConfigCard(
 
     SectionCard {
         Column(Modifier.padding(vertical = 4.dp)) {
-            Text(
-                stringResource(R.string.home_cards_data_fixed),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Spacing.l, vertical = 6.dp),
-            )
+            // 「数据区固定显示，不可关闭」的说明文字已删（2026-09-20）：该行本身就是一个
+            // **已开启且不可点击**的开关，禁用态已经把这条规则说完了，再写一行灰字是重复。
             order.forEachIndexed { index, id ->
                 val spec = HomeCardRegistry.resolveSpec(id) ?: return@forEachIndexed
                 val isOn = id !in disabled

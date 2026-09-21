@@ -10,8 +10,9 @@ import java.time.LocalDate
 class TierResolverTest {
 
     private val holidays = mapOf(
-        LocalDate.parse("2026-10-01") to HolidayKind.HOLIDAY,
-        LocalDate.parse("2026-09-27") to HolidayKind.WORKDAY, // 周日补班
+        LocalDate.parse("2026-10-01") to HolidayKind.STATUTORY, // 国庆法定日
+        LocalDate.parse("2026-10-05") to HolidayKind.REST,      // 国庆连休里被调成休息的周一
+        LocalDate.parse("2026-09-27") to HolidayKind.WORKDAY,   // 周日补班
     )
 
     private val standard = TierResolver(
@@ -25,6 +26,12 @@ class TierResolverTest {
     @Test
     fun `法定节假日为法定档`() {
         assertEquals(RateTier.STATUTORY, standard.tierFor(LocalDate.parse("2026-10-01")))
+    }
+
+    @Test
+    fun `调休休息日为周末档而非法定档`() {
+        // 2026-10-05 是周一，被调休成休息日：属休息日加班（2 倍），不是法定 3 倍（调研文档 §2.4 坑三）
+        assertEquals(RateTier.WEEKEND, standard.tierFor(LocalDate.parse("2026-10-05")))
     }
 
     @Test
@@ -48,5 +55,11 @@ class TierResolverTest {
         val resolver = TierResolver({ null }, workdays = setOf(DayOfWeek.MONDAY, DayOfWeek.TUESDAY))
         assertEquals(RateTier.WEEKDAY, resolver.tierFor(LocalDate.parse("2026-08-03"))) // 周一
         assertEquals(RateTier.WEEKEND, resolver.tierFor(LocalDate.parse("2026-08-05"))) // 周三（休息日）
+    }
+
+    @Test
+    fun `工作日设定里的调休休息日仍为周末档`() {
+        val resolver = TierResolver(holidays::get, workdays = setOf(DayOfWeek.MONDAY))
+        assertEquals(RateTier.WEEKEND, resolver.tierFor(LocalDate.parse("2026-10-05"))) // 周一被调休
     }
 }

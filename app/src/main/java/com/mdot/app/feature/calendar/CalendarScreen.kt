@@ -57,6 +57,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -66,6 +67,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.wrapContentWidth
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.AdaptiveSpecs
+import com.mdot.app.core.designsystem.CalendarCellSpec
 import com.mdot.app.core.util.AppResult
 import com.mdot.app.feature.record.rememberSaveWithHaptic
 import com.mdot.app.core.designsystem.Duration
@@ -83,25 +85,31 @@ import com.mdot.app.core.navigation.contentBottomPadding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
+import com.mdot.app.core.holiday.CalendarDayUseCase
+import com.mdot.app.core.holiday.DAY_LABEL_MAX_CHARS
+import com.mdot.app.core.holiday.DayCellLabel
 import com.mdot.app.core.holiday.HolidayRepository
+import com.mdot.app.core.holiday.RestBadge
 import com.mdot.app.core.repository.RecordRepository
 import com.mdot.app.domain.model.OtDraft
 import com.mdot.app.domain.model.TierSource
 import com.mdot.app.domain.toCalcLite
 import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.domain.PayrollCalculator
-import com.mdot.app.domain.model.HolidayInfo
 import com.mdot.app.domain.util.Money
 import com.mdot.app.domain.util.TimeUtils
 import com.mdot.app.feature.record.DurationGrid
 import com.mdot.app.feature.record.RecordSheetController
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -115,7 +123,8 @@ data class CalendarCell(
     val otMinutes: Int = 0,
     val leaveMinutes: Int = 0,
     val shiftName: String? = null,
-    val holiday: HolidayInfo? = null,
+    /** 左槽「休/班」+ 右槽节日/农历（组合层产出，见 CalendarDayUseCase；UI 只认这两个语义） */
+    val label: DayCellLabel = DayCellLabel.EMPTY,
     /** 工地记工：当日工数×1000（非 SITE=0） */
     val worksMilli: Long = 0,
 )
@@ -157,6 +166,7 @@ class CalendarViewModel @Inject constructor(
     private val recordRepo: RecordRepository,
     private val settings: SettingsDataSource,
     private val holidayRepo: HolidayRepository,
+    private val dayLabels: CalendarDayUseCase,
     private val siteRepo: com.mdot.app.core.repository.SiteRepository,
     private val shiftRepo: com.mdot.app.core.repository.ShiftRepository,
     val recordSheet: RecordSheetController,
@@ -164,6 +174,13 @@ class CalendarViewModel @Inject constructor(
 
     private val month = MutableStateFlow(YearMonth.now())
     private val selectedDate = MutableStateFlow(LocalDate.now())
+
+    /**
+     * 外观设置「隐藏农历日期」（默认关）→ 日历格右槽是否回落显示农历。
+     * 只有这一项变化才触发格子重算：外观里切主题/配色/弹层背景不会白白重算整个月与工资汇总。
+     */
+    private val showLunar: Flow<Boolean> =
+        settings.appearanceFlow.map { !it.hideLunarDate }.distinctUntilChanged()
 
     // ---- 长按多选批量记加班（非 SITE 制度；未来日期不可选） ----
     private val batchSelecting = MutableStateFlow(false)
@@ -248,7 +265,8 @@ class CalendarViewModel @Inject constructor(
     ) = combine(
         recordRepo.observeRange(m.atDay(1), m.atEndOfMonth()),
         settings.workdaysFlow,
-    ) { records, workdays ->
+        showLunar,
+    ) { records, workdays, showLunarDate ->
         val byDate = records.groupBy { it.date }
         val leading = (m.atDay(1).dayOfWeek.value - 1) // 周一起始
         val cells = buildList {
@@ -264,7 +282,7 @@ class CalendarViewModel @Inject constructor(
                         otMinutes = ot?.durationMinutes ?: 0,
                         leaveMinutes = leave?.durationMinutes ?: 0,
                         shiftName = ot?.shiftName ?: leave?.shiftName,
-                        holiday = holidayRepo.infoFor(date),
+                        label = dayLabels.labelFor(date, showLunarDate),
                     )
                 )
             }
@@ -320,7 +338,10 @@ class CalendarViewModel @Inject constructor(
         selDate: LocalDate,
     ) = kotlinx.coroutines.flow.flow<CalendarUiState> {
         val pid = siteRepo.currentProjectId()
-        siteRepo.observeAttendance(pid, m.atDay(1), m.atEndOfMonth()).collect { atts ->
+        combine(
+            siteRepo.observeAttendance(pid, m.atDay(1), m.atEndOfMonth()),
+            showLunar,
+        ) { atts, showLunarDate ->
             val byDate = atts.groupBy { java.time.LocalDate.parse(it.date) }
             val leading = (m.atDay(1).dayOfWeek.value - 1)
             val cells = buildList {
@@ -337,27 +358,25 @@ class CalendarViewModel @Inject constructor(
                             otMinutes = otMinutes,
                             worksMilli = worksMilli,
                             shiftName = workAtt?.let { if (worksMilli % 1000L == 0L) (worksMilli / 1000L).toString() else String.format(java.util.Locale.US, "%.1f", worksMilli / 1000f) },
-                            holiday = holidayRepo.infoFor(date),
+                            label = dayLabels.labelFor(date, showLunarDate),
                         )
                     )
                 }
             }
             val selCell = cells.firstOrNull { it.date == selDate }
-            emit(
-                CalendarUiState(
-                    month = m,
-                    cells = cells,
-                    recordedDays = byDate.size,
-                    selectedDate = selDate,
-                    selectedOtMinutes = selCell?.otMinutes ?: 0,
-                    selectedShiftName = selCell?.shiftName,
-                    selectedWorksMilli = selCell?.worksMilli ?: 0,
-                    monthOtMinutes = atts.sumOf { it.otMinutes },
-                    monthWorksMilli = atts.sumOf { it.workMinutes * 1000L / it.baseMinutes.coerceAtLeast(1) },
-                    workSystem = com.mdot.app.domain.model.WorkSystem.SITE,
-                )
+            CalendarUiState(
+                month = m,
+                cells = cells,
+                recordedDays = byDate.size,
+                selectedDate = selDate,
+                selectedOtMinutes = selCell?.otMinutes ?: 0,
+                selectedShiftName = selCell?.shiftName,
+                selectedWorksMilli = selCell?.worksMilli ?: 0,
+                monthOtMinutes = atts.sumOf { it.otMinutes },
+                monthWorksMilli = atts.sumOf { it.workMinutes * 1000L / it.baseMinutes.coerceAtLeast(1) },
+                workSystem = com.mdot.app.domain.model.WorkSystem.SITE,
             )
-        }
+        }.collect { emit(it) }
     }
 
 
@@ -617,7 +636,7 @@ private fun MonthGrid(state: CalendarUiState, vm: CalendarViewModel) {
                     fun dateAt(pos: Offset): LocalDate? {
                         if (pos.x < 0f || pos.y < 0f) return null
                         val cellW = size.width / 7f
-                        val cellH = cellW / 0.95f   // 与单元格 aspectRatio(0.95f) 一致
+                        val cellH = cellW / CalendarCellSpec.aspectRatio   // 与单元格 aspectRatio 保持一致
                         val col = (pos.x / cellW).toInt().coerceIn(0, 6)
                         val row = (pos.y / cellH).toInt()
                         val d = page.cells.getOrNull(row * 7 + col)?.date ?: return null
@@ -658,7 +677,7 @@ private fun MonthGrid(state: CalendarUiState, vm: CalendarViewModel) {
                                 isFuture = cell.date?.isAfter(today) == true,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .aspectRatio(0.95f),
+                                    .aspectRatio(CalendarCellSpec.aspectRatio),
                                 onClick = {
                                     cell.date?.let { d ->
                                         if (batchSelecting) vm.toggleBatchSelect(d) else vm.selectDate(d)
@@ -913,7 +932,7 @@ private fun CalendarCellView(
         targetValue = when {
             isFuture -> colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
             isBatchSelected || isSelected || isToday -> colorScheme.onPrimaryContainer
-            cell.holiday?.kind == com.mdot.app.domain.model.HolidayKind.HOLIDAY -> colorScheme.secondary
+            cell.label.badge == RestBadge.REST -> colorScheme.secondary
             else -> colorScheme.onSurface
         },
         animationSpec = colorSpec,
@@ -985,12 +1004,9 @@ private fun CalendarCellView(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Text(
-                    cell.date.dayOfMonth.toString(),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = textColor,
-                )
-                Spacer(Modifier.height(1.dp))
+                // 第一行：左槽「休/班」· 日期 · 右槽节日/农历
+                CellMainRow(cell = cell, textColor = textColor, colorScheme = colorScheme)
+                Spacer(Modifier.height(CalendarCellSpec.lineGap))
                 if (isSite && cell.worksMilli > 0) {
                     // 工地：当日工数（1 工 / 1.5 工）
                     val works = cell.worksMilli / 1000f
@@ -1013,8 +1029,6 @@ private fun CalendarCellView(
                     )
                 } else if (cell.leaveMinutes > 0) {
                     Dot(colorScheme.error)
-                } else if (cell.holiday != null) {
-                    Dot(colorScheme.tertiary, small = true)
                 } else {
                     Spacer(Modifier.height(10.dp))
                 }
@@ -1022,6 +1036,89 @@ private fun CalendarCellView(
         }
     }
 }
+
+/**
+ * 格子第一行（用户 2026-09-20 规格 + 当天两轮调整）：
+ * **日期是主体**——居中于本列（与表头星期对齐）、字号最大；「休/班」紧贴其左、节日名/农历稍离其右。
+ *
+ * 布局要点（两轮反馈各修掉一个坑）：
+ * 1. **不能按内容拼接后整体居中**（早先的 Row 写法）：左右槽宽度不等时日期会被挤偏约 5dp，
+ *    与表头星期对不上。改为两侧占位**固定等宽**（[CalendarCellSpec.sideSlotWidth]）后，
+ *    整体居中即等价于日期居中，且日期不必知道列宽。
+ * 2. **两侧不能贴格子边缘**：格宽约 45dp 时左右各留约 20dp 空隙，「休」会明显更靠近左边那一格的
+ *    农历，看着像别人家的信息。故左槽内容向中间右对齐、右槽向中间左对齐。
+ */
+@Composable
+private fun CellMainRow(
+    cell: CalendarCell,
+    textColor: Color,
+    colorScheme: androidx.compose.material3.ColorScheme,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // 左槽：固定宽、内容右对齐 → 紧贴日期
+        Box(
+            modifier = Modifier.width(CalendarCellSpec.sideSlotWidth),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            cell.label.badge?.let { badge ->
+                Text(
+                    stringResource(
+                        if (badge == RestBadge.REST) R.string.calendar_badge_rest
+                        else R.string.calendar_badge_makeup
+                    ),
+                    modifier = Modifier.padding(end = CalendarCellSpec.sideBadgeGap),
+                    fontSize = CalendarCellSpec.sideFontSize,
+                    lineHeight = CalendarCellSpec.sideLineHeight,
+                    fontWeight = FontWeight.Medium,
+                    color = if (badge == RestBadge.REST) colorScheme.error else colorScheme.primary,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
+        }
+        Text(
+            cell.date?.dayOfMonth?.toString().orEmpty(),
+            fontSize = CalendarCellSpec.dateFontSize,
+            lineHeight = CalendarCellSpec.dateLineHeight,
+            color = textColor,
+            maxLines = 1,
+            softWrap = false,
+        )
+        // 右槽：固定宽、内容左对齐 → 留在日期近旁
+        Box(
+            modifier = Modifier.width(CalendarCellSpec.sideSlotWidth),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            cell.label.text?.let { label ->
+                Text(
+                    label.vertical(),
+                    modifier = Modifier.padding(start = CalendarCellSpec.sideLabelGap),
+                    fontSize = CalendarCellSpec.sideFontSize,
+                    lineHeight = CalendarCellSpec.sideLineHeight,
+                    // 节日与农历同色同重（用户 2026-09-20 二轮规格）：两者都是挂靠信息，不争主次
+                    color = colorScheme.outline,
+                    maxLines = DAY_LABEL_MAX_CHARS,
+                    softWrap = false,
+                    overflow = TextOverflow.Clip,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 右槽文案竖排（用户 2026-09-20 规格）：每字一行。
+ *
+ * 用显式 `"\n"` 而不是 `Modifier.rotate(90f)` 或 `Column` 堆两个 `Text`：
+ * 前者会把汉字本身也转 90°（成了躺着的字），后者会让每格多出语义节点、无障碍朗读拆成两段。
+ * `softWrap = false` 只关自动换行，显式换行照常生效。
+ */
+private fun String.vertical(): String =
+    if (length < 2) this else chunked(1).joinToString("\n")
 
 @Composable
 private fun Dot(color: Color, small: Boolean = false) {

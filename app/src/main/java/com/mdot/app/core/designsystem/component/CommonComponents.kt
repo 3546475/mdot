@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -29,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -198,6 +201,47 @@ fun SettingRow(
             )
         }
         if (trailing != null) trailing()
+    }
+}
+
+/**
+ * 开关设置行：**整行可点**（`toggleable(role = Role.Switch)`，触达区 = 整行宽 × 48dp 高）。
+ *
+ * ⚠️ `Switch` 必须传 `onCheckedChange = null`：语义由外层 `toggleable` 承担。
+ * 两边都挂回调会让无障碍读出**两个重复的开关节点**，且开关本体与整行各响一次。
+ *
+ * 外观页（动态取色 / 隐藏农历日期）与底栏配置页（毛玻璃 / 仅图标 / 按钮右置 / 固定长度）
+ * 共用本组件——两页的开关行样式与触达行为从此不可能再走偏。
+ *
+ * @param desc 可选副行（labelSmall / onSurfaceVariant），说明放在标题下方而非右侧
+ */
+@Composable
+fun SwitchRow(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    desc: String? = null,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium)
+            if (desc != null) {
+                Text(
+                    desc,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Spacer(Modifier.size(Spacing.s))
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

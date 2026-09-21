@@ -51,7 +51,8 @@ import com.mdot.app.core.designsystem.BottomBarSpec
  */
 @Composable
 fun RecordPillButton(
-    onRecord: () -> Unit,
+    /** null = 纯展示（配置页预览）：不挂 clickable、不播按压缩放 */
+    onRecord: (() -> Unit)?,
     /** 仅首次出现播放弹簧弹入；底栏隐藏→再现（组合销毁重建）时不重播 */
     playEntrance: Boolean,
     onEntranceDone: () -> Unit,
@@ -87,9 +88,15 @@ fun RecordPillButton(
                 scaleY = scale
                 translationY = (1f - e) * 24.dp.toPx()
             }
-            .pressScale(interaction, pressedScale = 0.9f)
+            .then(if (onRecord != null) Modifier.pressScale(interaction, pressedScale = 0.9f) else Modifier)
             .clip(shape)
-            .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onRecord),
+            .then(
+                if (onRecord == null) Modifier
+                else Modifier.clickable(
+                    interactionSource = interaction,
+                    indication = LocalIndication.current,
+                ) { onRecord?.invoke() },
+            ),
     ) {
         Box(
             Modifier.size(52.dp),
@@ -115,7 +122,8 @@ fun RecordPillButton(
  */
 @Composable
 fun RecordCircleButton(
-    onRecord: () -> Unit,
+    /** null = 纯展示（配置页预览）：不挂 clickable、不播按压缩放 */
+    onRecord: (() -> Unit)?,
     /** 仅首次出现播放弹簧弹入；底栏隐藏→再现（组合销毁重建）时不重播 */
     playEntrance: Boolean,
     onEntranceDone: () -> Unit,
@@ -189,7 +197,7 @@ fun RecordCircleButton(
                 scaleY = scale
                 translationY = (1f - e) * 24.dp.toPx()
             }
-            .pressScale(interaction, pressedScale = 0.9f)
+            .then(if (onRecord != null) Modifier.pressScale(interaction, pressedScale = 0.9f) else Modifier)
             .clip(shape)
             .then(
                 if (frosted) {
@@ -200,7 +208,13 @@ fun RecordCircleButton(
                     )
                 } else Modifier
             )
-            .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onRecord),
+            .then(
+                if (onRecord == null) Modifier
+                else Modifier.clickable(
+                    interactionSource = interaction,
+                    indication = LocalIndication.current,
+                ) { onRecord?.invoke() },
+            ),
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             // 毛玻璃采样层（最底）：只画「身后内容」窗口并整层模糊（随 clip 裁进圆钮）

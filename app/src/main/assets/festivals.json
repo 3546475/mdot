@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "note": "节日层规则表（调研文档 §4）：没有权威机构发布「中国节日清单」，故自建静态表。kind=lunar/term 由 LunarEngine 提供（已接入：农历 1900-2100 查表 + Meeus 太阳黄经节气），超出表范围的年份不命中。priority 越小越优先（法定/传统 10 > 节气 20 > 纪念日 30 > 民间 40）。",
+  "festivals": [
+    { "id": "new_year",      "name": "元旦",   "kind": "solar",   "month": 1,  "day": 1,  "official": true,  "offDay": true,  "priority": 10 },
+    { "id": "spring_festival","name": "春节",  "kind": "lunar",   "lunarMonth": 1,  "lunarDay": 1,  "official": true,  "offDay": true,  "priority": 10 },
+    { "id": "qingming",      "name": "清明节", "kind": "term",    "term": "清明",                                 "official": true,  "offDay": true,  "priority": 10 },
+    { "id": "labour_day",    "name": "劳动节", "kind": "solar",   "month": 5,  "day": 1,  "official": true,  "offDay": true,  "priority": 10 },
+    { "id": "dragon_boat",   "name": "端午节", "kind": "lunar",   "lunarMonth": 5,  "lunarDay": 5,  "official": true,  "offDay": true,  "priority": 10 },
+    { "id": "mid_autumn",    "name": "中秋节", "kind": "lunar",   "lunarMonth": 8,  "lunarDay": 15, "official": true,  "offDay": true,  "priority": 10 },
+    { "id": "national_day",  "name": "国庆节", "kind": "solar",   "month": 10, "day": 1,  "official": true,  "offDay": true,  "priority": 10 },
+
+    { "id": "lantern",       "name": "元宵节", "kind": "lunar",   "lunarMonth": 1,  "lunarDay": 15, "official": false, "offDay": false, "priority": 12 },
+    { "id": "longtaitou",    "name": "龙抬头", "kind": "lunar",   "lunarMonth": 2,  "lunarDay": 2,  "official": false, "offDay": false, "priority": 12 },
+    { "id": "qixi",          "name": "七夕",   "kind": "lunar",   "lunarMonth": 7,  "lunarDay": 7,  "official": false, "offDay": false, "priority": 12 },
+    { "id": "zhongyuan",     "name": "中元节", "kind": "lunar",   "lunarMonth": 7,  "lunarDay": 15, "official": false, "offDay": false, "priority": 12 },
+    { "id": "chongyang",     "name": "重阳节", "kind": "lunar",   "lunarMonth": 9,  "lunarDay": 9,  "official": false, "offDay": false, "priority": 12 },
+    { "id": "laba",          "name": "腊八节", "kind": "lunar",   "lunarMonth": 12, "lunarDay": 8,  "official": false, "offDay": false, "priority": 12 },
+    { "id": "xiaonian",      "name": "小年",   "kind": "lunar",   "lunarMonth": 12, "lunarDay": 23, "official": false, "offDay": false, "priority": 12 },
+    { "id": "chuxi",         "name": "除夕",   "kind": "lunar",   "lunarMonth": 12, "lunarDay": -1, "official": true,  "offDay": true,  "priority": 10 },
+
+    { "id": "women",         "name": "妇女节", "kind": "solar",   "month": 3,  "day": 8,  "official": false, "offDay": false, "priority": 30 },
+    { "id": "tree_planting", "name": "植树节", "kind": "solar",   "month": 3,  "day": 12, "official": false, "offDay": false, "priority": 30 },
+    { "id": "april_fools",   "name": "愚人节", "kind": "solar",   "month": 4,  "day": 1,  "official": false, "offDay": false, "priority": 40 },
+    { "id": "youth",         "name": "青年节", "kind": "solar",   "month": 5,  "day": 4,  "official": false, "offDay": false, "priority": 30 },
+    { "id": "nurses",        "name": "护士节", "kind": "solar",   "month": 5,  "day": 12, "official": false, "offDay": false, "priority": 30 },
+    { "id": "children",      "name": "儿童节", "kind": "solar",   "month": 6,  "day": 1,  "official": false, "offDay": false, "priority": 30 },
+    { "id": "party",         "name": "建党节", "kind": "solar",   "month": 7,  "day": 1,  "official": false, "offDay": false, "priority": 30 },
+    { "id": "army",          "name": "建军节", "kind": "solar",   "month": 8,  "day": 1,  "official": false, "offDay": false, "priority": 30 },
+    { "id": "teachers",      "name": "教师节", "kind": "solar",   "month": 9,  "day": 10, "official": false, "offDay": false, "priority": 30 },
+    { "id": "journalists",   "name": "记者节", "kind": "solar",   "month": 11, "day": 8,  "official": false, "offDay": false, "priority": 30 },
+    { "id": "christmas",     "name": "圣诞节", "kind": "solar",   "month": 12, "day": 25, "official": false, "offDay": false, "priority": 40 },
+
+    { "id": "valentine",     "name": "情人节", "kind": "solar",   "month": 2,  "day": 14, "official": false, "offDay": false, "priority": 40 },
+
+    { "id": "mother",        "name": "母亲节", "kind": "weekday", "month": 5,  "ordinal": 2, "weekday": 7, "official": false, "offDay": false, "priority": 40 },
+    { "id": "father",        "name": "父亲节", "kind": "weekday", "month": 6,  "ordinal": 3, "weekday": 7, "official": false, "offDay": false, "priority": 40 },
+    { "id": "thanksgiving",  "name": "感恩节", "kind": "weekday", "month": 11, "ordinal": 4, "weekday": 4, "official": false, "offDay": false, "priority": 40 }
+  ]
+}

@@ -47,6 +47,10 @@
     <string name="ds_palette_teal">青绿</string>
     <string name="ds_palette_warm_orange">暖橙</string>
     <string name="ds_palette_violet">紫罗兰</string>
+    <string name="ds_palette_cinnabar">朱砂</string>
+    <string name="ds_palette_rose">玫红</string>
+    <string name="ds_palette_lake">湖蓝</string>
+    <string name="ds_palette_graphite">石墨</string>
     <string name="ds_topbar_switch_cd">切换工时制度</string>
     <string name="ds_topbar_appearance_cd">外观</string>
     <string name="ds_topbar_settings_cd">设置</string>

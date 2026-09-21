@@ -67,5 +67,19 @@ enum class ThemeMode { LIGHT, DARK, SYSTEM }
  */
 enum class SheetBackdropMode { DIM, BLUR, BLUR_SCALE }
 
-/** 节假日库条目类型 */
-enum class HolidayKind { HOLIDAY, WORKDAY }
+/**
+ * 节假日库条目语义（调研文档 §2.4 坑三：「放假」与「法定」是两件事，档位判定不得只看放不放假）。
+ *
+ * 云端 JSON 的 `isOffDay=true` 既包含法定假日，也包含连休里的周末与调休拼出来的休息日；
+ * 若一律按「放假」判法定 3 倍，调休日会被多算。故在此拆成三档语义。
+ */
+enum class HolidayKind {
+    /** 法定节假日（《全国年节及纪念日放假办法》13 天口径）→ 档位：法定 */
+    STATUTORY,
+
+    /** 调休得来的休息日（连休中的周末、被调成休息的工作日）→ 档位：休息日 */
+    REST,
+
+    /** 调休补班日（周末上班）→ 档位：平时 */
+    WORKDAY,
+}

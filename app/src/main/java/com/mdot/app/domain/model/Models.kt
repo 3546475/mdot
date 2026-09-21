@@ -48,9 +48,17 @@ data class CompAdjustment(
     val createdAt: Long,
 )
 
-/** 节假日信息（日历角标展示用） */
+/**
+ * 节假日信息（日历角标 + 档位判定用）。
+ *
+ * [name] 是当天所属节日的名称（如「春节」），[kind] 区分「法定 / 调休休息日 / 补班」；
+ * [makeupFor] 仅补班日有值 = 被调的节日名——**不得据此渲染节日角标**：
+ * 2026-02-14 是春节的补班日而不是春节假期，直接显示「春节 + 上班」逻辑自相矛盾
+ * （调研文档 §2.4 坑一），节日角标统一由 [kind] 决定。
+ */
 data class HolidayInfo(
     val date: LocalDate,
     val name: String,
     val kind: HolidayKind,
+    val makeupFor: String? = null,
 )

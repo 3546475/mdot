@@ -97,6 +97,9 @@
     <string name="calendar_leave">请假</string>
     <string name="calendar_ot_pay">加班费</string>
     <string name="calendar_shift">班次：%1$s</string>
+    <!-- 日历格左侧标记：休 = 放假日（取请假红），班 = 调休补班日（取加班蓝） -->
+    <string name="calendar_badge_rest">休</string>
+    <string name="calendar_badge_makeup">班</string>
     <string name="calendar_summary_hint">点日期查看当天 · 长按日期可多选批量记加班</string>
     <string name="calendar_batch_title">批量记加班</string>
     <string name="calendar_batch_selected">已选 %1$d 天</string>

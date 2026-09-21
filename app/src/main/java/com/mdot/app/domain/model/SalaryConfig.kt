@@ -65,12 +65,21 @@ data class AppearanceConfig(
     val dynamicColor: Boolean = true,
     /** 底部弹层背景效果（压暗 / 模糊 / 模糊缩小），默认模糊（v0.6.19 出厂默认） */
     val sheetBackdropMode: SheetBackdropMode = SheetBackdropMode.BLUR,
+    /** 日历格隐藏农历日期（默认关 = 显示农历；节日名不受影响） */
+    val hideLunarDate: Boolean = false,
 ) {
     companion object {
         const val PALETTE_CLASSIC_BLUE = "classic_blue"
         const val PALETTE_TEAL = "teal"
         const val PALETTE_WARM_ORANGE = "warm_orange"
         const val PALETTE_VIOLET = "violet"
+
+        // v0.7.x 扩展（docs/18）。id 一经发布**不可改名**：`paletteId` 是持久化字段，
+        // 改名等于清空所有老用户的配色选择（`paletteOf` 的兜底会静默回落到经典蓝）。
+        const val PALETTE_CINNABAR = "cinnabar"
+        const val PALETTE_ROSE = "rose"
+        const val PALETTE_LAKE = "lake"
+        const val PALETTE_GRAPHITE = "graphite"
     }
 }
 

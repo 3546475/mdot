@@ -1,11 +1,9 @@
 package com.mdot.app.feature.settings
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -13,7 +11,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import com.mdot.app.R
-import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.SegmentBar
 
@@ -22,6 +19,8 @@ import com.mdot.app.core.designsystem.component.SegmentBar
  * 都进入本页，入口仅决定默认页签（外观→0、首页卡片→1、底栏配置→2）。
  * 页签用 HorizontalPager（可横滑）；各页签内容各自垂直滚动、互不嵌套——
  * 垂直滚动「套娃」在 NavHost 转场的无界测量下会抛「infinite maximum height」（实测高概率崩溃）。
+ *
+ * 上下留白归各 Pane 自己管（各 Pane 自带 `Spacer(Spacing.s)` 起步），本页只负责顶栏与分页。
  */
 @Composable
 fun HomeBottomConfigScreen(
@@ -56,29 +55,10 @@ fun HomeBottomConfigScreen(
             beyondViewportPageCount = 1,
         ) { page ->
             when (page) {
-                0 -> AppearanceTabContent()
-                1 -> HomeCardsTabContent()
-                else -> BottomBarTabContent()
+                0 -> AppearancePane()
+                1 -> HomeCardsPane()
+                else -> BottomBarPane()
             }
         }
     }
-}
-
-/** 外观页签：与独立外观页一致的上下留白 */
-@Composable
-private fun AppearanceTabContent() {
-    Column(Modifier.fillMaxSize()) {
-        Spacer(Modifier.height(Spacing.m))
-        AppearancePane()
-    }
-}
-
-@Composable
-private fun HomeCardsTabContent() {
-    HomeCardsPane()
-}
-
-@Composable
-private fun BottomBarTabContent() {
-    BottomBarPane()
 }

@@ -5,8 +5,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -30,7 +32,13 @@ import com.mdot.app.core.designsystem.Radius
  * （pager 传 currentPage+offsetFraction 可随手势实时跟随；纯页签传动画值即得弹簧滑动）。
  * 按压反馈即滑块位移本身，不叠涟漪。
  *
+ * 本组件是全 app 「从 N 选 1」的唯一形态（04 文档 §4.1）——设置类页面同样走它，
+ * 不再混用 `FilterChip`：chip 的「描边 → 实心填充」与滑块语言不同，且块宽随标签长度变化，
+ * 一行里会出现 60/60/88dp 的参差右边界。
+ *
  * @param position 连续选中位置（0 起；如 0.35 表示滑在 0/1 段之间）
+ * @param fillWidth true = 撑满可用宽度、把宽度**等分**给各段（段宽由测量得出，忽略 [segWidth]）；
+ *   用于设置页那种「整行等分、右边界与卡片对齐」的场景
  */
 @Composable
 fun SegmentBar(
@@ -40,46 +48,59 @@ fun SegmentBar(
     modifier: Modifier = Modifier,
     segWidth: Dp = 96.dp,
     position: Float = selected.toFloat(),
+    fillWidth: Boolean = false,
 ) {
+    val gap = 4.dp
     Box(
         modifier
+            .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
             .clip(RoundedCornerShape(Radius.pill))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(4.dp),
+            .padding(gap),
     ) {
-        Box(
-            Modifier
-                .width(segWidth)
-                .height(34.dp)
-                .offset(x = (segWidth + 4.dp) * position)
-                .clip(RoundedCornerShape(Radius.pill))
-                .background(MaterialTheme.colorScheme.primaryContainer),
-        )
-        Row(
-            Modifier.height(34.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            val interactions = remember(labels.size) { List(labels.size) { MutableInteractionSource() } }
-            labels.forEachIndexed { index, label ->
-                Box(
-                    Modifier
-                        .width(segWidth)
-                        .fillMaxHeight()
-                        .clickable(
-                            interactionSource = interactions[index],
-                            indication = null,
-                        ) { onSelect(index) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    val sel = index == selected
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (sel) MaterialTheme.colorScheme.onPrimaryContainer
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
+        // 等分模式下段宽取自「轨道实测宽 - 段间距」再均分：BoxWithConstraints 在布局前就给出，
+        // 不需要 onSizeChanged 的额外一帧（否则首帧滑块会用默认段宽画错位置，闪一下）。
+        // 非等分模式仍用固定 segWidth，此时约束可能是无界的，不做任何算术。
+        BoxWithConstraints {
+            val seg = if (fillWidth && labels.isNotEmpty()) {
+                ((maxWidth - gap * (labels.size - 1)) / labels.size).coerceAtLeast(0.dp)
+            } else {
+                segWidth
+            }
+            Box(
+                Modifier
+                    .width(seg)
+                    .height(34.dp)
+                    .offset(x = (seg + gap) * position)
+                    .clip(RoundedCornerShape(Radius.pill))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+            )
+            Row(
+                Modifier.height(34.dp),
+                horizontalArrangement = Arrangement.spacedBy(gap),
+            ) {
+                val interactions = remember(labels.size) { List(labels.size) { MutableInteractionSource() } }
+                labels.forEachIndexed { index, label ->
+                    Box(
+                        Modifier
+                            .width(seg)
+                            .fillMaxHeight()
+                            .clickable(
+                                interactionSource = interactions[index],
+                                indication = null,
+                            ) { onSelect(index) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        val sel = index == selected
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (sel) MaterialTheme.colorScheme.onPrimaryContainer
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
         }

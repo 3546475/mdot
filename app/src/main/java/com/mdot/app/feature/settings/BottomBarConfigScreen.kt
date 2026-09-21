@@ -9,7 +9,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.runtime.key
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -61,7 +60,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -78,6 +76,7 @@ import com.mdot.app.core.designsystem.component.rememberBackdropBlurState
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.SlotRegistry
 import com.mdot.app.core.designsystem.component.SlotSpec
+import com.mdot.app.core.designsystem.component.SwitchRow
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.domain.model.BottomBarConfig
@@ -158,13 +157,13 @@ fun BottomBarPane(
                         shrinkVertically(animationSpec = sizeSpec),
                 ) {
                     Column {
-                        BarOptionSwitch(R.string.appearance_frosted, frosted, vm::setFrosted)
+                        SwitchRow(stringResource(R.string.appearance_frosted), frosted, vm::setFrosted)
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        BarOptionSwitch(R.string.appearance_icon_only, iconOnly, vm::setIconOnly)
+                        SwitchRow(stringResource(R.string.appearance_icon_only), iconOnly, vm::setIconOnly)
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        BarOptionSwitch(R.string.appearance_side_action, sideAction, vm::setSideAction)
+                        SwitchRow(stringResource(R.string.appearance_side_action), sideAction, vm::setSideAction)
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        BarOptionSwitch(R.string.appearance_fixed_width, fixedWidth, vm::setFixedWidth)
+                        SwitchRow(stringResource(R.string.appearance_fixed_width), fixedWidth, vm::setFixedWidth)
                     }
                 }
             }
@@ -201,29 +200,6 @@ fun BottomBarPane(
     }
 }
 
-/** 底栏外观开关行：整行可点（`toggleable` role=Switch），Switch 自身不接管点击（避免双重语义） */
-@Composable
-private fun BarOptionSwitch(
-    labelRes: Int,
-    checked: Boolean,
-    onToggle: (Boolean) -> Unit,
-) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .toggleable(value = checked, role = Role.Switch, onValueChange = onToggle)
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            stringResource(labelRes),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f),
-        )
-        Switch(checked = checked, onCheckedChange = null)
-    }
-}
-
 /**
  * 底栏预览：**与真实底栏完全同一套实现**——槽位与胶囊复用 [JiabanBottomBar]，
  * 记加班按钮复用 [RecordPillButton] / [RecordCircleButton]（曾因预览另画简化版，
@@ -232,6 +208,9 @@ private fun BarOptionSwitch(
  * 毛玻璃：传入的 [previewBlurState] **不挂源**（只呈现玻璃底色渐变 + 内高光 + 去投影 + 衬托渐变）——
  * 与真实底栏在「身后无内容」（contentBottomPadding 让出的空白区）时的观感一致；
  * 预览区无法真实采样页面（挂源会把预览自身也录进去 → 自采样），故不接源。
+ *
+ * **纯展示**：槽位传 `onSlotClick = null`，不挂 clickable、不播按压缩放——
+ * 预览是展示件，不做「按了会缩但无响应」的假可点。
  */
 @Composable
 private fun BottomBarPreview(
@@ -248,13 +227,13 @@ private fun BottomBarPreview(
     // 毛玻璃源（空源：只走玻璃样式，不采样）
     val previewBlurState = rememberBackdropBlurState()
     val blurState = if (frosted) previewBlurState else null
-    // 记加班按钮：与真实底栏同一实现（不播放入场动画）
+    // 记加班按钮：与真实底栏同一实现（不播放入场动画）；onRecord = null → 预览中纯展示、不可点
     val recordPill: @Composable () -> Unit = {
-        RecordPillButton(onRecord = {}, playEntrance = false, onEntranceDone = {})
+        RecordPillButton(onRecord = null, playEntrance = false, onEntranceDone = {})
     }
     val recordCircle: @Composable () -> Unit = {
         RecordCircleButton(
-            onRecord = {},
+            onRecord = null,
             playEntrance = false,
             onEntranceDone = {},
             backdropBlur = blurState,
@@ -278,7 +257,9 @@ private fun BottomBarPreview(
                 slots = slotSpecs,
                 selectedRoute = slotSpecs.firstOrNull()?.route,
                 visible = true,
-                onSlotClick = {},
+                // null = 纯展示：预览槽位不响应点击（原先传空 lambda，会出现
+                // 「按下去缩一下、松手什么都不发生」的假可点）
+                onSlotClick = null,
                 iconOnly = iconOnly,
                 showIndicator = true,
                 centerAction = if (sideAction) null else recordPill,
@@ -346,7 +327,11 @@ private fun SlotConfigCard(
                                 scaleY = dragScale
                             }
                             .zIndex(if (isDragged) 1f else 0f)
-                            .pointerInput(id) {
+                            // 仅开启项可拖：关闭项在底栏不显示，其顺序无意义，
+                            // 且手柄已按 draggable=false 降权——手势必须同步关掉，
+                            // 否则会出现「暗手柄却仍能拖」的自相矛盾
+                            .pointerInput(id, isOn) {
+                                if (!isOn) return@pointerInput
                                 detectVerticalDragGestures(
                                     onDragStart = {
                                         dragFrom = currentIndex
@@ -413,7 +398,7 @@ private fun SlotConfigCard(
                             spec = spec,
                             isOn = isOn,
                             isDragged = isDragged,
-                            draggable = true,
+                            draggable = isOn,
                             onToggle = { onToggle(id, !isOn) },
                         )
                     }

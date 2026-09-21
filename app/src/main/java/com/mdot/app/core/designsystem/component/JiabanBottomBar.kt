@@ -92,7 +92,9 @@ fun JiabanBottomBar(
     slots: List<SlotSpec>,
     selectedRoute: String?,
     visible: Boolean,
-    onSlotClick: (SlotSpec) -> Unit,
+    /** 槽位点击；**null = 纯展示**（配置页预览）：不挂 clickable、不播按压缩放，
+     *  避免「按下去会缩、松手什么都不发生」的假可点 */
+    onSlotClick: ((SlotSpec) -> Unit)?,
     modifier: Modifier = Modifier,
     /** 仅图标模式：隐藏槽位文字标签 */
     iconOnly: Boolean = false,
@@ -257,7 +259,7 @@ fun JiabanBottomBar(
             Row(Modifier.fillMaxSize()) {
                 val leftCount = if (centerAction != null) slots.size / 2 else 0
                 slots.take(leftCount).forEachIndexed { idx, slot ->
-                    SlotCell(slot, idx == selectedIndex, iconOnly) { onSlotClick(slot) }
+                    SlotCell(slot, idx == selectedIndex, iconOnly, onSlotClick)
                 }
                 if (centerAction != null) {
                     Box(
@@ -268,7 +270,7 @@ fun JiabanBottomBar(
                     ) { centerAction() }
                 }
                 slots.drop(leftCount).forEachIndexed { idx, slot ->
-                    SlotCell(slot, leftCount + idx == selectedIndex, iconOnly) { onSlotClick(slot) }
+                    SlotCell(slot, leftCount + idx == selectedIndex, iconOnly, onSlotClick)
                 }
             }
         }
@@ -293,21 +295,26 @@ fun JiabanBottomBar(
     }
 }
 
-/** 底栏槽位单元：等分宽 + 按压缩放 + 点击 */
+/** 底栏槽位单元：等分宽 + 按压缩放 + 点击（[onClick] 为 null 时完全不响应，纯展示） */
 @Composable
 private fun androidx.compose.foundation.layout.RowScope.SlotCell(
     slot: SlotSpec,
     selected: Boolean,
     iconOnly: Boolean,
-    onClick: () -> Unit,
+    /** null = 不可点（配置页预览）：不挂 clickable、也不播按压缩放 */
+    onClick: ((SlotSpec) -> Unit)?,
 ) {
     val interaction = remember { MutableInteractionSource() }
     Box(
         Modifier
             .weight(1f)
             .fillMaxHeight()
-            .pressScale(interaction, pressedScale = 0.9f)
-            .clickable(indication = null, interactionSource = interaction, onClick = onClick),
+            .then(
+                if (onClick == null) Modifier
+                else Modifier
+                    .pressScale(interaction, pressedScale = 0.9f)
+                    .clickable(indication = null, interactionSource = interaction) { onClick?.invoke(slot) },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         SlotBody(slot, selected = selected, iconOnly = iconOnly)

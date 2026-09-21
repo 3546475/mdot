@@ -205,6 +205,11 @@ class AppearanceViewModel @Inject constructor(
     fun setSheetBackdrop(mode: com.mdot.app.domain.model.SheetBackdropMode) = viewModelScope.launch {
         settings.setAppearance(appearance.value.copy(sheetBackdropMode = mode))
     }
+
+    /** 日历隐藏农历日期（默认关） */
+    fun setHideLunar(value: Boolean) = viewModelScope.launch {
+        settings.setAppearance(appearance.value.copy(hideLunarDate = value))
+    }
 }
 
 @HiltViewModel

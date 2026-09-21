@@ -102,7 +102,6 @@ import com.mdot.app.feature.payroll.PayrollScreen
 import com.mdot.app.feature.profile.ProfileScreen
 import com.mdot.app.feature.record.RecordSheet
 import com.mdot.app.feature.settings.AboutScreen
-import com.mdot.app.feature.settings.AppearanceScreen
 import com.mdot.app.feature.settings.DataSourceScreen
 import com.mdot.app.feature.settings.SystemSettingsScreen
 import com.mdot.app.feature.settings.SystemSwitchScreen
