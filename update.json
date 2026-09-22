@@ -1,16 +1,16 @@
 {
-  "versionName": "0.7.2",
-  "versionCode": 52,
-  "tag": "v0.7.2",
-  "releaseNotes": "## 更新内容\n\n**记加班弹窗与日期选择器打磨**\n\n- 记加班弹窗半开⇄全开增加平滑的展开/收起动画，编辑态删除按钮随动画进出（不再瞬时跳变）\n- 日期选择器精简：移除手动输入切换（同时修复切换时动画抽搐数秒的问题）与英文标题，收紧标题区留白\n- 修复「保存」「取消」等短文案按钮文字未在按钮内居中的问题（工资页 / 记工页 / 记加班弹窗等）\n- 存储源页：切换 WebDAV/S3 页签不再跳动；移除「当前使用」文字；断开按钮移至页底\n\n\n系统要求：Android 10（API 29）及以上。",
+  "versionName": "0.7.3",
+  "versionCode": 53,
+  "tag": "v0.7.3",
+  "releaseNotes": "## 更新内容\n\n**底栏配置页**\n\n- 「更多选项」改名为 **More**，并搬到页面底部：不再套一层卡片，与上方卡片留 12dp 间距，看起来清爽多了\n- 每个配置项的图标**补上了底色方块**（与首页卡片配置页同款）：打开时浅橙底、关闭时灰底，一眼就能看出开关状态\n- 配置项**长按即可拖动排序**：原来的六点拖拽手柄已去掉，行更干净；四个配置页（底栏 / 首页卡片 / 周期工作日·班次 / 工地项目）统一同一套手势\n- **已关闭的配置项现在也能拖动排序**（此前被锁住不能拖）\n- 工地项目行：项目信息压成一行不换行，名称不再被挤断；非当前项目的信息变淡，一眼分清哪个在用\n\n**视觉细节**\n\n- 全应用**圆角与间距统一到设计档位**：此前散落的 6dp / 10dp / 14dp 等\"半档\"间距全部收敛到 4 / 8 / 12 / 16 / 24 档 —— 标签、药丸、列表行、顶栏的内边距因此整齐了（标签类会略微宽松一点）\n- **图标尺寸与底色方块统一**：图标尺寸归入几档标准值；设置行、工地卡片、首页入口卡的图标底统一为 36dp 方块，方块圆角只保留 12dp 与 16dp 两档\n- 导出页的 Excel 方块、图表气泡、热力图小格、记加班按钮与悬浮按钮的圆角一并归入同一套档位（观感不变，今后调整不会再\"各写各的\"）\n- **说明文字精简**：61 条啰嗦的说明改写为更短的说法，删掉 4 条与上一行完全重复的提示\n\n**内部（不影响使用）**\n\n- 图标全部改为自绘，移除一个第三方图标库依赖，安装包更小\n- 新增 5 条自动化测试守住上面这些视觉规范，避免以后的改动把它们改回去\n\n\n系统要求：Android 10（API 29）及以上。",
   "apkUrl": {
-    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.7.2/MDOT-RELEASE-0.7.2-v8a.apk",
-    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.7.2/MDOT-RELEASE-0.7.2-v7a.apk",
-    "universal": "https://github.com/3546475/mdot/releases/download/v0.7.2/MDOT-RELEASE-0.7.2-dual.apk"
+    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.7.3/MDOT-RELEASE-0.7.3-v8a.apk",
+    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.7.3/MDOT-RELEASE-0.7.3-v7a.apk",
+    "universal": "https://github.com/3546475/mdot/releases/download/v0.7.3/MDOT-RELEASE-0.7.3-dual.apk"
   },
   "apkSha256": {
-    "arm64-v8a": "17f90f1f7caf2cc5502d13eac281bbb1b8855fd358cd864830d253b0df4aa117",
-    "armeabi-v7a": "651b0cd08f08cd20de7e2fb55e2f6ab725a3781a78aaab5a0fe4804aadfc0ffa",
-    "universal": "272b213a30d3d24b2b1109ce7cd5bf31d736dd2892a1807dd6065a07642906e7"
+    "arm64-v8a": "0c1f816d91568441e6cfc5a99990c958c73d94fdf93de1ca01c01c972eb11567",
+    "armeabi-v7a": "e8566c0ae8b18d1a029823d5ddaa6d2e2ef604c0aa4a376fd0c3f88f9a07d4c6",
+    "universal": "cb9ce1a845ec0a35145620085ea567b8b733e8757af661ddb716350844d10a60"
   }
 }
