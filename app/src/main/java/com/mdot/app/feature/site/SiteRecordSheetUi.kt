@@ -57,7 +57,7 @@ import com.mdot.app.R
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
-import com.mdot.app.core.designsystem.component.DatePick
+import com.mdot.app.core.designsystem.component.DayPickDialog
 import com.mdot.app.core.designsystem.component.LocalSheetBackdropState
 import com.mdot.app.core.designsystem.component.SegmentBar
 import com.mdot.app.core.designsystem.component.SheetBackdropLayer
@@ -97,7 +97,6 @@ fun SiteRecordScreen(
     var showUnitSheet by remember { mutableStateOf(false) }
     // 日期选择弹窗：项目+日期卡上移为固定区（四种表单共用），弹窗随之提升到弹层级
     var showDatePicker by remember { mutableStateOf(false) }
-    var showMultiDate by remember { mutableStateOf(false) }
     // 保存反馈：单颗「保存」＝原地保存并留在本页（原「保存 并再记一笔」行为），
     // 反馈动效＝按钮对称收缩成 ✓ 圆钮再展开（与工资页保存同款，实现在 ShrinkFeedbackButton）
     var saveFlash by remember { mutableStateOf(false) }
@@ -163,7 +162,6 @@ fun SiteRecordScreen(
                         state = state,
                         onOpenProjectPick = onOpenProjectPick,
                         onShowDatePicker = { showDatePicker = true },
-                        onShowMultiDate = { showMultiDate = true },
                     )
                     Spacer(Modifier.height(Spacing.s))
 
@@ -249,16 +247,17 @@ fun SiteRecordScreen(
                 }
             }
 
-            // ---- 弹层（独立窗口：DatePick 是 M3 DatePickerDialog，其余走 SiteBottomSheet）----
+            // ---- 弹层（日期类走统一的共享选择器，其余走 SiteBottomSheet）----
             if (showDatePicker) {
-                DatePick(initial = state.date, onPick = { vm.onDate(it) }, onDismiss = { showDatePicker = false })
-            }
-            if (showMultiDate) {
-                MultiDateDialog(
-                    primary = state.date,
-                    selected = state.extraDates,
-                    onToggle = { vm.onToggleExtraDate(it) },
-                    onDismiss = { showMultiDate = false },
+                // 一个入口搞定单日与多日：多选在选择器内切换（行上只留一个点击区）
+                DayPickDialog(
+                    title = stringResource(R.string.ds_pick_date),
+                    initial = state.date,
+                    multiSelectable = true,
+                    initialSelection = (state.extraDates + state.date).toSet(),
+                    onPick = { vm.onDate(it); showDatePicker = false },
+                    onPickDates = { vm.onSelectDates(it); showDatePicker = false },
+                    onDismiss = { showDatePicker = false },
                 )
             }
 

@@ -49,10 +49,13 @@ enum class InlineConfirmPhase { Idle, Asking, Done }
 /**
  * 外观式样：
  * - [Standalone] 独立/整行：固定外壳（宽度动画左右对称）+ 居中 + 实心主色 idle（如记月页「导入上月」）；
+ * - [Tonal]      次级强调：**无固定外壳**（宽度随内容、定位交给调用方）+ 居中 + idle 走
+ *                `secondaryContainer`（用于「已移出主内容卡」的页面级动作，
+ *                如记月页「同步本月考勤」「导入上月」）；
  * - [Compact]    行内紧凑：外壳随内容（不预留、不挤压同行信息）+ 右对齐 + idle 为 error 色朴素文字
  *                （如列表行「删除」，与原先的 TextButton 观感一致）。
  */
-enum class InlineConfirmStyle { Standalone, Compact }
+enum class InlineConfirmStyle { Standalone, Tonal, Compact }
 
 /** 胶囊最小高度（48dp = Spacing.xl × 2） */
 private val ButtonHeight = Spacing.xl * 2
@@ -138,8 +141,10 @@ fun InlineConfirmButton(
     val widthSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
 
     val standalone = style == InlineConfirmStyle.Standalone
+    val tonal = style == InlineConfirmStyle.Tonal
+    // 只有 Standalone 预留固定外壳（其余：宽度随内容、定位交给调用方）
     val shellWidth: Dp? = if (standalone) ShellWidth else null
-    val cellMinWidth: Dp = if (standalone) MinWidth else 0.dp
+    val cellMinWidth: Dp = if (style == InlineConfirmStyle.Compact) 0.dp else MinWidth
 
     // ---- 宽度：单一 Animatable 驱动；首次测量 snap、之后相位切换动画 ----
     var naturalWidthPx by remember(resetKey) { mutableStateOf(0) }
@@ -177,6 +182,7 @@ fun InlineConfirmButton(
     val container by animateColorAsState(
         targetValue = when {
             isIdle && standalone -> cs.primary
+            isIdle && tonal -> cs.secondaryContainer
             isIdle -> Color.Transparent
             else -> cs.surfaceContainerHighest
         },
@@ -192,7 +198,11 @@ fun InlineConfirmButton(
         animationSpec = colorSpec,
         label = "inlineConfirmBorder",
     )
-    val idleContentColor = if (standalone) cs.onPrimary else cs.error
+    val idleContentColor = when {
+        standalone -> cs.onPrimary
+        tonal -> cs.onSecondaryContainer
+        else -> cs.error
+    }
 
     // 固定外壳（Standalone）：胶囊在其内居中 → 位置随宽度自动对称。
     // Compact：外壳随内容（不预留），交给同行布局吸收。
@@ -223,14 +233,14 @@ fun InlineConfirmButton(
                             text = idleText,
                             contentColor = idleContentColor,
                             minWidth = cellMinWidth,
-                            compact = !standalone,
+                            compact = style == InlineConfirmStyle.Compact,
                             onClick = { phase = InlineConfirmPhase.Asking },
                         )
 
                         InlineConfirmPhase.Asking -> AskingRow(
                             cancelText = cancelText,
                             confirmText = confirmText,
-                            compact = !standalone,
+                            compact = style == InlineConfirmStyle.Compact,
                             onCancel = { settle() },
                             onConfirm = {
                                 onConfirm()
@@ -246,7 +256,7 @@ fun InlineConfirmButton(
                             text = undoText,
                             contentColor = cs.primary,
                             minWidth = cellMinWidth,
-                            compact = !standalone,
+                            compact = style == InlineConfirmStyle.Compact,
                             onClick = {
                                 onUndo?.invoke()
                                 settle()

@@ -9,6 +9,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
@@ -73,6 +76,7 @@ import com.mdot.app.core.designsystem.component.SettingRow
 import com.mdot.app.core.designsystem.component.ShrinkFeedbackButton
 import com.mdot.app.domain.CycleCalculator
 import com.mdot.app.domain.HourlyPayrollStrategy
+import com.mdot.app.domain.PayrollCalculator
 import com.mdot.app.domain.StandardPayrollStrategy
 import com.mdot.app.domain.model.LeaveType
 import com.mdot.app.domain.model.RateTier
@@ -172,6 +176,7 @@ class PayrollViewModel @Inject constructor(
         it.copy(coefPercents = it.coefPercents + (type to percent.coerceIn(0, 100)), saved = false)
     }
     fun onIncludeBase(value: Boolean) = _state.update { it.copy(includeBase = value, saved = false) }
+
     fun onHourlyRate(text: String) = _state.update {
         it.copy(hourlyRateText = text.filter { c -> c.isDigit() || c == '.' }, saved = false)
     }
@@ -214,7 +219,17 @@ class PayrollViewModel @Inject constructor(
                 ?.let { (it * 60).toInt().coerceIn(0, 31 * 24 * 60) } ?: 0,
         )
         viewModelScope.launch {
-            settings.setSalary(salary)
+            // ⚠️ 社保/公积金已搬到**记月各自行的弹窗**里设置（见 PayMonthContent）——本页保存时必须沿用
+            // 已存的值，否则会把用户在那儿设好的比例/基数重置为 0（它们的 UI 已不在本页）。
+            val prev = settings.salaryFlow.first()
+            settings.setSalary(
+                salary.copy(
+                    socialInsuranceRateBp = prev.socialInsuranceRateBp,
+                    socialInsuranceBaseCents = prev.socialInsuranceBaseCents,
+                    housingFundRateBp = prev.housingFundRateBp,
+                    housingFundBaseCents = prev.housingFundBaseCents,
+                )
+            )
             _state.update { it.copy(saved = true) }
             onDone()
         }
@@ -677,4 +692,3 @@ private fun buildPreviewSalary(state: PayrollUiState, workSystem: WorkSystem): S
     hourlyRatesCents = RateTier.entries.associateWith { Money.parseYuanToCents(state.hourlyRateText) ?: 0 },
     workSystem = workSystem,
 )
-

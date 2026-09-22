@@ -59,39 +59,6 @@ private val pieceUnitOptions = listOf(
     R.string.site_unit_other,
 )
 
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-internal fun MultiDateDialog(
-    primary: LocalDate,
-    selected: List<LocalDate>,
-    onToggle: (LocalDate) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val today = LocalDate.now()
-    val days = (1..today.dayOfMonth).map { today.withDayOfMonth(it) }.filter { it != primary }
-    SiteBottomSheet(title = stringResource(R.string.site_multi_select), onDismiss = onDismiss) { dismiss ->
-        Text(
-            stringResource(R.string.site_multi_select_hint),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(Spacing.s))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
-            days.forEach { d ->
-                FilterChip(
-                    selected = d in selected,
-                    onClick = { onToggle(d) },
-                    label = { Text("${d.dayOfMonth}") },
-                )
-            }
-        }
-        Spacer(Modifier.height(Spacing.m))
-        Button(onClick = dismiss, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.site_dialog_ok))
-        }
-    }
-}
-
 /** 选工天弹窗：同记加班的时长网格（预设 0.5–3 工 + 末位“…”自定义格），点格即生效并关窗 */
 @Composable
 internal fun DayCountDialog(

@@ -80,6 +80,11 @@
     <string name="export_range_invalid">请选择有效区间</string>
     <string name="export_import_csv">导入 CSV（从备份明细恢复）</string>
     <string name="export_csv_detail">导出 CSV 明细</string>
+    <!-- v0.7.4 工资单长图数据源（docs/20 P0-1） -->
+    <string name="export_payslip_source_label">长图数据源</string>
+    <string name="export_payslip_source_sheet">记月单据</string>
+    <string name="export_payslip_source_attendance">考勤计算</string>
+    <string name="export_payslip_sheet_empty">该月记月单据还没填，已按考勤计算生成</string>
     <string name="export_payslip_generate">生成工资单长图</string>
     <string name="export_preview_payslip_title">工资单预览</string>
     <string name="export_preview_csv_title">CSV 预览</string>

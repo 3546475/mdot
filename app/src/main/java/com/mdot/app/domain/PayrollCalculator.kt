@@ -106,6 +106,96 @@ object PayrollCalculator {
     fun effectiveTier(record: DailyRecordLite, tierOf: (LocalDate) -> RateTier): RateTier =
         if (record.tierSource == TierSource.MANUAL) record.tier ?: tierOf(record.date)
         else tierOf(record.date)
+
+    /**
+     * 本月考勤摘要（记月摘要条用，docs/20 P1-1）：按档位拆分的加班分钟 + 按类型的请假分钟 + 有记录天数。
+     *
+     * 全部从 [Output.breakdowns] 推导——逐条记录自带档位与时长，**与引擎同源**，不在 UI 另算。
+     */
+    data class AttendanceSummary(
+        val otMinutesByTier: Map<RateTier, Int> = emptyMap(),
+        val leaveMinutesByType: Map<LeaveType, Int> = emptyMap(),
+        /** 有记录的天数（去重；同日多条只算一天） */
+        val recordDays: Int = 0,
+    ) {
+        val otMinutes: Int get() = otMinutesByTier.values.sum()
+        val leaveMinutes: Int get() = leaveMinutesByType.values.sum()
+        val isEmpty: Boolean get() = otMinutes == 0 && leaveMinutes == 0
+    }
+
+    fun attendanceSummary(output: Output): AttendanceSummary {
+        val ot = linkedMapOf<RateTier, Int>()
+        val leave = linkedMapOf<LeaveType, Int>()
+        output.breakdowns.forEach { b ->
+            when (b.record.type) {
+                RecordType.OT -> ot.merge(b.tier ?: RateTier.WEEKDAY, b.record.durationMinutes, Int::plus)
+                RecordType.LEAVE -> leave.merge(b.record.leaveType ?: LeaveType.OTHER, b.record.durationMinutes, Int::plus)
+            }
+        }
+        return AttendanceSummary(
+            otMinutesByTier = ot,
+            leaveMinutesByType = leave,
+            recordDays = output.breakdowns.map { it.record.date }.distinct().size,
+        )
+    }
+
+    /**
+     * **社保个人部分（分）** = 缴费基数 × 个人比例。
+     * 基数 0 = **跟随底薪**（大多数人的基数就是月薪；基数不同的人再单独填），
+     * 比例 0 = 不自动算（行保持手填）。
+     */
+    fun socialInsuranceCents(salary: SalaryConfig): Long =
+        rateCents(insuranceBase(salary, salary.socialInsuranceBaseCents), salary.socialInsuranceRateBp)
+
+    /** **公积金个人部分（分）** = 缴费基数 × 个人比例（口径同 [socialInsuranceCents]） */
+    fun housingFundCents(salary: SalaryConfig): Long =
+        rateCents(insuranceBase(salary, salary.housingFundBaseCents), salary.housingFundRateBp)
+
+    /** 社保实际生效的缴费基数（分）：单独填了用单独的，否则跟随底薪 */
+    fun socialInsuranceBaseCents(salary: SalaryConfig): Long =
+        insuranceBase(salary, salary.socialInsuranceBaseCents)
+
+    /** 公积金实际生效的缴费基数（分） */
+    fun housingFundBaseCents(salary: SalaryConfig): Long =
+        insuranceBase(salary, salary.housingFundBaseCents)
+
+    /** 缴费基数：单独填了用单独的，否则跟随底薪（自动） */
+    private fun insuranceBase(salary: SalaryConfig, own: Long): Long =
+        if (own > 0) own else salary.baseSalaryCents
+
+    /** 基数 × 比例（基点 → 万分比），HALF_UP 到分 */
+    private fun rateCents(baseCents: Long, rateBp: Int): Long {
+        if (rateBp <= 0 || baseCents <= 0) return 0
+        return BigDecimal(baseCents)
+            .multiply(BigDecimal(rateBp))
+            .divide(BigDecimal(10_000), 0, RoundingMode.HALF_UP)
+            .toLong()
+    }
+
+    /**
+     * 本月**转调休分钟** = 加班分钟 − 实际计酬加班分钟（[Output.paidOtMinutes] 已扣除转调休部分）。
+     * 用于记月「调休折现」行的推导说明（docs/20 P0-2 修订）。
+     */
+    fun compFromOtMinutes(output: Output): Int = output.otMinutes - output.paidOtMinutes
+
+    /**
+     * **调休折现（分）**：把「转调休」的加班分钟按**引擎自己的口径**折成钱——
+     * 即这些时间若计酬应得的加班费（时薪 × 档位倍率 × 小时，与 [StandardPayrollStrategy.overtimeCents]
+     * 同一套算法，不另造公式）；逐条记录用**该记录的实际档位**算、HALF_UP 到分后求和（硬规则 1）。
+     *
+     * 为什么自动算：用户在记加班时勾「转调休」已经表达了「这段时间换调休」，
+     * 折算成多少钱属于**能算出来的**，不该再让用户手填（docs/20 设计原则）。
+     */
+    fun compCashCents(salary: SalaryConfig, output: Output): Long =
+        output.breakdowns
+            .filter { it.record.type == RecordType.OT && it.record.toCompMinutes > 0 }
+            .sumOf {
+                StandardPayrollStrategy.overtimeCents(
+                    salary,
+                    it.tier ?: RateTier.WEEKDAY,
+                    it.record.toCompMinutes,
+                )
+            }
 }
 
 /** 工资计算策略接口（08 文档 §4.1） */
@@ -204,6 +294,7 @@ object StandardPayrollStrategy : PayrollStrategy {
         return daily.multiply(BigDecimal.valueOf(coefficient)).multiply(BigDecimal(minutes))
             .divide(PayrollCalculator.MINUTES_PER_WORKDAY, 0, RoundingMode.HALF_UP).toLong()
     }
+
 }
 
 /**

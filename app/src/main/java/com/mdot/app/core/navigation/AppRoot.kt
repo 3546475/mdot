@@ -451,6 +451,7 @@ private fun AppRootContent(
                                 canBack = true,
                                 onBack = { navController.popBackStack() },
                                 initialTab = entry.arguments?.getInt("tab") ?: 0,
+                                onOpenTax = { navTo(navController, Routes.TAX_ESTIMATE, slots) },
                             )
                         }
                     }
@@ -463,6 +464,7 @@ private fun AppRootContent(
                                 canBack = !inBar("stats"),
                                 onBack = { navController.popBackStack() },
                                 initialTab = entry.arguments?.getInt("tab") ?: 0,
+                                onOpenTax = { navTo(navController, Routes.TAX_ESTIMATE, slots) },
                             )
                         }
                     }
@@ -561,6 +563,13 @@ private fun AppRootContent(
                     composable(Routes.SITE_PROJECT_EDIT_PATTERN) { entry ->
                         AdaptiveContainer {
                             SiteProjectEditScreen(onBack = { navController.popBackStack() })
+                        }
+                    }
+                    composable(Routes.TAX_ESTIMATE) {
+                        AdaptiveContainer {
+                            com.mdot.app.feature.tax.TaxEstimateScreen(
+                                onBack = { navController.popBackStack() },
+                            )
                         }
                     }
                     composable(Routes.SITE_SETTLEMENT) {

@@ -37,6 +37,9 @@ object Routes {
     fun siteProjects(pick: Boolean = false): String =
         if (pick) "$SITE_PROJECTS?pick=1" else SITE_PROJECTS
 
+    /** 个税估算页（入口：记月「个人所得税」行） */
+    const val TAX_ESTIMATE = "tax/estimate"
+
     const val SYSTEM = "settings/system"
     const val SYSTEM_SWITCH = "settings/system/switch"
     const val APPEARANCE = "settings/appearance"

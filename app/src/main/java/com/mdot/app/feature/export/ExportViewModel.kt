@@ -15,6 +15,7 @@ import com.mdot.app.domain.util.TimeUtils
 import com.mdot.app.core.util.PayslipRenderer
 import com.mdot.app.domain.CycleCalculator
 import com.mdot.app.domain.PayrollCalculator
+import com.mdot.app.domain.model.PayMonthSheet
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +42,8 @@ enum class ExportBusyAction { CSV, PAYSLIP }
 data class ExportUiState(
     val dimension: ExportDimension = ExportDimension.CYCLE,
     val range: CycleCalculator.Period? = null,
+    /** 工资单长图数据源（docs/20 P0-1）：默认记月单据 */
+    val payslipSource: PayslipSource = PayslipSource.MONTH_SHEET,
     val busy: Boolean = false,
     /** 正在 busy 的导出按钮（CSV 详情 / 生成工资单）；null=无导出按钮在 busy */
     val busyAction: ExportBusyAction? = null,
@@ -51,6 +54,15 @@ data class ExportUiState(
     /** 预览弹窗产物：工资单长图 或 CSV */
     val preview: PreviewArtifact? = null,
 )
+
+/** 工资单长图数据源（docs/20 P0-1） */
+enum class PayslipSource(val labelRes: Int) {
+    /** 记月单据（用户在记月页维护的那张单：含社保/公积金/个税等），**默认** */
+    MONTH_SHEET(com.mdot.app.R.string.export_payslip_source_sheet),
+
+    /** 考勤计算（PayrollCalculator 口径，长图不包含手填项） */
+    ATTENDANCE(com.mdot.app.R.string.export_payslip_source_attendance),
+}
 
 /** 导出预览产物 */
 sealed interface PreviewArtifact {
@@ -88,6 +100,7 @@ class ExportViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ExportUiState())
 
     fun onDimension(d: ExportDimension) = extra.update { it.copy(dimension = d, doneText = null, errorText = null) }
+    fun onPayslipSource(s: PayslipSource) = extra.update { it.copy(payslipSource = s, doneText = null, errorText = null) }
     fun onCustomFrom(d: LocalDate) = extra.update { it.copy(customFrom = d) }
     fun onCustomTo(d: LocalDate) = extra.update { it.copy(customTo = d) }
 
@@ -220,34 +233,56 @@ class ExportViewModel @Inject constructor(
                     )
                     fileName = "结算单_${range.from}_${range.to}.png"
                 } else {
-                    val records = recordRepo.getRange(range.from, range.to)
-                    if (records.isEmpty()) {
-                        extra.update { it.copy(busy = false, busyAction = null, errorText = "该区间没有记录") }
-                        return@launch
-                    }
-                    val out = PayrollCalculator.summarize(
-                        PayrollCalculator.Input(
-                            salary,
-                            records.map { it.toCalcLite() },
-                            tierOf = { date -> holidayRepo.tierFor(date, workdays) },
-                            standardMinutes = autoStandardMinutes(salary, workdays, range),
+                    // 记月单据（默认）：单据整月全 0 时回落考勤计算并提示（docs/20 P0-1）
+                    val month = java.time.YearMonth.from(range.to)
+                    val sheet = settings.payMonthFlow(month.toString()).first() ?: PayMonthSheet.default()
+                    val sheetFilled = sheet.incomeCents != 0L || sheet.netCents != 0L
+                    if (st.payslipSource == PayslipSource.MONTH_SHEET && sheetFilled) {
+                        bitmap = PayslipRenderer.renderSheet(
+                            context,
+                            title = "工资单",
+                            monthLabel = context.getString(
+                                com.mdot.app.R.string.paymonth_month,
+                                month.year,
+                                month.monthValue,
+                            ),
+                            sheet = sheet,
+                            palette = palette,
                         )
-                    )
-                    val showMoney = when (salary.mode) {
-                        com.mdot.app.domain.model.SalaryMode.BASE -> salary.hasBaseSalary
-                        com.mdot.app.domain.model.SalaryMode.MANUAL ->
-                            salary.hasBaseSalary || salary.manualRatesCents.values.any { it > 0 }
+                        fileName = "工资单_${month}.png"
+                    } else {
+                        if (st.payslipSource == PayslipSource.MONTH_SHEET) {
+                            extra.update { it.copy(doneText = context.getString(com.mdot.app.R.string.export_payslip_sheet_empty)) }
+                        }
+                        val records = recordRepo.getRange(range.from, range.to)
+                        if (records.isEmpty()) {
+                            extra.update { it.copy(busy = false, busyAction = null, errorText = "该区间没有记录") }
+                            return@launch
+                        }
+                        val out = PayrollCalculator.summarize(
+                            PayrollCalculator.Input(
+                                salary,
+                                records.map { it.toCalcLite() },
+                                tierOf = { date -> holidayRepo.tierFor(date, workdays) },
+                                standardMinutes = autoStandardMinutes(salary, workdays, range),
+                            )
+                        )
+                        val showMoney = when (salary.mode) {
+                            com.mdot.app.domain.model.SalaryMode.BASE -> salary.hasBaseSalary
+                            com.mdot.app.domain.model.SalaryMode.MANUAL ->
+                                salary.hasBaseSalary || salary.manualRatesCents.values.any { it > 0 }
+                        }
+                        bitmap = PayslipRenderer.render(
+                            context,
+                            title = "工资单",
+                            range = range,
+                            output = out,
+                            showMoney = showMoney,
+                            workSystem = salary.workSystem,
+                            palette = palette,
+                        )
+                        fileName = "工资单_${range.from}_${range.to}.png"
                     }
-                    bitmap = PayslipRenderer.render(
-                        context,
-                        title = "工资单",
-                        range = range,
-                        output = out,
-                        showMoney = showMoney,
-                        workSystem = salary.workSystem,
-                        palette = palette,
-                    )
-                    fileName = "工资单_${range.from}_${range.to}.png"
                 }
                 val file = PayslipRenderer.savePng(bitmap, context, fileName)
                 extra.update { it.copy(busy = false, busyAction = null, preview = PreviewArtifact.Payslip(file)) }

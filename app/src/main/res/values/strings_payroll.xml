@@ -9,6 +9,19 @@
     <string name="payroll_include_base">加班费计入底薪</string>
     <string name="payroll_base_label">月薪底薪（元）</string>
     <string name="payroll_hourly_converted">折算时薪 %1$s 元/小时</string>
+    <!-- v0.7.4 社保与公积金（选项优先，docs/20「自动 > 选项 > 手动输入」） -->
+    <string name="payroll_social_title">社保（个人部分）</string>
+    <string name="payroll_social_hint">常见：养老 8% + 医疗 2% + 失业 0.5% = 10.5%</string>
+    <string name="payroll_fund_title">公积金（个人部分）</string>
+    <string name="payroll_fund_hint">法定区间 5%–12%，多数单位按 12% 缴纳</string>
+    <string name="payroll_rate_off">不算</string>
+    <string name="payroll_rate_custom">自定义</string>
+    <string name="payroll_rate_custom_label">比例（%）</string>
+    <string name="payroll_rate_percent">%1$s%%</string>
+    <string name="payroll_insurance_base_label">缴费基数（元）</string>
+    <string name="payroll_base_follow">跟随底薪（自动）</string>
+    <string name="payroll_base_custom">自定义</string>
+    <string name="payroll_insurance_preview_off">选好比例后，记月同步会自动计入这两项</string>
     <string name="payroll_hourly_formula">时薪 = 底薪 ÷ 21.75 ÷ 8</string>
     <string name="payroll_overtime_multiplier">加班倍率</string>
     <string name="payroll_suffix_x">倍</string>

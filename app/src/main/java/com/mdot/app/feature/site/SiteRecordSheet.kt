@@ -246,6 +246,13 @@ class SiteRecordViewModel @Inject constructor(
     }
     fun onNote(v: String) = _state.update { it.copy(note = v.take(100)) }
     fun onDate(v: LocalDate) = _state.update { it.copy(date = v, error = null) }
+    /** 多选整组日期：最早的一天作主日期，其余作为附加（选择器「多选 → 完成」用） */
+    fun onSelectDates(dates: Set<LocalDate>) {
+        if (dates.isEmpty()) return
+        val sorted = dates.sorted()
+        _state.update { it.copy(date = sorted.first(), extraDates = sorted.drop(1)) }
+    }
+
     fun onToggleExtraDate(v: LocalDate) = _state.update {
         it.copy(extraDates = if (v in it.extraDates) it.extraDates - v else (it.extraDates + v).sorted())
     }

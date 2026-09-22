@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.mdot.app.domain.model.AppearanceConfig
 import com.mdot.app.domain.model.BottomBarConfig
 import com.mdot.app.domain.model.HomeCardsConfig
@@ -51,6 +52,32 @@ class SettingsDataSource @Inject constructor(
 
     suspend fun setPayMonth(monthKey: String, sheet: PayMonthSheet) =
         dataStore.edit { it[stringPreferencesKey("paymonth_$monthKey")] = json.encodeToString(sheet) }
+
+    /**
+     * 记月分组折叠状态（跨会话记住；元素 = PayGroup.name）。开关只影响显隐，与数据无关。
+     * **null = 从未设置过**（区别于「用户把四个都展开了」= 空集）——调用方据此给默认值
+     * （v0.7.4 起：四个分组**默认全折叠**，用户反馈展开四张卡太占屏）。
+     */
+    val payMonthCollapsedFlow: Flow<Set<String>?> =
+        dataStore.data.map { prefs ->
+            if (prefs.contains(PAY_MONTH_COLLAPSED)) prefs[PAY_MONTH_COLLAPSED].orEmpty() else null
+        }
+
+    suspend fun setPayMonthCollapsed(groups: Set<String>) =
+        dataStore.edit { it[PAY_MONTH_COLLAPSED] = groups }
+
+    /** 某年 12 个月的记月单据（只回已写入的月份；键 = 月份 1–12）。个税页按年累计用 */
+    fun payMonthsFlow(year: Int): Flow<Map<Int, PayMonthSheet>> = dataStore.data.map { prefs ->
+        buildMap {
+            for (m in 1..12) {
+                prefs[stringPreferencesKey("paymonth_$year-${m.toString().padStart(2, '0')}")]?.let { text ->
+                    runCatching { json.decodeFromString<PayMonthSheet>(text) }.getOrNull()?.let { put(m, it) }
+                }
+            }
+        }
+    }
+
+    private val PAY_MONTH_COLLAPSED = stringSetPreferencesKey("paymonth_collapsed")
 
     // ---- 考勤周期 ----
     val cycleAnchorDayFlow: Flow<Int> = dataStore.data.map { it[CYCLE_ANCHOR_DAY] ?: 1 }

@@ -11,7 +11,11 @@
     <string name="paymonth_group_subsidy">补贴项目</string>
     <string name="paymonth_group_deduction">扣款项目</string>
     <string name="paymonth_group_other">其他项目</string>
+    <string name="paymonth_add_basic">添加基本项</string>
     <string name="paymonth_add_subsidy">添加补贴</string>
+    <string name="paymonth_add_other">添加其他项</string>
+    <string name="paymonth_add_count">添加 %1$d 项</string>
+    <string name="paymonth_add_multi_hint">可多选常用项一次添加；金额留空则为 0，之后逐条改</string>
     <string name="paymonth_add_deduction">添加扣款</string>
     <string name="paymonth_add_title">添加条目</string>
     <string name="paymonth_edit_title">编辑条目</string>
@@ -23,6 +27,43 @@
     <string name="paymonth_import_prev">导入上月</string>
     <string name="paymonth_import_confirm_action">确认覆盖</string>
     <string name="paymonth_undo">撤销</string>
+    <!-- v0.7.4 记月：实发汇总卡 + 金额来源标记 + 调休折现算法（docs/20 P0-2/P0-3） -->
+    <string name="paymonth_net_title">实发工资</string>
+    <string name="paymonth_card_toggle_cd">切换汇总卡形态（完整／精简）</string>
+    <string name="paymonth_sum_income">应发</string>
+            <string name="paymonth_slice_percent">%1$s %2$d%%</string>
+    <string name="paymonth_slice_base">基本工资</string>
+    <string name="paymonth_slice_overtime">加班工资</string>
+    <string name="paymonth_slice_other">其他应发</string>
+    <string name="paymonth_period_progress">周期进度 %1$d/%2$d 天</string>
+    <string name="paymonth_sum_deduction">扣款</string>
+    <string name="paymonth_sum_other">其他项目</string>
+    <string name="paymonth_source_synced">来自考勤 · %1$s 同步</string>
+    <string name="paymonth_source_edited">已手改（引擎 %1$s）</string>
+    <string name="paymonth_source_synced_derived">来自考勤 · %1$s 同步 · %2$s</string>
+    <string name="paymonth_source_estimated">来自个税估算 · %1$s</string>
+    <string name="paymonth_derivation_comp">本月转调休 %1$s</string>
+    <string name="paymonth_derivation_rate">基数 %1$s × %2$s%%</string>
+    <!-- v0.7.4 B3：环比 / 考勤摘要 / 对账（docs/20 P1-1~P1-3） -->
+    <string name="paymonth_mom">较上月 %1$s</string>
+    <string name="paymonth_attendance_ot_total">加班 %1$s</string>
+    <string name="paymonth_attendance_weekday">平日 %1$s</string>
+    <string name="paymonth_attendance_weekend">周末 %1$s</string>
+    <string name="paymonth_attendance_statutory">法定 %1$s</string>
+    <string name="paymonth_attendance_leave">请假 %1$s</string>
+    <string name="paymonth_attendance_days">记了 %1$d 天</string>
+    <string name="paymonth_attendance_none">本月还没记录，点这里去看明细</string>
+    <string name="paymonth_recon_line">%1$d 项与考勤计算不一致（合计 %2$s）</string>
+    <string name="paymonth_recon_title">与考勤计算的差异</string>
+    <string name="paymonth_recon_row">引擎 %1$s → 现值 %2$s（%3$s）</string>
+    <string name="paymonth_recon_empty">没有差异，全部与考勤计算一致</string>
+    <string name="paymonth_insurance_formula">基数 %1$s × %2$s%% = ¥%3$s</string>
+    <string name="paymonth_close">关闭</string>
+    <string name="paymonth_picker_title">选择月份</string>
+    <string name="paymonth_this_month">回本月</string>
+    <string name="paymonth_empty_hint">先点「同步本月考勤」，按记录自动回填；再补社保 / 公积金</string>
+    <string name="paymonth_recon_restore">恢复</string>
+    <string name="paymonth_recon_restore_all">全部恢复</string>
     <string name="paymonth_sync">同步本月考勤</string>
     <string name="paymonth_sync_confirm_action">确认同步</string>
     <!-- 记月添加条目预选项（参考主流记工记账 App 常见工资项） -->
@@ -33,6 +74,19 @@
         <item>住房补贴</item>
         <item>交通补贴</item>
         <item>全勤奖</item>
+    </string-array>
+    <string-array name="paymonth_basic_presets">
+        <item>绩效奖金</item>
+        <item>岗位津贴</item>
+        <item>年终奖分摊</item>
+        <item>补发工资</item>
+    </string-array>
+    <string-array name="paymonth_other_presets">
+        <item>商业保险</item>
+        <item>企业年金</item>
+        <item>工会费</item>
+        <item>党费</item>
+        <item>宿舍费</item>
     </string-array>
     <string-array name="paymonth_deduction_presets">
         <item>水电费</item>
@@ -134,4 +188,26 @@
     <string name="site_stat_piece_pay">包工工资</string>
     <string name="site_stat_advance">已借支</string>
     <string name="site_stat_pending">待结余额</string>
+    <!-- v0.7.4 B5：个税估算页（累计预扣法，docs/20 P3-5） -->
+    <string name="tax_title">个人所得税估算</string>
+    <string name="tax_disclaimer">按累计预扣法估算，仅供参考；实际以单位代扣与年度汇算为准</string>
+    <string name="tax_result_label">%1$d年%2$d月 应预扣预缴</string>
+    <string name="tax_result_breakdown">累计应纳税所得额 %1$s · 预扣率 %2$d%% · 速算扣除数 %3$s</string>
+    <string name="tax_sources_title">数据来源</string>
+    <string name="tax_sources_hint">以下数字都由 App 从「记月」自动汇总，不用手填</string>
+    <string name="tax_sources_summary">累计收入 %1$s · 累计已缴 %2$s</string>
+    <string name="tax_sources_toggle_cd">展开或收起数据来源明细</string>
+    <string name="tax_source_income">累计收入（1–%1$d月）</string>
+    <string name="tax_source_basic">累计减除费用（5000 × %1$d）</string>
+    <string name="tax_source_special">累计社保 + 公积金</string>
+    <string name="tax_source_additional">累计专项附加扣除</string>
+    <string name="tax_source_paid">累计已预扣预缴税额</string>
+    <string name="tax_deduction_title">专项附加扣除</string>
+    <string name="tax_deduction_edit">修改</string>
+    <string name="tax_deduction_summary">已选 %1$d 项 · 每月合计 ¥%2$s</string>
+    <string name="tax_deduction_hint">勾选符合的项目，金额按月合计自动累加；没有就不勾</string>
+    <string name="tax_deduction_group_common">常用</string>
+    <string name="tax_deduction_group_other">其他</string>
+    <string name="tax_deduction_item_amount">¥%1$s/月</string>
+    <string name="tax_apply_action">填入记月</string>
 </resources>

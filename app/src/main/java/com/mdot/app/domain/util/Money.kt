@@ -13,16 +13,27 @@ object Money {
     /** 分 → "¥5,586.20" */
     fun yuanWithSign(cents: Long): String = "¥${yuanText(cents)}"
 
-    /** 分 → 去尾零元文本（记月条目用）：0→"0"，230000→"2300"，951730→"951.73"，-10→"-0.1" */
+    /**
+     * 分 → 去尾零元文本（记月条目用）：0→"0"，230000→"2,300"，951730→"951.73"，-10→"-0.1"。
+     * **带千分位**：金额上万是常态（12345.6 读不出来），与 [yuanText] 一致。
+     */
     fun yuanTrimText(cents: Long): String {
         val abs = kotlin.math.abs(cents)
         val text = when {
-            abs % 100L == 0L -> String.format(Locale.US, "%d", abs / 100)
-            abs % 10L == 0L -> String.format(Locale.US, "%.1f", abs / 100.0)
-            else -> String.format(Locale.US, "%.2f", abs / 100.0)
+            abs % 100L == 0L -> String.format(Locale.US, "%,d", abs / 100)
+            abs % 10L == 0L -> String.format(Locale.US, "%,.1f", abs / 100.0)
+            else -> String.format(Locale.US, "%,.2f", abs / 100.0)
         }
         return if (cents < 0) "-$text" else text
     }
+
+    /** 基点 → 百分点文本：1050 → "10.5"，800 → "8"（去尾零；比例以基点存，1 基点 = 0.01%） */
+    fun ratePercentText(bp: Int): String =
+        if (bp % 100 == 0) {
+            (bp / 100).toString()
+        } else {
+            String.format(Locale.US, "%.2f", bp / 100.0).trimEnd('0').trimEnd('.')
+        }
 
     /** 元字符串 → 分；非法输入返回 null。支持 "5000" / "5000.5" / "5,000.50"；负数拒绝（金额域非负，13 文档 B4-04） */
     fun parseYuanToCents(text: String): Long? {

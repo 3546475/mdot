@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.horizontalScroll
@@ -52,7 +53,7 @@ import com.mdot.app.R
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.IconSpec
-import com.mdot.app.core.designsystem.component.DatePick
+import com.mdot.app.core.designsystem.component.DayPickDialog
 import com.mdot.app.core.designsystem.component.JiabanButton
 import com.mdot.app.core.designsystem.component.JiabanButtonRole
 import com.mdot.app.core.designsystem.component.JiabanButtonSize
@@ -181,6 +182,24 @@ fun ExportScreen(
                     enabled = !state.busy && state.range != null,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                // 长图数据源（docs/20 P0-1）：默认记月单据——用户发出去的和 App 里看到的是同一份
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(R.string.export_payslip_source_label),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(Spacing.s))
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                        PayslipSource.entries.forEach { src ->
+                            FilterChip(
+                                selected = state.payslipSource == src,
+                                onClick = { vm.onPayslipSource(src) },
+                                label = { Text(stringResource(src.labelRes)) },
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -205,7 +224,10 @@ fun ExportScreen(
     }
 
     picking?.let { which ->
-        DatePick(
+        DayPickDialog(
+            title = stringResource(
+                if (which == "from") R.string.ds_pick_start else R.string.ds_pick_end,
+            ),
             initial = if (which == "from") state.customFrom ?: LocalDate.now().withDayOfMonth(1)
             else state.customTo ?: LocalDate.now(),
             onPick = { d ->

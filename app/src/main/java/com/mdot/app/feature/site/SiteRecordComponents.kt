@@ -29,6 +29,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -104,7 +105,6 @@ internal fun ProjectDateCard(
     state: SiteRecordUiState,
     onOpenProjectPick: () -> Unit,
     onShowDatePicker: () -> Unit,
-    onShowMultiDate: () -> Unit,
 ) {
     SectionCard {
         Column {
@@ -134,9 +134,8 @@ internal fun ProjectDateCard(
                         )
                     }
                 },
-                trailingText = stringResource(R.string.site_multi_select),
-                trailingActive = state.extraDates.isNotEmpty(),
-                onTrailing = onShowMultiDate,
+                // 行上**只有一个入口**（点行 → 选择器；多选在选择器内切换）——
+                // 曾在这里加过「多选日期」胶囊，把日期挤成两行、还与「今天」徽标抢视觉（用户反馈突兀）
                 onClick = onShowDatePicker,
             )
         }
@@ -252,17 +251,25 @@ private fun TonalRow(
         badge?.invoke()
         if (trailingText.isNotEmpty()) {
             if (onTrailing != null) {
+                // 行内动作：轻量 tone 胶囊（与行内徽标同款）+ **48dp 触控区**。
+                // 规则见 docs/03 §5.4.4：不描边、不用主色加粗——描边款会把值挤换行、与徽标抢视觉。
                 val trailInteraction = remember { MutableInteractionSource() }
                 Text(
                     trailingText,
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (trailingActive) MaterialTheme.colorScheme.primary
+                    color = if (trailingActive) MaterialTheme.colorScheme.onPrimaryContainer
                     else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                     modifier = Modifier
-                        .pressScale(trailInteraction, pressedScale = 0.92f)
+                        .pressScale(trailInteraction, pressedScale = 0.94f)
+                        .minimumInteractiveComponentSize()
                         .clip(RoundedCornerShape(Radius.pill))
+                        .background(
+                            if (trailingActive) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        )
                         .clickable(interactionSource = trailInteraction, indication = LocalIndication.current, onClick = onTrailing)
-                        .padding(horizontal = Spacing.s, vertical = Spacing.s),
+                        .padding(horizontal = Spacing.s, vertical = Spacing.xs),
                 )
             } else {
                 Text(

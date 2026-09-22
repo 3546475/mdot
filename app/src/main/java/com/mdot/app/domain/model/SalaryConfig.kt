@@ -52,6 +52,21 @@ data class SalaryConfig(
     val siteCurrentProjectId: Long = 0,
     /** 工地记工显示单位偏好：DAY 按工天 | HOUR 按小时（仅影响展示，存储恒为分钟；F-S11 Phase 2） */
     val siteDisplayUnit: String = "DAY",
+    /**
+     * 社保个人比例（**基点**，1 基点 = 0.01%；0 = 不自动算）。
+     * 例：1050 = 10.5%（养老 8% + 医疗 2% + 失业 0.5%，多数城市）。
+     */
+    val socialInsuranceRateBp: Int = 0,
+    /** 社保缴费基数（分）；0 = **跟随底薪**（自动，见 [PayrollCalculator.socialInsuranceCents]） */
+    val socialInsuranceBaseCents: Long = 0,
+    /** 公积金个人比例（基点；0 = 不自动算）；法定区间 5%–12% */
+    val housingFundRateBp: Int = 0,
+    /** 公积金缴费基数（分）；0 = 跟随底薪 */
+    val housingFundBaseCents: Long = 0,
+    /** 个税专项附加扣除：**月合计**（分）。由个税页的勾选项相加，也允许直接改 */
+    val taxAdditionalDeductionCents: Long = 0,
+    /** 个税页勾选的专项附加扣除项 key（仅为回显；金额以 [taxAdditionalDeductionCents] 为准） */
+    val taxDeductionItemKeys: Set<String> = emptySet(),
 ) {
     val hasBaseSalary: Boolean get() = baseSalaryCents > 0
 }

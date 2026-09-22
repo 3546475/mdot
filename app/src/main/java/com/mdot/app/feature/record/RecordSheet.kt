@@ -37,21 +37,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -78,6 +74,7 @@ import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.Duration
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.component.DayPickDialog
 import com.mdot.app.core.designsystem.component.ConfirmDialog
 import com.mdot.app.core.designsystem.component.SunkenWell
 import com.mdot.app.core.designsystem.component.TierRow
@@ -537,59 +534,13 @@ fun RecordSheet(
     }
 
     if (showDatePicker) {
-        val todayUtc = LocalDate.now().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-        val pickerState = rememberDatePickerState(
-            initialSelectedDateMillis = state.date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
-            selectableDates = object : SelectableDates {
-                override fun isSelectableDate(utcTimeMillis: Long): Boolean =
-                    utcTimeMillis <= todayUtc
-            },
+        // 统一到共享的日期选择（docs/03 §日期选择）：点一下即生效——不再内联一份 M3 DatePickerDialog
+        DayPickDialog(
+            title = stringResource(R.string.ds_pick_date),
+            initial = state.date,
+            onPick = { vm.onDateChange(it); showDatePicker = false },
+            onDismiss = { showDatePicker = false },
         )
-        val density = LocalDensity.current
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                // 与记加班弹窗操作行同款（docs 03 §13 形态）：确定 PRIMARY、取消 GHOST
-                JiabanButton(
-                    text = stringResource(R.string.record_ok),
-                    onClick = {
-                        pickerState.selectedDateMillis?.let { millis ->
-                            vm.onDateChange(
-                                java.time.Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
-                            )
-                        }
-                        showDatePicker = false
-                    },
-                    role = JiabanButtonRole.PRIMARY,
-                    size = JiabanButtonSize.M,
-                )
-            },
-            dismissButton = {
-                JiabanButton(
-                    text = stringResource(R.string.record_cancel),
-                    onClick = { showDatePicker = false },
-                    role = JiabanButtonRole.GHOST,
-                    size = JiabanButtonSize.M,
-                )
-            },
-        ) {
-            // 手动输入模式切换与标题均已移除（用户定稿）：无模式切换即无尺寸动画，
-            // 也无 M3 alpha18 缺失中文翻译的「Select date」标题
-            // 标题槽传空：压掉 M3 默认英文「Select date」
-            // layout 裁掉标题槽残留的空内容+内边距（约 40dp），消除大标题上方留白
-            DatePicker(
-                state = pickerState,
-                showModeToggle = false,
-                title = {},
-                modifier = Modifier.layout { measurable, constraints ->
-                    val p = measurable.measure(constraints)
-                    val trim = with(density) { 40.dp.roundToPx() }
-                    layout(p.width, (p.height - trim).coerceAtLeast(0)) {
-                        p.place(0, -trim)
-                    }
-                },
-            )
-        }
     }
 
     if (showDeleteConfirm) {

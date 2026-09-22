@@ -80,7 +80,7 @@ import com.mdot.app.core.designsystem.component.buildWeekBars
 import com.mdot.app.core.designsystem.component.WorkHeatmap
 import com.mdot.app.core.designsystem.component.SegmentBar
 import com.mdot.app.core.designsystem.component.modeValueText
-import com.mdot.app.core.designsystem.component.DatePick
+import com.mdot.app.core.designsystem.component.DayPickDialog
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.TopBarHeight
 import com.mdot.app.core.navigation.primaryTabEdgeRelay
@@ -452,6 +452,8 @@ fun StatsScreen(
     /** 初始页签（首页收入卡直达明细：工地=1、非工地=2；默认 0=统计） */
     initialTab: Int = 0,
     vm: StatsViewModel = hiltViewModel(),
+    /** 记月「个人所得税」行 → 个税估算页（导航由 AppRoot 注入） */
+    onOpenTax: () -> Unit = {},
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val pieMode by vm.pieMode.collectAsStateWithLifecycle()
@@ -462,6 +464,9 @@ fun StatsScreen(
     val monthTab = state.workSystem == WorkSystem.STANDARD || state.workSystem == WorkSystem.COMPREHENSIVE
     // 首帧 workSystem 尚未加载（默认 STANDARD=3 页签），按初始页签夹取防越界
     val pagerState = rememberPagerState(initialPage = initialTab.coerceAtMost(2), pageCount = { if (monthTab) 3 else 2 })
+
+    // 摘要条/空态点「明细」时切页签用（pager 由本页持有）
+    val scope = rememberCoroutineScope()
 
     Column(
         Modifier
@@ -507,7 +512,15 @@ fun StatsScreen(
                     selectedBar = selectedBar,
                     showBottomBar = !canBack,
                 )
-                1 -> if (monthTab) PayMonthContent() else DetailPane(showBottomBar = !canBack)
+                1 -> if (monthTab) {
+                    // 摘要条/空态点「明细」：切到末位页签（pager 由本页持有）
+                    PayMonthContent(
+                        onOpenDetail = { scope.launch { pagerState.animateScrollToPage(2) } },
+                        onOpenTax = onOpenTax,
+                    )
+                } else {
+                    DetailPane(showBottomBar = !canBack)
+                }
                 else -> DetailPane(showBottomBar = !canBack)
             }
         }
@@ -676,7 +689,10 @@ private fun StatsContent(
     }
 
     picking?.let { which ->
-        DatePick(
+        DayPickDialog(
+            title = stringResource(
+                if (which == "from") R.string.ds_pick_start else R.string.ds_pick_end,
+            ),
             initial = if (which == "from") state.customFrom ?: LocalDate.now().withDayOfMonth(1)
             else state.customTo ?: LocalDate.now(),
             onPick = { d ->
