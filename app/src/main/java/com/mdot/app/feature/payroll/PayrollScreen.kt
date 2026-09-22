@@ -62,6 +62,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.mdot.app.R
 import com.mdot.app.core.datastore.SettingsDataSource
+import com.mdot.app.core.designsystem.ButtonSpec
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.AnimatedNumberText
@@ -70,7 +71,6 @@ import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.designsystem.component.SettingRow
 import com.mdot.app.core.designsystem.component.ShrinkFeedbackButton
-import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.domain.CycleCalculator
 import com.mdot.app.domain.HourlyPayrollStrategy
 import com.mdot.app.domain.StandardPayrollStrategy
@@ -227,34 +227,19 @@ class PayrollViewModel @Inject constructor(
     }
 }
 
-/** 工资设定页（底栏「工资」槽位页）——内容主体抽为 [PayrollPane]（设定多页签「工资」页签复用） */
-@Composable
-fun PayrollScreen(
-    canBack: Boolean = false,
-    onBack: () -> Unit = {},
-    onOpenSiteProjects: () -> Unit = {},
-    onOpenSiteSettlement: () -> Unit = {},
-    vm: PayrollViewModel = hiltViewModel(),
-) {
-    Column(Modifier.fillMaxSize()) {
-        JiabanTopBar(
-            title = if (canBack) stringResource(R.string.payroll_title) else null,
-            showBack = canBack,
-            onBack = onBack,
-        )
-        PayrollPane(onSaved = onBack, vm = vm)
-    }
-}
-
 /**
- * 工资设定内容主体：按制度渲染表单（标准/小时/综合=薪资本体；工地=项目与结算入口，
- * 点工标准在项目设置内维护）+ 底部悬浮保存按钮（onSaved=保存成功后回调，独立页为返回、页签内停留）。
+ * 工资设定内容主体：按制度渲染表单（标准/小时/综合=薪资本体）+ 底部悬浮保存按钮
+ * （onSaved=保存成功后回调，页签形态下停留不关界面）。
+ *
+ * ⚠️ **不再有 SITE 分支**：工地制度没有「工资」页签（制度设定只有 项目/结算，见 [SystemSettingsScreen]），
+ * 点工标准在「项目设置」内维护。
+ *
+ * 这里曾经还有一个 `PayrollScreen`（整页版工资页，底栏「工资」槽位页）：
+ * 2026-09-22 确认它**全仓无任何入口**（功能池不含 payroll、无导航调用）后已删除，本函数是唯一入口。
  */
 @Composable
 fun PayrollPane(
     onSaved: () -> Unit = {},
-    onOpenSiteProjects: () -> Unit = {},
-    onOpenSiteSettlement: () -> Unit = {},
     vm: PayrollViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -286,7 +271,7 @@ fun PayrollPane(
                 .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = Spacing.page)
-                .padding(bottom = 96.dp), // 留出悬浮按钮空间
+                .padding(bottom = ButtonSpec.heightL * 2), // 留出悬浮按钮空间
         ) {
             Spacer(Modifier.height(Spacing.s))
 
@@ -294,8 +279,9 @@ fun PayrollPane(
                 WorkSystem.STANDARD -> StandardPayrollContent(state, vm)
                 WorkSystem.HOURLY -> HourlyPayrollContent(state, vm)
                 WorkSystem.COMPREHENSIVE -> ComprehensivePayrollContent(state, vm)
-                // 工地记工（12 文档 F-S2）：点工标准在项目设置内，此处仅入口与说明
-                WorkSystem.SITE -> SitePayrollContent(state, vm, onOpenSiteProjects, onOpenSiteSettlement)
+                // 工地制度没有「工资」页签（制度设定只有 项目/结算）：本分支不会被走到，
+                // 点工标准在「项目设置」内维护。保留空分支以保持 when 穷尽（勿改回渲染入口卡）。
+                WorkSystem.SITE -> Unit
             }
         }
 
@@ -306,7 +292,7 @@ fun PayrollPane(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = Spacing.page, vertical = 12.dp),
+                .padding(horizontal = Spacing.page, vertical = Spacing.m),
             contentAlignment = Alignment.Center,
         ) {
             ShrinkFeedbackButton(
@@ -314,40 +300,6 @@ fun PayrollPane(
                 busy = saveFlash,
                 onClick = ::saveWithFeedback,
                 modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun SitePayrollContent(
-    state: PayrollUiState,
-    vm: PayrollViewModel,
-    onOpenProjects: () -> Unit,
-    onOpenSettlement: () -> Unit,
-) {
-    // 工地记工（F-S2）：点工标准在项目设置内维护；借支与结算独立页（显示单位切换按钮已随 v0.6.11 移除）
-    SectionCard {
-        Column {
-            Text(stringResource(R.string.payroll_site_hint_title), style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(Spacing.s))
-            SettingRow(
-                stringResource(R.string.site_projects_title),
-                stringResource(R.string.payroll_site_projects_summary),
-                painterResource(R.drawable.ic_ms_dashboard),
-                onClick = onOpenProjects,
-            )
-            SettingRow(
-                stringResource(R.string.site_settlement_title),
-                stringResource(R.string.payroll_site_settlement_summary),
-                painterResource(R.drawable.ic_ms_paid),
-                onClick = onOpenSettlement,
-            )
-            Text(
-                stringResource(R.string.payroll_site_hint_body),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = Spacing.s),
             )
         }
     }
@@ -367,7 +319,7 @@ private fun StandardPayrollContent(state: PayrollUiState, vm: PayrollViewModel) 
             val previewSalary = buildPreviewSalary(state, WorkSystem.STANDARD)
             Row(
                 Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s),
             ) {
                 RateTier.entries.forEach { tier ->
                     Column(modifier = Modifier.weight(1f)) {
@@ -388,7 +340,7 @@ private fun StandardPayrollContent(state: PayrollUiState, vm: PayrollViewModel) 
                             text = { Money.yuanText(it) },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp).align(Alignment.CenterHorizontally),
+                            modifier = Modifier.padding(top = Spacing.xs).align(Alignment.CenterHorizontally),
                             label = "perHourPreview",
                         )
                     }
@@ -399,7 +351,7 @@ private fun StandardPayrollContent(state: PayrollUiState, vm: PayrollViewModel) 
                     stringResource(R.string.payroll_weekend_law_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = Spacing.xs),
                 )
             }
         }
@@ -460,7 +412,7 @@ private fun SalaryModeSection(state: PayrollUiState, vm: PayrollViewModel) {
                     style = MaterialTheme.typography.bodySmall,
                     color = if (baseCents > 0) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = Spacing.xs),
                 )
                 Spacer(Modifier.height(Spacing.s))
             }
@@ -491,7 +443,7 @@ private fun LeaveCoefficientSection(state: PayrollUiState, vm: PayrollViewModel)
             for (i in leaveTypes.indices step 2) {
                 Row(
                     Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.m),
                 ) {
                     OutlinedTextField(
                     shape = RoundedCornerShape(Radius.textField),
@@ -607,7 +559,7 @@ private fun ComprehensivePayrollContent(state: PayrollUiState, vm: PayrollViewMo
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = Spacing.xs),
             )
         }
     }
@@ -622,7 +574,7 @@ private fun ComprehensivePayrollContent(state: PayrollUiState, vm: PayrollViewMo
             val previewSalary = buildPreviewSalary(state, WorkSystem.COMPREHENSIVE)
             Row(
                 Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s),
             ) {
                 listOf(RateTier.WEEKDAY to stringResource(R.string.payroll_tier_overtime), RateTier.STATUTORY to stringResource(R.string.payroll_tier_statutory)).forEach { (tier, label) ->
                     Column(modifier = Modifier.weight(1f)) {
@@ -643,7 +595,7 @@ private fun ComprehensivePayrollContent(state: PayrollUiState, vm: PayrollViewMo
                             text = { Money.yuanText(it) },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp).align(Alignment.CenterHorizontally),
+                            modifier = Modifier.padding(top = Spacing.xs).align(Alignment.CenterHorizontally),
                             label = "perHourPreview",
                         )
                     }
@@ -653,7 +605,7 @@ private fun ComprehensivePayrollContent(state: PayrollUiState, vm: PayrollViewMo
                 stringResource(R.string.payroll_comp_multiplier_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = Spacing.xs),
             )
         }
     }
@@ -691,7 +643,7 @@ private fun ExpandableCard(
                     if (hasModifyMark) {
                         Box(
                             Modifier
-                                .padding(start = 6.dp)
+                                .padding(start = Spacing.s)
                                 .size(6.dp)
                                 .background(MaterialTheme.colorScheme.error, CircleShape),
                         )

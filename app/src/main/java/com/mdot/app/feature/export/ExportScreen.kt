@@ -49,7 +49,9 @@ import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
+import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.component.DatePick
 import com.mdot.app.core.designsystem.component.JiabanButton
 import com.mdot.app.core.designsystem.component.JiabanButtonRole
@@ -111,7 +113,7 @@ fun ExportScreen(
             Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s),
         ) {
             ExportDimension.entries.forEach { dim ->
                 FilterChip(
@@ -126,7 +128,7 @@ fun ExportScreen(
             Spacer(Modifier.height(Spacing.s))
             val fromDefault = stringResource(R.string.export_custom_from_default)
             val toDefault = stringResource(R.string.export_custom_to_default)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                 JiabanButton(
                     text = stringResource(R.string.export_custom_from_label, state.customFrom?.let { "$it" } ?: fromDefault),
                     onClick = { picking = "from" },
@@ -282,14 +284,14 @@ private fun ExportPreviewDialog(
                                 Box(
                                     Modifier
                                         .size(96.dp)
-                                        .background(Color(0xFF217346), RoundedCornerShape(20.dp)),
+                                        .background(Color(0xFF217346), RoundedCornerShape(Radius.button)),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Icon(
                                         painterResource(R.drawable.ic_ms_table_chart),
                                         contentDescription = null,
                                         tint = Color.White,
-                                        modifier = Modifier.size(52.dp),
+                                        modifier = Modifier.size(IconSpec.hero),
                                     )
                                 }
                                 Spacer(Modifier.height(Spacing.m))

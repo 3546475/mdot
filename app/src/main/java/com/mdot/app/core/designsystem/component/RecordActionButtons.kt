@@ -32,7 +32,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.mdot.app.R
+import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.BottomBarSpec
+import com.mdot.app.core.designsystem.IconSpec
 
 /*
  * 底栏「记加班」主操作按钮（两种布局共用）：
@@ -74,7 +76,7 @@ fun RecordPillButton(
         label = "recordPillElevation",
     )
     // 方圆形 20dp，与底栏配置页预览完全一致（按压反馈由 pressScale 缩放 + 阴影贴合承担，无形状 morph）
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(Radius.textField)
     Surface(
         shape = shape,
         color = MaterialTheme.colorScheme.primary,
@@ -105,7 +107,6 @@ fun RecordPillButton(
             Icon(
                 painterResource(R.drawable.ic_ms_more_time), null,
                 tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(24.dp),
             )
         }
     }
@@ -240,7 +241,6 @@ fun RecordCircleButton(
             Icon(
                 painterResource(R.drawable.ic_ms_more_time), null,
                 tint = if (frosted) cs.onSurface else cs.onPrimary,
-                modifier = Modifier.size(24.dp),
             )
         }
     }

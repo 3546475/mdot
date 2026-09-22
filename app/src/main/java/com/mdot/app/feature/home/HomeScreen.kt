@@ -56,11 +56,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.wrapContentWidth
 import com.mdot.app.R
+import com.mdot.app.core.designsystem.IconBoxSpec
 import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.LocalWindowSpec
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.SiteMoneyColors
 import com.mdot.app.feature.stats.pieColor
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.WindowSpec
 import com.mdot.app.core.designsystem.component.AnimatedMoneyText
@@ -294,13 +296,13 @@ private fun DataSection(state: HomeUiState, onOpenStats: () -> Unit, onOpenRecor
                         indication = LocalIndication.current,
                         onClick = onOpenStats,
                     )
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                    .padding(horizontal = Spacing.m, vertical = Spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     painterResource(R.drawable.ic_ms_calendar_month), null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier.size(IconSpec.inline),
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
@@ -326,7 +328,7 @@ private fun DataSection(state: HomeUiState, onOpenStats: () -> Unit, onOpenRecor
                     stringResource(R.string.detail_worked_hours_unit),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 8.dp, start = 4.dp),
+                    modifier = Modifier.padding(bottom = Spacing.s, start = Spacing.xs),
                 )
             }
             // 综合工时副行：超时部分 primary 强调（10 文档 F-Z5；月中为预演值）
@@ -385,10 +387,10 @@ private fun TodayPill(text: String, filled: Boolean, onRecord: () -> Unit) {
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier
-                    .padding(top = 6.dp)
+                    .padding(top = Spacing.s)
                     .clip(RoundedCornerShape(Radius.pill))
                     .background(MaterialTheme.colorScheme.primaryContainer)
-                    .padding(horizontal = 10.dp, vertical = 3.dp),
+                    .padding(horizontal = Spacing.m, vertical = Spacing.xs),
             )
         } else {
             val interaction = remember { MutableInteractionSource() }
@@ -398,12 +400,12 @@ private fun TodayPill(text: String, filled: Boolean, onRecord: () -> Unit) {
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier
-                    .padding(top = 6.dp)
+                    .padding(top = Spacing.s)
                     .pressScale(interaction, pressedScale = 0.93f)
                     .clip(RoundedCornerShape(Radius.pill))
                     .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(Radius.pill))
                     .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onRecord)
-                    .padding(horizontal = 10.dp, vertical = 3.dp),
+                    .padding(horizontal = Spacing.m, vertical = Spacing.xs),
             )
         }
     }
@@ -422,14 +424,14 @@ private fun EntryCard(
             // M3 Expressive：图标置于圆角 tonal 方块上
             Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(IconBoxSpec.entry.box)
                     .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(Radius.button)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     painterResource(iconRes), null,
                     tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(IconBoxSpec.entry.icon),
                 )
             }
             Spacer(Modifier.height(Spacing.s))
@@ -568,7 +570,7 @@ private fun IncomeCard(
                         indication = LocalIndication.current,
                         onClick = onOpenDetail,
                     )
-                    .padding(horizontal = 8.dp, vertical = 10.dp),
+                    .padding(horizontal = Spacing.s, vertical = Spacing.m),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -617,13 +619,13 @@ private fun SiteDataContent(state: HomeUiState, site: SiteHomeUi, onOpenRecord: 
                 else stringResource(R.string.stats_works_unit),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 8.dp, start = 4.dp),
+                modifier = Modifier.padding(bottom = Spacing.s, start = Spacing.xs),
             )
         }
         if (site.otMinutes > 0 || site.projectName.isNotEmpty()) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s),
             ) {
                 Text(
                     listOfNotNull(
@@ -717,7 +719,7 @@ private fun SitePendingCard(site: SiteHomeUi, onOpenDetail: () -> Unit) {
                     .pressScale(interaction, pressedScale = 0.88f)
                     .clip(RoundedCornerShape(Radius.button))
                     .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onOpenDetail)
-                    .padding(horizontal = 8.dp, vertical = 10.dp),
+                    .padding(horizontal = Spacing.s, vertical = Spacing.m),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(stringResource(R.string.home_income_detail), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)

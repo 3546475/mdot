@@ -46,6 +46,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mdot.app.core.designsystem.Duration
+import com.mdot.app.core.designsystem.IconBoxSpec
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 
@@ -85,12 +87,12 @@ fun EmptyState(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 48.dp),
+            .padding(vertical = Spacing.xl * 2),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
             modifier = Modifier
-                .size(72.dp)
+                .size(IconBoxSpec.hero.box)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
@@ -98,7 +100,7 @@ fun EmptyState(
                 icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(IconBoxSpec.hero.icon),
             )
         }
         Spacer(Modifier.height(Spacing.m))
@@ -171,22 +173,22 @@ fun SettingRow(
                     Modifier
                 }
             )
-            .padding(horizontal = Spacing.l, vertical = 14.dp),
+            .padding(horizontal = Spacing.l, vertical = Spacing.l),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
-            // M3 Expressive：行图标置于圆角 tonal 小底上，增强节奏感
+            // M3 Expressive：行图标置于圆角 tonal 小底上，增强节奏感（盒+图标成对，见 IconBoxSpec）
             Box(
                 modifier = Modifier
-                    .size(34.dp)
-                    .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(12.dp)),
+                    .size(IconBoxSpec.tile.box)
+                    .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(Radius.small)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     icon,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(IconBoxSpec.tile.icon),
                 )
             }
             Spacer(Modifier.size(Spacing.l))
@@ -227,7 +229,7 @@ fun SwitchRow(
         modifier
             .fillMaxWidth()
             .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
-            .padding(vertical = 12.dp),
+            .padding(vertical = Spacing.m),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -256,7 +258,7 @@ fun TierRow(
         modifier = modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-            .padding(vertical = 10.dp),
+            .padding(vertical = Spacing.m),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(

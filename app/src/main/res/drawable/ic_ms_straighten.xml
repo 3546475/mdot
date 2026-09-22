@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 固定长度（底栏胶囊固定 N 格宽）：一把尺子。evenOdd：外框减内孔成环，三颗刻度落在孔内自成实心 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M4.5 7.5 h15 a2.5 2.5 0 0 1 2.5 2.5 v4 a2.5 2.5 0 0 1 -2.5 2.5 h-15 a2.5 2.5 0 0 1 -2.5 -2.5 v-4 a2.5 2.5 0 0 1 2.5 -2.5 Z M5 9.3 h13.4 a1.2 1.2 0 0 1 1.2 1.2 v3 a1.2 1.2 0 0 1 -1.2 1.2 h-13.4 a1.2 1.2 0 0 1 -1.2 -1.2 v-3 a1.2 1.2 0 0 1 1.2 -1.2 Z M6.3 10 a0.7 0.7 0 0 1 1.4 0 v1.6 a0.7 0.7 0 0 1 -1.4 0 Z M10.65 10 a0.7 0.7 0 0 1 1.4 0 v1.6 a0.7 0.7 0 0 1 -1.4 0 Z M15 10 a0.7 0.7 0 0 1 1.4 0 v1.6 a0.7 0.7 0 0 1 -1.4 0 Z" android:fillColor="#FF000000" android:fillType="evenOdd" />
+</vector>

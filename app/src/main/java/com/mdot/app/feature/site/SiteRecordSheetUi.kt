@@ -55,6 +55,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.Radius
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.DatePick
 import com.mdot.app.core.designsystem.component.LocalSheetBackdropState
@@ -315,7 +316,7 @@ private fun RecordHeader(formPager: PagerState, onBack: () -> Unit, onSwitchTop:
                 painterResource(R.drawable.ic_ms_arrow_back),
                 contentDescription = stringResource(R.string.site_back),
                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier.size(IconSpec.boxed),
             )
         }
         // 分段胶囊：滑块连续跟随表单分页（顶栏整行手势已负责横滑切上级，此处不再重复挂手势）
@@ -323,7 +324,7 @@ private fun RecordHeader(formPager: PagerState, onBack: () -> Unit, onSwitchTop:
             Modifier
                 .clip(RoundedCornerShape(Radius.pill))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(4.dp),
+                .padding(Spacing.xs),
         ) {
             SegmentBar(
                 labels = listOf(

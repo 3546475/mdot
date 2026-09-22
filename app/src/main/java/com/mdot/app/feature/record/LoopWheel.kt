@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.distinctUntilChanged
+import com.mdot.app.core.designsystem.Spacing
 
 /**
  * 循环无限滚轮（时分选择器）：
@@ -150,7 +151,7 @@ fun LoopWheel(
                     modifier = Modifier
                         .height(itemHeight.dp)
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp),
+                        .padding(horizontal = Spacing.xs),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(

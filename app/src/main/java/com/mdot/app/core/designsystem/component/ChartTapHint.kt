@@ -29,6 +29,8 @@ import com.mdot.app.domain.util.TimeUtils
 import java.time.LocalDate
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.Radius
 
 /**
  * 图表点击提示（docs/15 T6 #19）：点热力图/柱状图时，在点击列上方显示
@@ -133,17 +135,17 @@ private fun ChartHintBubble(text: String) {
     Box(
         Modifier
             .wrapContentSize(Alignment.Center)
-            .shadow(2.dp, RoundedCornerShape(8.dp))
+            .shadow(2.dp, RoundedCornerShape(Radius.xs))
             .background(
                 MaterialTheme.colorScheme.surfaceContainerHigh,
-                RoundedCornerShape(8.dp),
+                RoundedCornerShape(Radius.xs),
             )
             .border(
                 1.dp,
                 MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
-                RoundedCornerShape(8.dp),
+                RoundedCornerShape(Radius.xs),
             )
-            .padding(horizontal = 12.dp, vertical = 5.dp),
+            .padding(horizontal = Spacing.m, vertical = Spacing.xs),
     ) {
         Text(
             text,

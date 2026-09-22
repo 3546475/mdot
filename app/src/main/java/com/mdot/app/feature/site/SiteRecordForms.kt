@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.Radius
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.pressScale
@@ -320,7 +321,7 @@ private fun UnitPickButton(current: String, onClick: () -> Unit) {
         Icon(
             painterResource(R.drawable.ic_ms_expand_more), null,
             tint = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(IconSpec.dense),
         )
     }
 }

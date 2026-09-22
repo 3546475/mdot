@@ -7,7 +7,7 @@
     <string name="datasource_current_lib_version">当前库版本</string>
     <string name="datasource_builtin_default">内置默认</string>
     <string name="datasource_refresh_now">立即刷新</string>
-    <string name="datasource_builtin_hint">内置库为估算数据（仅节日正日），请配置远程 JSON 获取权威安排；刷新失败自动保留现库。</string>
+    <string name="datasource_builtin_hint">内置库为估算数据；配远程 JSON 取权威安排，刷新失败保留现库</string>
     <!-- 应用内更新（无弹窗按钮状态流转：检查更新→圆环→下载→下载中→安装，docs/15 反馈） -->
     <string name="update_checking_short">检查中</string>
     <string name="update_action_download_version">下载 v%1$s</string>

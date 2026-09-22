@@ -3,7 +3,7 @@
     <!-- 首页（feature/home/HomeScreen.kt） -->
     <string name="home_overtime_prefix">"超时 "</string>
     <string name="home_overtime_hours">%1$sh</string>
-    <string name="home_overtime_standard_suffix">" · 标准 %1$sh（截至今天）"</string>
+    <string name="home_overtime_standard_suffix">" · 标准 %1$sh（至今）"</string>
     <string name="home_today_empty">今日还没记，点此去记</string>
     <string name="home_today_ot">今日 %1$sh</string>
     <string name="home_cycle_period">周期 %1$s</string>

@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mdot.app.core.designsystem.AdaptiveSpecs
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.domain.model.WorkSystem
@@ -82,9 +83,9 @@ fun TopLevelBar(
                         indication = LocalIndication.current,
                         onClick = onOpenWorkSystem,
                     )
-                    .padding(horizontal = 14.dp, vertical = 9.dp),
+                    .padding(horizontal = Spacing.l, vertical = Spacing.s),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s),
             ) {
                 Text(
                     workSystem.displayName,
@@ -94,7 +95,7 @@ fun TopLevelBar(
                 Icon(
                     painterResource(R.drawable.ic_ms_swap_horiz),
                     contentDescription = stringResource(R.string.ds_topbar_switch_cd),
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(IconSpec.inline),
                     tint = MaterialTheme.colorScheme.onSecondaryContainer,
                 )
             }
@@ -111,7 +112,7 @@ fun TopLevelBar(
             Icon(
                 painterResource(R.drawable.ic_ms_palette),
                 contentDescription = stringResource(R.string.ds_topbar_appearance_cd),
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier.size(IconSpec.bar),
                 tint = MaterialTheme.colorScheme.primary,
             )
         }
@@ -127,7 +128,7 @@ fun TopLevelBar(
             Icon(
                 painterResource(R.drawable.ic_ms_settings),
                 contentDescription = stringResource(R.string.ds_topbar_settings_cd),
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier.size(IconSpec.bar),
                 tint = MaterialTheme.colorScheme.primary,
             )
         }

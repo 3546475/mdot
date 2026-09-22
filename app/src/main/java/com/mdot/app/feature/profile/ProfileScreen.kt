@@ -69,6 +69,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.mdot.app.core.designsystem.Radius
+import com.mdot.app.core.designsystem.IconSpec
 
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.KeyValue
@@ -191,7 +192,7 @@ fun ProfileScreen(
                             Icon(
                                 painterResource(R.drawable.ic_ms_photo_camera), contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(14.dp),
+                                modifier = Modifier.size(IconSpec.inline),
                             )
                         }
                     }
@@ -234,7 +235,7 @@ fun ProfileScreen(
                     Icon(
                         painterResource(R.drawable.ic_ms_edit), contentDescription = stringResource(R.string.profile_edit_nickname),
                         tint = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(IconSpec.inline),
                     )
                 }
                 Spacer(Modifier.height(Spacing.xs))
@@ -436,7 +437,7 @@ private fun AvatarCropDialog(
                 // MD3 底部操作栏
                 Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
                     Row(
-                        Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = Spacing.l, vertical = 12.dp),
+                        Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = Spacing.l, vertical = Spacing.m),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -473,7 +474,7 @@ private fun ActionIconButton(icon: Painter, label: String, onClick: () -> Unit) 
         modifier = Modifier
             .clip(RoundedCornerShape(Radius.button))
             .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = Spacing.l, vertical = Spacing.s),
     ) {
         Icon(icon, contentDescription = label, tint = MaterialTheme.colorScheme.primary)
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

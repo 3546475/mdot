@@ -19,7 +19,6 @@ object Routes {
     fun statsDetail(tab: Int): String = "statsDetail?tab=$tab"
 
     fun stats(tab: Int): String = if (tab <= 0) STATS else "stats?tab=$tab"
-    const val PAYROLL = "payroll"
     const val EXPORT = "export"
     const val SYNC = "sync"
     const val SYNC_STORAGE = "sync/storage"
@@ -53,7 +52,7 @@ object Routes {
      * 注意：设置是二级页面（从首页 ⚙ / 我的 进入）。
      */
     val TOP_LEVEL_BASE_ROUTES = setOf(
-        HOME, "calendar", STATS, PAYROLL, EXPORT, SYNC, PROFILE,
+        HOME, "calendar", STATS, EXPORT, SYNC, PROFILE,
     )
 
     /** 当前路由（destination.route，可含 ?query）是否一级页面 */

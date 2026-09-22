@@ -4,20 +4,10 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.runtime.key
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,7 +24,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -47,7 +36,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -57,26 +45,30 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
+import com.mdot.app.core.designsystem.IconBoxSpec
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.BottomBarSpec
 import com.mdot.app.core.designsystem.Duration
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.JiabanBottomBar
+import com.mdot.app.core.designsystem.component.OptionPillCard
+import com.mdot.app.core.designsystem.component.OptionPillItem
 import com.mdot.app.core.designsystem.component.RecordCircleButton
 import com.mdot.app.core.designsystem.component.RecordPillButton
 import com.mdot.app.core.designsystem.component.rememberBackdropBlurState
-import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.SlotRegistry
 import com.mdot.app.core.designsystem.component.SlotSpec
-import com.mdot.app.core.designsystem.component.SwitchRow
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.domain.model.BottomBarConfig
@@ -107,69 +99,6 @@ fun BottomBarPane(
     ) {
         Spacer(Modifier.height(Spacing.s))
 
-        // ---- 外观选项（可折叠卡：标题行 + 四行开关）----
-        // 三条动画**共用同一条曲线**（motionScheme.fastSpatialSpec）：高度（expand/shrinkVertically）、
-        // 内容透明度（fadeIn/fadeOut）、箭头角度（rotationZ）——三者同拍，收展不脱节。
-        // 箭头角度在 graphicsLayer（绘制期）读取，避免逐帧重组；展开状态用 rememberSaveable 跨旋转保留。
-        // 出厂默认**折叠**（用户定，2026-09-20）
-        var optionsExpanded by rememberSaveable { mutableStateOf(false) }
-        // 同一条曲线，按值域取（expand/shrinkVertically 需要 IntSize 版本的 spec）
-        val expandSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
-        val sizeSpec = MaterialTheme.motionScheme.fastSpatialSpec<androidx.compose.ui.unit.IntSize>()
-        val arrowRotation = animateFloatAsState(
-            targetValue = if (optionsExpanded) 180f else 0f,
-            animationSpec = expandSpec,
-            label = "barOptionsArrow",
-        )
-        SectionCard {
-            Column {
-                // 整行可点但**不要涟漪**：折叠卡是容器，整卡涟漪会显得吵（用户要求）
-                val headerInteraction = remember { MutableInteractionSource() }
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable(
-                            interactionSource = headerInteraction,
-                            indication = null,
-                        ) { optionsExpanded = !optionsExpanded }
-                        .padding(vertical = Spacing.xs),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        stringResource(R.string.appearance_options),
-                        style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Icon(
-                        painterResource(R.drawable.ic_ms_expand_more),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .graphicsLayer { rotationZ = arrowRotation.value },
-                    )
-                }
-                AnimatedVisibility(
-                    visible = optionsExpanded,
-                    enter = fadeIn(expandSpec) +
-                        expandVertically(animationSpec = sizeSpec),
-                    exit = fadeOut(expandSpec) +
-                        shrinkVertically(animationSpec = sizeSpec),
-                ) {
-                    Column {
-                        SwitchRow(stringResource(R.string.appearance_frosted), frosted, vm::setFrosted)
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        SwitchRow(stringResource(R.string.appearance_icon_only), iconOnly, vm::setIconOnly)
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        SwitchRow(stringResource(R.string.appearance_side_action), sideAction, vm::setSideAction)
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        SwitchRow(stringResource(R.string.appearance_fixed_width), fixedWidth, vm::setFixedWidth)
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(Spacing.l))
-
         // ---- 预览（纯展示，不可交互） ----
         Text(stringResource(R.string.appearance_preview), style = MaterialTheme.typography.titleSmall)
         Spacer(Modifier.height(Spacing.l))
@@ -195,6 +124,52 @@ fun BottomBarPane(
             },
             onDragEnd = { vm.setOrder(draft) },
             onToggle = { id, enabled -> vm.setEnabled(id, enabled) },
+        )
+        Spacer(Modifier.height(Spacing.l))
+
+        // ---- More（原「更多选项」，2026-09-22 改名；同日定：**移到页面最下方**）----
+        // 形态移植自 Bencho 的 Assignees 组件（数值/令牌映射/每个数字的理由见 OptionPillSpec）。
+        // 药丸**就是读数**：左侧叠放已开启项的圆形图标，全关时写「More」；点开后在下方就地撑出列表卡。
+        // ⚠️ **不包分区卡、也不加分区标题**（用户定）；曾经把它放最上方并居中试过（“方案 C”），
+        // 用户看真机样张后改为**放最下方**：它是这一页最细的调参（四项开关），
+        // 排在「预览」与「槽位列表」之后不打断主流程的阅读；收起/展开的动效不变。
+        // 出厂默认**折叠**（用户定，2026-09-20），由组件内部 rememberSaveable 保存。
+        OptionPillCard(
+            title = stringResource(R.string.appearance_options),
+            items = listOf(
+                OptionPillItem(
+                    id = "frosted",
+                    iconRes = R.drawable.ic_ms_blur_on,
+                    label = stringResource(R.string.appearance_frosted),
+                    checked = frosted,
+                ),
+                OptionPillItem(
+                    id = "iconOnly",
+                    iconRes = R.drawable.ic_ms_grid_view,
+                    label = stringResource(R.string.appearance_icon_only),
+                    checked = iconOnly,
+                ),
+                OptionPillItem(
+                    id = "sideAction",
+                    iconRes = R.drawable.ic_ms_align_horizontal_right,
+                    label = stringResource(R.string.appearance_side_action),
+                    checked = sideAction,
+                ),
+                OptionPillItem(
+                    id = "fixedWidth",
+                    iconRes = R.drawable.ic_ms_straighten,
+                    label = stringResource(R.string.appearance_fixed_width),
+                    checked = fixedWidth,
+                ),
+            ),
+            onToggle = { id, enabled ->
+                when (id) {
+                    "frosted" -> vm.setFrosted(enabled)
+                    "iconOnly" -> vm.setIconOnly(enabled)
+                    "sideAction" -> vm.setSideAction(enabled)
+                    "fixedWidth" -> vm.setFixedWidth(enabled)
+                }
+            },
         )
         Spacer(Modifier.height(Spacing.xl))
     }
@@ -275,6 +250,15 @@ private fun BottomBarPreview(
 /**
  * 槽位卡片：**单列表**（对齐班次管理页卡片）——全部槽位同列，每行都能拖拽排序 + 开关。
  * 开关只影响是否显示（关闭的只是不在底栏出现），**不影响顺序**；首页固定首位、不在此列表内。
+ *
+ * ⚠️ **拖动 = 长按后拖、且整行可拖、关闭项也能拖**（2026-09-22 用户定）：
+ * 原先直接按下就拖，行首还画了个六点抓手。现在：
+ * ① 抓手**移除**（它白占 20+12dp 把每行文字推窄，而长按手势不需要“抓手”来指认可拖区域）；
+ * ② 手势改 `detectDragGesturesAfterLongPress`（长按前不消费事件 → 快速滑动仍归页面滚动）；
+ * ③ **关闭项也能拖**（原来是 `if (!isOn) return@pointerInput` 拦住的）：
+ *    抓手降权曾是“这行拖不动”的唯一信号，抓手一删就没了信号，而长按本身已是个明确的起手式，
+ *    误拖风险小——于是选“全都能拖”而不是“留一堆不吭声的行”（顺序只影响它将来的位置）。
+ * 长按触发时给一次 [HapticFeedbackType.LongPress]（与日历长按多选、热力图长按同款手感）。
  */
 @Composable
 private fun SlotConfigCard(
@@ -289,18 +273,19 @@ private fun SlotConfigCard(
     var dragY by remember { mutableFloatStateOf(0f) }
     var dragMoved by remember { mutableStateOf(false) }
     val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
 
     Surface(
         shape = RoundedCornerShape(Radius.card),
         color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(vertical = 4.dp)) {
+        Column(Modifier.padding(vertical = Spacing.xs)) {
             Text(
                 stringResource(R.string.appearance_slots_home_fixed),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Spacing.l, vertical = 6.dp),
+                modifier = Modifier.padding(horizontal = Spacing.l, vertical = Spacing.s),
             )
             // 单 key 循环：开关切换**不移动行**（顺序只由拖拽改），Switch 身份稳定 → 切换动画正常
             order.forEachIndexed { index, id ->
@@ -327,13 +312,11 @@ private fun SlotConfigCard(
                                 scaleY = dragScale
                             }
                             .zIndex(if (isDragged) 1f else 0f)
-                            // 仅开启项可拖：关闭项在底栏不显示，其顺序无意义，
-                            // 且手柄已按 draggable=false 降权——手势必须同步关掉，
-                            // 否则会出现「暗手柄却仍能拖」的自相矛盾
-                            .pointerInput(id, isOn) {
-                                if (!isOn) return@pointerInput
-                                detectVerticalDragGestures(
+                            // 整行可拖、关闭项也可拖（长按后拖，见本版块 KDoc）
+                            .pointerInput(id) {
+                                detectDragGesturesAfterLongPress(
                                     onDragStart = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         dragFrom = currentIndex
                                         draggingId = id
                                         dragY = 0f
@@ -361,7 +344,8 @@ private fun SlotConfigCard(
                                     },
                                 ) { change, dragAmount ->
                                     change.consume()
-                                    dragY += dragAmount
+                                    // 长按版给的是 Offset（两个轴），只取纵向
+                                    dragY += dragAmount.y
                                     if (cellPx > 0 && dragFrom >= 0) {
                                         var swapped = true
                                         while (swapped) {
@@ -397,8 +381,6 @@ private fun SlotConfigCard(
                         SlotConfigRowContent(
                             spec = spec,
                             isOn = isOn,
-                            isDragged = isDragged,
-                            draggable = isOn,
                             onToggle = { onToggle(id, !isOn) },
                         )
                     }
@@ -408,13 +390,11 @@ private fun SlotConfigCard(
     }
 }
 
-/** 单行内容：拖拽手柄 + 图标文字 + switch */
+/** 单行内容：图标方块 + 文字 + switch */
 @Composable
 private fun SlotConfigRowContent(
     spec: SlotSpec,
     isOn: Boolean,
-    isDragged: Boolean,
-    draggable: Boolean,
     onToggle: () -> Unit,
 ) {
     // 颜色随开关切换过渡（motionScheme effects spec，禁硬编码，硬规则 7）——原先瞬间跳变
@@ -425,11 +405,13 @@ private fun SlotConfigRowContent(
         animationSpec = colorSpec,
         label = "slotRowContent",
     )
-    val handleColor by animateColorAsState(
-        targetValue = if (draggable) MaterialTheme.colorScheme.onSurfaceVariant
-        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+    // 图标方块底色随开关浅深（secondaryContainer ⇄ surfaceContainerHighest）
+    // ——**与首页卡片配置行完全一致**（同一屏的两个页签，视觉必须同款；用户 2026-09-22 指出缺底）
+    val iconBoxColor by animateColorAsState(
+        targetValue = if (isOn) MaterialTheme.colorScheme.secondaryContainer
+        else MaterialTheme.colorScheme.surfaceContainerHighest,
         animationSpec = colorSpec,
-        label = "slotRowHandle",
+        label = "slotRowIconBox",
     )
 
     Row(
@@ -438,20 +420,20 @@ private fun SlotConfigRowContent(
             .padding(horizontal = Spacing.l),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // 拖拽手柄（仅 on 的项可拖）
-        Icon(
-            painterResource(R.drawable.ic_ms_drag_indicator),
-            contentDescription = if (draggable) stringResource(R.string.appearance_drag_reorder) else null,
-            tint = handleColor,
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(Spacing.m))
-        Icon(
-            painterResource(spec.iconRes),
-            contentDescription = null,
-            tint = contentColor,
-            modifier = Modifier.size(22.dp),
-        )
+        // 图标方块：盒+图标成对（IconBoxSpec.tile = 36dp + 20dp）+ 圆角 Radius.small
+        Box(
+            modifier = Modifier
+                .size(IconBoxSpec.tile.box)
+                .background(iconBoxColor, RoundedCornerShape(Radius.small)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painterResource(spec.iconRes),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(IconBoxSpec.tile.icon),
+            )
+        }
         Spacer(Modifier.width(Spacing.m))
         Text(
             stringResource(spec.labelRes),

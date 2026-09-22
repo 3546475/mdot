@@ -45,7 +45,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.mdot.app.R
+import com.mdot.app.core.designsystem.IconBoxSpec
 import com.mdot.app.core.designsystem.Radius
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.pressScale
@@ -78,14 +80,14 @@ private fun NotePhotoCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         Modifier
-                            .size(36.dp)
+                            .size(IconBoxSpec.tile.box)
                             .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(Radius.small)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             painterResource(R.drawable.ic_ms_photo_camera), null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(IconBoxSpec.tile.icon),
                         )
                     }
                     Spacer(Modifier.width(Spacing.m))
@@ -95,12 +97,6 @@ private fun NotePhotoCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(Modifier.height(Spacing.s))
-                Text(
-                    stringResource(R.string.site_photo_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
                 Spacer(Modifier.height(Spacing.s))
                 PhotoSection(photos = photos, onAdd = onAddPhotos, onRemove = onRemovePhoto)
             }
@@ -177,10 +173,10 @@ private fun PhotoSection(photos: List<String>, onAdd: (List<String>) -> Unit, on
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(2.dp)
+                    .padding(Spacing.xs)
                     .clip(RoundedCornerShape(Radius.pill))
                     .background(MaterialTheme.colorScheme.primaryContainer)
-                    .padding(horizontal = 6.dp, vertical = 1.dp),
+                    .padding(horizontal = Spacing.s, vertical = 1.dp),
             )
         }
     }

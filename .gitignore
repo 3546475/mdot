@@ -20,6 +20,9 @@ docs/test-s3.local.properties
 
 # ZCode 会话/工具状态
 .zcode/
+# pi / specify 工具状态（会话、计划等，勿入库）
+.pi/
+.specify/
 
 # archify 架构图导出物（本地产物，不入库）
 docs/结构图/
@@ -33,6 +36,7 @@ sqlc/
 /holidays.json
 .claude/
 .codebuddy/
+.workbuddy/
 .cursor/
 .cursorrules
 .gemini/

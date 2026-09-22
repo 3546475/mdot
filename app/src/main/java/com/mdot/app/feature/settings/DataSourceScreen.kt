@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalContentColor
@@ -73,6 +71,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.Radius
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.navigation.contentBottomPadding
@@ -128,7 +127,7 @@ fun DataSourceScreen(
                         onClick = vm::refreshHoliday,
                         enabled = !busy,
                         shape = RoundedCornerShape(Radius.pill),
-                        contentPadding = PaddingValues(horizontal = Spacing.l, vertical = 8.dp),
+                        contentPadding = PaddingValues(horizontal = Spacing.l, vertical = Spacing.s),
                     ) {
                         if (busy) {
                             CircularProgressIndicator(
@@ -359,7 +358,7 @@ private fun UpdateHeroContent(
                 Button(
                     onClick = onPickSource,
                     shape = RoundedCornerShape(Radius.pill),
-                    contentPadding = PaddingValues(horizontal = Spacing.m, vertical = 4.dp),
+                    contentPadding = PaddingValues(horizontal = Spacing.m, vertical = Spacing.xs),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = onContainer.copy(alpha = 0.12f),
                         contentColor = onContainer,
@@ -405,7 +404,7 @@ private fun UpdateActionButton(
     val busy = state is UpdateState.Checking ||
         state is UpdateState.Downloading ||
         state is UpdateState.BackgroundDownloading
-    val contentPadding = PaddingValues(horizontal = Spacing.l, vertical = 8.dp)
+    val contentPadding = PaddingValues(horizontal = Spacing.l, vertical = Spacing.s)
     val progress: Float? = when (state) {
         is UpdateState.Downloading -> state.progress / 100f
         is UpdateState.BackgroundDownloading -> state.progress / 100f
@@ -495,7 +494,7 @@ private fun UpdateActionButton(
             ButtonSpinner(busy = busy, progress = progress)
             if (state is UpdateState.Available) {
                 Icon(
-                    imageVector = Icons.Filled.Download,
+                    painterResource(R.drawable.ic_ms_file_download),
                     contentDescription = label,
                     modifier = Modifier.size(ButtonDefaults.IconSize),
                 )
@@ -575,7 +574,7 @@ private fun UrlPicker(
                         else Color.Transparent
                     )
                     .clickable(onClick = { onSelect(url) })
-                    .padding(horizontal = Spacing.s, vertical = 4.dp),
+                    .padding(horizontal = Spacing.s, vertical = Spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RadioButton(selected = isSel, onClick = { onSelect(url) })
@@ -602,9 +601,9 @@ private fun UrlPicker(
         OutlinedButton(
             onClick = { showAdd = true },
             shape = RoundedCornerShape(Radius.pill),
-            contentPadding = PaddingValues(horizontal = Spacing.l, vertical = 6.dp),
+            contentPadding = PaddingValues(horizontal = Spacing.l, vertical = Spacing.s),
         ) {
-            Icon(painterResource(R.drawable.ic_ms_add), null, Modifier.size(16.dp))
+            Icon(painterResource(R.drawable.ic_ms_add), null, Modifier.size(IconSpec.inline))
             Spacer(Modifier.width(Spacing.s))
             Text(stringResource(R.string.datasource_add_url), style = MaterialTheme.typography.labelMedium)
         }
@@ -665,7 +664,7 @@ private fun UpdateSourcePickerDialog(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(Radius.small))
                             .clickable(onClick = { onSelect(url) })
-                            .padding(horizontal = Spacing.xs, vertical = 6.dp),
+                            .padding(horizontal = Spacing.xs, vertical = Spacing.s),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(selected = url == selected, onClick = null)
@@ -700,9 +699,9 @@ private fun UpdateSourcePickerDialog(
                 OutlinedButton(
                     onClick = { showAdd = true },
                     shape = RoundedCornerShape(Radius.pill),
-                    contentPadding = PaddingValues(horizontal = Spacing.l, vertical = 6.dp),
+                    contentPadding = PaddingValues(horizontal = Spacing.l, vertical = Spacing.s),
                 ) {
-                    Icon(painterResource(R.drawable.ic_ms_add), null, Modifier.size(16.dp))
+                    Icon(painterResource(R.drawable.ic_ms_add), null, Modifier.size(IconSpec.inline))
                     Spacer(Modifier.width(Spacing.s))
                     Text(stringResource(R.string.datasource_add_url), style = MaterialTheme.typography.labelMedium)
                 }

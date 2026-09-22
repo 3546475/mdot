@@ -48,7 +48,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mdot.app.R
+import com.mdot.app.core.designsystem.IconBoxSpec
 import com.mdot.app.core.designsystem.Radius
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.pressScale
@@ -89,7 +91,7 @@ internal fun SegmentPill(text: String, selected: Boolean, onClick: () -> Unit) {
             .background(bgColor)
             .pressScale(interaction, pressedScale = 0.94f)
             .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick)
-            .padding(horizontal = Spacing.l, vertical = 8.dp),
+            .padding(horizontal = Spacing.l, vertical = Spacing.s),
         style = MaterialTheme.typography.labelLarge,
         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         color = fgColor,
@@ -226,14 +228,14 @@ private fun TonalRow(
         // 图标 tonal 方块（03 §3.4）
         Box(
             Modifier
-                .size(36.dp)
+                .size(IconBoxSpec.tile.box)
                 .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(Radius.small)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 painterResource(iconRes), null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(IconBoxSpec.tile.icon),
             )
         }
         Spacer(Modifier.width(Spacing.m))
@@ -260,7 +262,7 @@ private fun TonalRow(
                         .pressScale(trailInteraction, pressedScale = 0.92f)
                         .clip(RoundedCornerShape(Radius.pill))
                         .clickable(interactionSource = trailInteraction, indication = LocalIndication.current, onClick = onTrailing)
-                        .padding(horizontal = Spacing.s, vertical = 6.dp),
+                        .padding(horizontal = Spacing.s, vertical = Spacing.s),
                 )
             } else {
                 Text(
@@ -302,14 +304,14 @@ internal fun PayHeroCard(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
-                    .size(36.dp)
+                    .size(IconBoxSpec.tile.box)
                     .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.small)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     painterResource(R.drawable.ic_ms_paid), null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(IconBoxSpec.tile.icon),
                 )
             }
             Spacer(Modifier.width(Spacing.m))
@@ -401,7 +403,7 @@ internal fun SelectTile(
                 tint = fgColor,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(4.dp)
+                    .padding(Spacing.xs)
                     .size(14.dp),
             )
         }
@@ -414,7 +416,7 @@ private fun PlannedSegment(text: String) {
         Modifier
             .clip(RoundedCornerShape(Radius.pill))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f))
-            .padding(horizontal = Spacing.l, vertical = 8.dp),
+            .padding(horizontal = Spacing.l, vertical = Spacing.s),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -442,7 +444,7 @@ private fun BadgePill(text: String, bg: Color, fg: Color) {
             .padding(start = Spacing.s)
             .clip(RoundedCornerShape(Radius.pill))
             .background(bg)
-            .padding(horizontal = 8.dp, vertical = 2.dp),
+            .padding(horizontal = Spacing.s, vertical = Spacing.xs),
     )
 }
 
@@ -464,14 +466,14 @@ internal fun BigAmountRow(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
-                    .size(36.dp)
+                    .size(IconBoxSpec.tile.box)
                     .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(Radius.small)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     painterResource(iconRes), null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(IconBoxSpec.tile.icon),
                 )
             }
             Spacer(Modifier.width(Spacing.m))

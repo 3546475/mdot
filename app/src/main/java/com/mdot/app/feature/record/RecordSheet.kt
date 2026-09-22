@@ -72,6 +72,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.LocalWindowSpec
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.WindowSpec
 import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.Duration
@@ -208,7 +209,7 @@ fun RecordSheet(
                                     },
                                 )
                             }
-                            .padding(vertical = 10.dp),
+                            .padding(vertical = Spacing.m),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
@@ -231,7 +232,7 @@ fun RecordSheet(
                             Column(
                                 Modifier
                                     .weight(1f)
-                                    .padding(vertical = 4.dp),
+                                    .padding(vertical = Spacing.xs),
                             ) {
                                 TextButton(onClick = { showDatePicker = true }) {
                                     Text(
@@ -305,7 +306,8 @@ fun RecordSheet(
                         // 两种输入态容器等高（凹陷托盘 156dp：内层 144dp 可视 3 行 ×44+间距，
                         // 外圈 6dp 凹面留边；预设已扩至 24h、更多的行在网格内部滚动），
                         // 切换不引起弹层高度跳动
-                        SunkenWell(Modifier.fillMaxWidth().height(156.dp)) {
+                        // 高度 = DurationGrid 可视 3 行（44×3 + Spacing.s×2 = 148）+ SunkenWell 内衬 Spacing.s×2
+                        SunkenWell(Modifier.fillMaxWidth().height(164.dp)) {
                             if (state.durationMode == DurationInputMode.MINUTES) {
                                 MinutesWheels(
                                     totalMinutes = state.pendingMinutes,
@@ -339,7 +341,7 @@ fun RecordSheet(
                                 Spacer(Modifier.height(Spacing.xs))
                                 Row(
                                     Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(Spacing.s),
                                 ) {
                                     val options = if (state.tab == RecordType.OT) {
                                         shifts.map {
@@ -397,7 +399,7 @@ fun RecordSheet(
                                         text = tierText + if (state.tierManual) stringResource(R.string.record_tier_manual_suffix) else "",
                                         onClick = null,
                                     )
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                                         RateTier.entries.forEach { tier ->
                                             // 综合工时无周末档（10 文档 D5）
                                             if (isComprehensive && tier == RateTier.WEEKEND) return@forEach
@@ -436,7 +438,7 @@ fun RecordSheet(
                                                         bottomEnd = 4.dp,
                                                     ),
                                                 ) {
-                                                    Icon(painterResource(R.drawable.ic_ms_remove), null, Modifier.size(18.dp))
+                                                    Icon(painterResource(R.drawable.ic_ms_remove), null, Modifier.size(IconSpec.dense))
                                                 }
                                                 OutlinedButton(
                                                     onClick = { vm.onToCompDelta(30) },
@@ -447,7 +449,7 @@ fun RecordSheet(
                                                         bottomEnd = Radius.textField,
                                                     ),
                                                 ) {
-                                                    Icon(painterResource(R.drawable.ic_ms_add), null, Modifier.size(18.dp))
+                                                    Icon(painterResource(R.drawable.ic_ms_add), null, Modifier.size(IconSpec.dense))
                                                 }
                                             }
                                         }
@@ -678,7 +680,7 @@ private fun ChipFlow(options: List<ChipOption>, onSelect: (String) -> Unit) {
         Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.s),
     ) {
         options.forEach { opt ->
             FilterChip(selected = opt.selected, onClick = { onSelect(opt.key) }, label = { Text(opt.label) })

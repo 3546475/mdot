@@ -4,7 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,7 +42,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -50,6 +52,8 @@ import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
+import com.mdot.app.core.designsystem.IconBoxSpec
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.HomeCardRegistry
@@ -85,6 +89,15 @@ fun HomeCardsPane(
     ) {
         Spacer(Modifier.height(Spacing.s))
 
+        // 提示行：**只写手势本身**（用户 2026-09-22 要「言简意赅」）——
+        // 与班次页 / 工地页同款（labelSmall + onSurfaceVariant），不再复述“数据区固定显示”那种自我说明
+        Text(
+            stringResource(R.string.appearance_drag_hint),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.m))
+
         // 卡片总表：单列表（对齐底栏配置页 / 班次卡片）——全部卡片同列，每行都能拖拽 + 开关
         HomeCardsConfigCard(
             order = draft,
@@ -109,6 +122,11 @@ fun HomeCardsPane(
 /**
  * 卡片总表：**单列表**（对齐底栏配置页 / 班次管理页卡片）——全部卡片同列，每行都能拖拽排序 + 开关。
  * 开关只影响是否显示（隐藏的只是不在首页出现），**不影响顺序**；「数据区」固定显示、不可隐藏。
+ *
+ * ⚠️ **拖动 = 长按后拖**（2026-09-22 用户定）：行首的六点抓手图标已**移除**，手势改
+ * `detectDragGesturesAfterLongPress`——快速滑动仍归页面滚动，只有按住不动才进入拖拽；
+ * 长按触发时给一次 `HapticFeedbackType.LongPress`（与底栏槽位卡、日历长按多选同手感）。
+ * 两个好处与代价详见底栏页 `SlotConfigCard` 的同名注释。
  */
 @Composable
 private fun HomeCardsConfigCard(
@@ -123,9 +141,10 @@ private fun HomeCardsConfigCard(
     var dragY by remember { mutableFloatStateOf(0f) }
     var dragMoved by remember { mutableStateOf(false) }
     val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
 
     SectionCard {
-        Column(Modifier.padding(vertical = 4.dp)) {
+        Column(Modifier.padding(vertical = Spacing.xs)) {
             // 「数据区固定显示，不可关闭」的说明文字已删（2026-09-20）：该行本身就是一个
             // **已开启且不可点击**的开关，禁用态已经把这条规则说完了，再写一行灰字是重复。
             order.forEachIndexed { index, id ->
@@ -155,8 +174,9 @@ private fun HomeCardsConfigCard(
                             }
                             .zIndex(if (isDragged) 1f else 0f)
                             .pointerInput(id) {
-                                detectVerticalDragGestures(
+                                detectDragGesturesAfterLongPress(
                                     onDragStart = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         dragFrom = currentIndex
                                         draggingId = id
                                         dragY = 0f
@@ -184,7 +204,8 @@ private fun HomeCardsConfigCard(
                                     },
                                 ) { change, dragAmount ->
                                     change.consume()
-                                    dragY += dragAmount
+                                    // 长按版给的是 Offset（两个轴），只取纵向
+                                    dragY += dragAmount.y
                                     if (cellPx > 0 && dragFrom >= 0) {
                                         var swapped = true
                                         while (swapped) {
@@ -220,7 +241,6 @@ private fun HomeCardsConfigCard(
                         HomeCardRow(
                             spec = spec,
                             isOn = isOn,
-                            draggable = true,
                             closable = closable,
                             onToggle = { onToggle(id, !isOn) },
                         )
@@ -231,12 +251,11 @@ private fun HomeCardsConfigCard(
     }
 }
 
-/** 单行：拖拽手柄 + 图标 tonal 方块 + 名称 + 开关（视觉对齐底栏配置行，开关切换） */
+/** 单行：图标 tonal 方块 + 名称 + 开关（视觉对齐底栏配置行，开关切换） */
 @Composable
 private fun HomeCardRow(
     spec: HomeCardSpec,
     isOn: Boolean,
-    draggable: Boolean,
     /** 可关闭（「数据区」=false：开关置灰，保证首页至少一张卡） */
     closable: Boolean,
     onToggle: () -> Unit,
@@ -249,12 +268,6 @@ private fun HomeCardRow(
         animationSpec = colorSpec,
         label = "homeCardRowContent",
     )
-    val handleColor by animateColorAsState(
-        targetValue = if (draggable) MaterialTheme.colorScheme.onSurfaceVariant
-        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-        animationSpec = colorSpec,
-        label = "homeCardRowHandle",
-    )
     val iconBoxColor by animateColorAsState(
         targetValue = if (isOn) MaterialTheme.colorScheme.secondaryContainer
         else MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -265,20 +278,13 @@ private fun HomeCardRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = Spacing.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            painterResource(R.drawable.ic_ms_drag_indicator),
-            contentDescription = if (draggable) stringResource(R.string.appearance_drag_reorder) else null,
-            tint = handleColor,
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(Spacing.m))
-        // 图标 tonal 容器（03 文档 §3.4）：secondaryContainer 底 + primary 图标
+        // 图标 tonal 容器（03 文档 §3.4）：secondaryContainer 底 + primary 图标，盒+图标成对
         Box(
             modifier = Modifier
-                .size(34.dp)
+                .size(IconBoxSpec.tile.box)
                 .background(iconBoxColor, RoundedCornerShape(Radius.small)),
             contentAlignment = Alignment.Center,
         ) {
@@ -286,7 +292,7 @@ private fun HomeCardRow(
                 painterResource(spec.iconRes),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(IconBoxSpec.tile.icon),
             )
         }
         Spacer(Modifier.width(Spacing.m))

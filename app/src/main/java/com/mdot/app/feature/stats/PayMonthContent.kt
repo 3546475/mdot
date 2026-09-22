@@ -22,12 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.HorizontalDivider
@@ -58,6 +53,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.AdaptiveSpecs
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.AnimatedNumberText
@@ -103,7 +99,7 @@ fun PayMonthContent(vm: PayMonthViewModel = hiltViewModel()) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = vm::prevMonth) {
-                    Icon(Icons.Filled.KeyboardArrowLeft, stringResource(R.string.paymonth_prev_cd))
+                    Icon(painterResource(R.drawable.ic_ms_keyboard_arrow_left), stringResource(R.string.paymonth_prev_cd))
                 }
                 Text(
                     stringResource(R.string.paymonth_month, month.year, month.monthValue),
@@ -113,7 +109,7 @@ fun PayMonthContent(vm: PayMonthViewModel = hiltViewModel()) {
                     modifier = Modifier.widthIn(min = 120.dp),
                 )
                 IconButton(onClick = vm::nextMonth) {
-                    Icon(Icons.Filled.KeyboardArrowRight, stringResource(R.string.paymonth_next_cd))
+                    Icon(painterResource(R.drawable.ic_ms_keyboard_arrow_right), stringResource(R.string.paymonth_next_cd))
                 }
             }
             Spacer(Modifier.height(Spacing.s))
@@ -281,7 +277,7 @@ private fun PayGroupCard(
                 )
                 Spacer(Modifier.width(Spacing.s))
                 Icon(
-                    if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                    painterResource(if (expanded) R.drawable.ic_ms_expand_less else R.drawable.ic_ms_expand_more),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -293,7 +289,7 @@ private fun PayGroupCard(
                         Modifier
                             .fillMaxWidth()
                             .clickable { onEdit(item) }
-                            .padding(vertical = 10.dp),
+                            .padding(vertical = Spacing.m),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -309,10 +305,10 @@ private fun PayGroupCard(
                         )
                         Spacer(Modifier.width(Spacing.xs))
                         Icon(
-                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            painterResource(R.drawable.ic_ms_keyboard_arrow_right),
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(IconSpec.inline),
                         )
                     }
                 }
@@ -422,7 +418,7 @@ private fun AddItemDialog(
                 Spacer(Modifier.height(Spacing.s))
                 // 预选项快选：点选填入名称（金额仍需自行填写）
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s),
                     verticalArrangement = Arrangement.spacedBy((-2).dp),
                 ) {
                     presets.forEach { preset ->

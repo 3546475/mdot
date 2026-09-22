@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.ChartSpec
 
 /**
  * GitHub 贡献图风格热点图（参照用户提供的竞品截图）：
@@ -93,7 +95,7 @@ fun WorkHeatmap(
     ChartHintBox(hint = hint.value, columns = cols, modifier = modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth()) {
             // 月份行：与格子列同宽；文字超出列宽时可见溢出（参考图月份比格子宽）
-            Row(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+            Row(Modifier.fillMaxWidth().padding(bottom = Spacing.xs)) {
                 monthLabels.forEach { label ->
                     Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                         Text(
@@ -119,7 +121,7 @@ fun WorkHeatmap(
                         (0 until 7).forEach { r ->
                             val date = grid.getOrNull(c * 7 + r)
                             val level = date?.let { heatLevel(values[it] ?: 0f, maxV) } ?: -1
-                            val shape = RoundedCornerShape(3.dp)
+                            val shape = RoundedCornerShape(ChartSpec.cellRadius)
                             val isSelected = date != null && date == selectedDate
                             Box(
                                 Modifier

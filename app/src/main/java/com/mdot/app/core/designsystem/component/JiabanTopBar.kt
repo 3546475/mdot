@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mdot.app.core.designsystem.Radius
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 
 /**
@@ -64,7 +65,7 @@ fun JiabanTopBar(
                         Modifier
                             .clip(RoundedCornerShape(Radius.pill))
                             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                            .padding(4.dp),
+                            .padding(Spacing.xs),
                     ) {
                         Text(
                             title,
@@ -75,7 +76,7 @@ fun JiabanTopBar(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(Radius.pill))
                                 .background(MaterialTheme.colorScheme.primaryContainer)
-                                .padding(horizontal = Spacing.l, vertical = 8.dp),
+                                .padding(horizontal = Spacing.l, vertical = Spacing.s),
                         )
                     }
                 }
@@ -88,7 +89,6 @@ fun JiabanTopBar(
                     Icon(
                         painterResource(R.drawable.ic_ms_arrow_back),
                         contentDescription = stringResource(R.string.ds_topbar_back_cd),
-                        modifier = Modifier.size(24.dp),
                     )
                 }
                 leading != null -> leading()

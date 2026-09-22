@@ -265,7 +265,7 @@ private fun SystemCard(
                         painterResource(R.drawable.ic_ms_check),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(end = 6.dp),
+                        modifier = Modifier.padding(end = Spacing.s),
                     )
                 }
                 when {

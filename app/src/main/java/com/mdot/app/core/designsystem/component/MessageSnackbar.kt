@@ -32,6 +32,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.Radius
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 
 /**
@@ -122,7 +123,7 @@ private fun MessageSnackbarCapsule(data: SnackbarData, isError: Boolean) {
                 painterResource(if (isError) R.drawable.ic_ms_warning else R.drawable.ic_ms_check_circle),
                 contentDescription = null,
                 tint = accent,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(IconSpec.dense),
             )
             Spacer(Modifier.width(Spacing.s))
             Text(

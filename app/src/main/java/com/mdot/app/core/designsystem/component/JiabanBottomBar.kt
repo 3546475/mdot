@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.mdot.app.R
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.BottomBarSpec
 import com.mdot.app.core.designsystem.Radius
 import kotlin.math.roundToInt
@@ -64,7 +65,6 @@ object SlotRegistry {
         "home" to SlotSpec("home", R.string.ds_slot_home, "home", R.drawable.ic_ms_home),
         "calendar" to SlotSpec("calendar", R.string.ds_slot_calendar, "calendar", R.drawable.ic_ms_calendar_month),
         "stats" to SlotSpec("stats", R.string.ds_slot_stats, "stats", R.drawable.ic_ms_bar_chart),
-        "payroll" to SlotSpec("payroll", R.string.ds_slot_payroll, "payroll", R.drawable.ic_ms_paid),
         "export" to SlotSpec("export", R.string.ds_slot_export, "export", R.drawable.ic_ms_file_download),
         "sync" to SlotSpec("sync", R.string.ds_slot_sync, "sync", R.drawable.ic_ms_cloud_sync),
         "settings" to SlotSpec("settings", R.string.ds_slot_settings, "settings", R.drawable.ic_ms_settings),
@@ -351,7 +351,7 @@ private fun SlotBody(
             contentDescription = stringResource(slot.labelRes),
             tint = tint,
             modifier = Modifier
-                .size(22.dp)
+                .size(IconSpec.bar)
                 .graphicsLayer {
                     scaleX = iconScale
                     scaleY = iconScale

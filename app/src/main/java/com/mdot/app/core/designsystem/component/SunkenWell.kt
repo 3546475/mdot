@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.Radius
 
 /**
@@ -35,7 +36,8 @@ import com.mdot.app.core.designsystem.Radius
  *
  * 用法（记加班弹窗的时长选择区）：
  * ```
- * SunkenWell(Modifier.fillMaxWidth().height(156.dp)) {
+ * SunkenWell(Modifier.fillMaxWidth().height(164.dp)) {   // 内容区 = 164 - Spacing.s×2 = 148（3 行 44 格 + 2×Spacing.s 行距）
+ * // ⚠️ 改 innerPadding 或 DurationGrid 行距时必须同步这个高度，否则第 3 行会被裁掉
  *     if (分钟) MinutesWheels(...) else DurationGrid(...)
  * }
  * ```
@@ -45,7 +47,7 @@ import com.mdot.app.core.designsystem.Radius
 fun SunkenWell(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(Radius.textField),
-    innerPadding: PaddingValues = PaddingValues(6.dp),
+    innerPadding: PaddingValues = PaddingValues(Spacing.s),
     content: @Composable BoxScope.() -> Unit,
 ) {
     Box(modifier.clip(shape)) {

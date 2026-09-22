@@ -1,8 +1,5 @@
 package com.mdot.app.core.designsystem
 
-import androidx.compose.animation.core.AnimationSpec
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -120,21 +117,172 @@ fun onColorFor(background: Color): Color =
     if (background.luminance() > 0.5f) Color(0xFF1A1B21) else Color.White
 
 /**
- * M3 Expressive 弹簧动效：按下干脆利落（无过冲），松手带轻微弹性回弹。
- * 用于 pressScale、底栏指示胶囊滑动等位置/缩放动画。
+ * 「选项药丸 + 列表卡」规格（底栏配置页「More」区块；形态移植自 **Bencho 的 Assignees 组件**，v0.7.2 之后、未发版；
+ * 规范见 docs/03 §13，施工坑见 docs/11 053）。
+ *
+ * 形态：一颗实底药丸 —— **药丸本身就是读数**：左侧叠放「已开启项」的圆形图标，全关时退化为一个状态词，
+ * 右侧箭头；点开在其下方**就地撑出**一张实底列表卡，每行「圆图标 + 文案 + 开关」，行依次错峰入场。
+ *
+ * 药丸为什么是读数：Bencho 原文——没有计数徽标、也没有「已选 3 项」的副标题，**图标本身就说清了「哪些开着」**；
+ * 一个数字只告诉你数量，一叠图标才告诉你选对没有。全关时写状态词而不是动词（「未开启」而非「设置」）——
+ * 药丸是**读数**，没内容时就该报告「没有内容」。
+ *
+ * **令牌映射**（Bencho 的 CSS 自定义属性 → 本项目已有色槽/令牌，**不新增全局变量**，移植的核心要求）：
+ *
+ * | Bencho | 本项目 |
+ * |---|---|
+ * | `--card`（区块底色） | `colorScheme.surfaceContainer`（分区卡 [com.mdot.app.core.designsystem.component.SectionCard] 的底色） |
+ * | `--fill-slab`（药丸与列表卡的实底） | `colorScheme.surfaceContainerHigh`（比卡片底色深/亮一档，自成一块「板」） |
+ * | `--fill-on` / `--ink` | `colorScheme.onSurface`（板上的墨色） |
+ * | `--ink-rgb` / `--fill-on-rgb` | **不需要**：Bencho 用三个裸数字拼 `rgba()` 是因为 CSS 拿不到 alpha，Compose 里 `Color.copy(alpha = …)` 直接得到同一件事 |
+ * | `--pane-edge`（描边） | `colorScheme.outlineVariant`——本移植**不画**：Bencho 的描边只在 Stroke 开关打开时出现，本页没有这个开关（原文：无投影、无描边，药丸与卡片已经靠「板比底亮一档」自己分开了） |
+ * | `--font-ui` | 主题默认字体（`MaterialTheme.typography.*`，不引入第二套字族） |
+ *
+ * **动效映射**：Bencho 里的裸弹簧系数（stiffness 460/600/660、damping 21/23/34）与缓动曲线一律换成
+ * `MaterialTheme.motionScheme` 三档（[com.mdot.app.core.designsystem.component.OptionPillCard] 内）。
+ * 这是本仓库硬规则（不许新写硬编码 tween），且换来一件 Bencho 要自己写分支才有的东西：
+ * 系统的「动画时长缩放」（开发者选项）由 Compose 的 MotionDurationScale 自动接管，等价于
+ * Bencho 的 `@media (prefers-reduced-motion: reduce)`，无需自己判断。
  */
-object Springs {
-    /** 干脆利落：按下/常态过渡 */
-    val snappy: AnimationSpec<Float> = spring(
-        dampingRatio = Spring.DampingRatioNoBouncy,
-        stiffness = Spring.StiffnessMedium,
-    )
+object OptionPillSpec {
+    /**
+     * 药丸高。Bencho 原值 44px —— 低于 Android 无障碍最小触达 48dp，
+     * 故直接对齐页面级按钮高 [ButtonSpec.heightL]，与本页其它主操作同一量纲。
+     */
+    val pillHeight = ButtonSpec.heightL
 
-    /** 带弹性：松手回弹、指示条滑动 */
-    val bouncy: AnimationSpec<Float> = spring(
-        dampingRatio = 0.55f,
-        stiffness = Spring.StiffnessMedium,
-    )
+    /**
+     * 药丸左内边距 —— **比右边小**。Bencho 原文：左边常常是一枚实心圆，
+     * 16 的空白挨着圆比挨着字要空得多（`padding: 0 12px 0 8px`）。
+     */
+    val pillPaddingStart = Spacing.s
+
+    /** 药丸右内边距：挨着文字/箭头，需要多一点空气 */
+    val pillPaddingEnd = Spacing.m
+
+    /** 药丸内元素间距：读数 → 标题 → 箭头（Bencho `gap: 10px`） */
+    val pillGap = 10.dp
+
+    /** 读数圆的直径（Bencho 的 `FACE = 28`） */
+    val readoutSize = 28.dp
+
+    /** 读数圆里的图标尺寸（比例对齐 [com.mdot.app.core.designsystem.component.SettingRow] 的 34 → 20） */
+    val readoutIconSize = 16.dp
+
+    /**
+     * 后一个圆压住前一个的量。**叠压而不是排成一行**——
+     * 一排互不重叠的圆会把药丸撑到近半屏；叠起来才是「一叠东西」而不是「一列东西」。
+     * 后加的人排在最右、**压在别人身上**：Bencho 用反向 z 序（第一个在最上层），
+     * 这样栈从左往右读、与列表同向；反过来画的话，最后来的会盖住之前所有人，
+     * 加第四个人看起来像丢了前三个人。
+     *
+     * ⚠️ **本项目取 8dp 而非 Bencho 的 10px，这是有意的换算，不是抄错**：
+     * Bencho 标称叠压 10/28（36%），但它的环是**向外**画的 `box-shadow: 0 0 0 2px`，
+     * 所以**实际遮挡 10+2 = 12px（43%）**。照片被盖掉 43% 仍然是一张人脸；
+     * 但本项目的读数是**字形**——实测叠压 10dp 时「固定长度」那把尺子被吃掉左半截、认不出是什么。
+     * 故把**实际**遮挡对齐回 Bencho 的标称值：叠压 8 + 环 2 = 10px（36%），
+     * 叠起来的观感与 Bencho 同量级，字形只损失左缘 25%。
+     */
+    val readoutLap = 8.dp
+
+    /**
+     * 叠压圆之间的描边宽。**颜色取「它背后是什么」**（即药丸/列表卡自己的实底），
+     * 而不是写死白或黑——这圈描边是「两个圆之间的缝」，缝里应该是什么东西就是什么东西，
+     * 否则深色模式下叠起来的圆会长出一圈光晕（Bencho 2px）。
+     */
+    val readoutRing = 2.dp
+
+    /**
+     * 读数全关时那句占位文字的不透明度。
+     * 不用满墨色：它是**占位**（标题暂时借住在读数位），不是状态；图标一进来它就退场，
+     * 降一档才不跟旁边真正的内容抢。
+     */
+    const val emptyTextAlpha = 0.7f
+
+    /**
+     * 箭头尺寸。Bencho 是 lucide 描边图标（24 viewBox、内边距大）画在 16px；
+     * Material Symbols 是实心字形、几乎不留内边距，同光学尺寸要大一档。
+     */
+    val chevronSize = 18.dp
+
+    /** 箭头常态不透明度 */
+    const val chevronAlpha = 0.4f
+
+    /**
+     * 按压/展开时箭头的不透明度 —— **箭头就是按压态**。
+     * Bencho 原文：投影去掉后药丸只剩它能回应手指，而在「整体就是形状」的控件上再塞一块填充
+     * 等于凭空多出一个形状；于是改用同一句话说给箭头听（同页配色卡刷新按钮的同一取舍）。
+     */
+    const val chevronActiveAlpha = 0.75f
+
+    /**
+     * 药丸与列表卡之间的竖向间距。
+     * Bencho 原值 10px（药丸 44 → 卡片 top 54）；本项目取 [Spacing.m]=12dp ——
+     * **因为两块「板」同色**（见 [slabColor]），靠 8dp 分不干净、会看成一块。
+     */
+    val pillCardGap = Spacing.m
+
+    /**
+     * 列表卡内边距。Bencho 用 6px 是为了让行圆角 = 卡片圆角 − 6 = 16；
+     * 本项目卡片圆角 [Radius.card] = 24、内边距 [Spacing.s] = 8 → 行圆角同样是 [Radius.button] = 16。
+     * **同心圆角**：一个东西装在另一个里面时，它的圆角 = 外面的 − 两者间距（否则内框看着比外框方）。
+     */
+    val listPadding = Spacing.s
+
+    /**
+     * 药丸与列表卡的圆角 —— **同一个值**：Bencho 里两者是同一块「板」的两种形态，不拆成两个数。
+     * 24dp 落在 48dp 高的药丸上约等于胶囊（半径 ≥ 半高），与 Bencho 的 22/44 同一观感。
+     */
+    val slabRadius = Radius.card
+
+    /** 列表行圆角（同心，推导见 [listPadding]） */
+    val rowRadius = Radius.button
+
+    /** 行高（Bencho `.pik-row` height 48） */
+    val rowHeight = 48.dp
+
+    /** 行左右内边距（Bencho `padding: 0 8px`） */
+    val rowPadding = Spacing.s
+
+    /**
+     * 行按下时的墨色填充不透明度。
+     * Bencho 分了两档（hover 0.05 / focus-visible 0.07）；Android 没有 hover，按下就等价于它的焦点态，取后者。
+     */
+    const val rowPressedAlpha = 0.07f
+
+    /**
+     * 行入场的错峰间隔（Bencho 40ms）。Bencho 原文：四行**一起**出现是一个面板，
+     * 四行**依次**到位才是有人把一张名单递给你；要能感觉到，但不该让人等。
+     */
+    const val rowStaggerMillis = 40L
+
+    /** 行入场的纵向位移：从上方 -8 → 0（Bencho `initial={{ y: -8 }}`） */
+    val rowEnterOffset = 8.dp
+
+    /**
+     * 读数圆进场/退场的旋转角（Bencho -22° 进 / +14° 出）。
+     * Bencho 原文：圆在缩放的同时**转一点**，才像一件东西被放下；只缩放，圆还是圆。
+     */
+    const val readoutEnterRotation = -22f
+    const val readoutExitRotation = 14f
+
+    /** 读数圆进场起始缩放（Bencho `scale: 0.2`） */
+    const val readoutEnterScale = 0.2f
+
+    /** 读数圆进场起始纵向偏移（Bencho `y: ty - 10` → 从上方 10 落下） */
+    val readoutDropOffset = 10.dp
+
+    /** 读数圆退场时上浮的距离（Bencho exit `y: ty - 6`）——**比进场小**：撤走比放上要短促 */
+    val readoutExitRise = 6.dp
+
+    /** 列表卡从药丸底下展开时的起始纵向偏移（Bencho `y: -10`） */
+    val cardEnterOffset = 10.dp
+
+    /** 列表卡退场时的纵向偏移（Bencho `y: -8`）。
+     *  另：Bencho 用 `transform-origin: 0 0` 配非等比缩放（scaleX .86 / scaleY .72）做「从左上角展开」；
+     *  Compose 的 [androidx.compose.animation.scaleIn] 只能等比，且「就地撑开」已经用高度增长
+     *  表达了同一件事，故本移植只用高度增长 + 淡入，不加等比缩放（加了反而像「弹出一块」。） */
+    val cardExitOffset = 8.dp
 }
 
 /** 底栏规格 */
@@ -177,6 +325,17 @@ object BottomBarSpec {
 }
 
 /**
+ * 图表小格 / 小柱的圆角（月柱状的小柱、热力图的小格）。
+ *
+ * 3dp 是刻意的：这些格子只有 8–10dp 宽，用 `Radius.xs`(8dp) 会接近半圆、看着像胶囊而不是「格子」；
+ * 3dp 才读得出方块轮廓。2026-09-22 之前这两处各写一个 `RoundedCornerShape(3.dp)` 魔法值，现收进本对象。
+ */
+object ChartSpec {
+    /** 柱/格的圆角（月柱状小柱、热力图小格） */
+    val cellRadius = 3.dp
+}
+
+/**
  * 按钮规格（按钮规范化第一批，docs/03 §按钮）：feature 层禁止手写按钮高度/内边距，
  * 统一从 [ButtonSpec] 取值（组件 [com.mdot.app.core.designsystem.component.JiabanButton]）。
  *
@@ -201,6 +360,62 @@ object ButtonSpec {
 
     /** 图标按钮的图标尺寸（热区另由 IconButton 默认 48dp 保证） */
     val iconSize = 20.dp
+}
+
+/**
+ * 图标尺寸档位（**按角色记，别按数字记**）。
+ *
+ * 角色 → 档位的完整表、盒+图标配对、跨页共用表、新增图标 SOP 全在 **docs/03 §3.4**；
+ * 代码里写**裸数字**（如 `.size(17.dp)`）会被 `IconContractTest` 拦下，改用这里的令牌。
+ *
+ * ⚠️ **改档位要同时改三处**：① 本对象 ② docs/03 §3.4 的角色表 ③ `IconContractTest.允许的裸数字`。
+ * ⚠️ **装饰档不进本对象**：致谢卡跑马灯（11/15/21）、首页收入卡（28）、弹层拖拽箭头（30）
+ * 是一次性的装饰尺寸，抽成令牌只会多一层间接——它们由测试的「装饰档」集合显式豁免（勿“统一”）。
+ */
+object IconSpec {
+    /** 行内：正文旁的小图标（首页/统计/明细的行内日历、我的页相机、「新建」胶囊） */
+    val inline = 16.dp
+
+    /** 紧凑行：消息条、弹层加减号、右侧辅助图标 */
+    val dense = 18.dp
+
+    /**
+     * tonal 盒内：`SettingRow` / `TappableTonalRow` / `BigAmountRow` / `RowIconAction` / `EquationCard`
+     * 里的图标（盒与图标是一对，配对表见 docs/03 §3.4）。
+     */
+    val boxed = 20.dp
+
+    /** 底栏槽位（`JiabanBottomBar`） */
+    val bar = 22.dp
+
+    /** hero：导出页空态大图标（配固定品牌底，见 docs/03 §3.4「允许的例外」） */
+    val hero = 52.dp
+}
+
+/** 盒 + 图标 成对（[box] 是容器圆/方尺寸，[icon] 是里面的图标） */
+data class IconBox(val box: androidx.compose.ui.unit.Dp, val icon: androidx.compose.ui.unit.Dp)
+
+/**
+ * 「盒 + 图标」配对表（docs/03 §3.4）。**盒与图标是一对**：只改盒不改图标会出现
+ * “图标在盒里显空/显挤”，所以成对取用、别两处各写一个数。
+ */
+object IconBoxSpec {
+    /**
+     * 通用图标方块：**36dp 方底（`Radius.small`）+ `IconSpec.boxed`(20dp)**。
+     *
+     * 2026-09-22 合并：原先三种几乎一样的盒（`SettingRow` 34 / 工地各卡 36 / `RowIconAction` 40）
+     * 视觉上分不出差别，现统一为 36；且**盒与图标同源**（图标尺寸引用 `IconSpec.boxed`，不再各写一个数）。
+     *
+     * ⚠️ **只管几何、不管底色**：底色由调用方给 —— 普通行用 `secondaryContainer`，
+     * primary 卡上的图标块用 `surface`（两者几何相同，故同一个令牌，见 docs/03 §3.4）。
+     */
+    val tile = IconBox(box = 36.dp, icon = IconSpec.boxed)
+
+    /** 空态大图标：72dp 圆底 + 32dp 图标（[com.mdot.app.core.designsystem.component.EmptyState]） */
+    val hero = IconBox(box = 72.dp, icon = 32.dp)
+
+    /** 首页入口卡：42dp 圆角方底 + 22dp 图标（`HomeScreen` 的 `EntryCard`） */
+    val entry = IconBox(box = 42.dp, icon = 22.dp)
 }
 
 /**

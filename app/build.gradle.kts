@@ -32,8 +32,8 @@ android {
         applicationId = "com.mdot.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 52
-        versionName = "0.7.2"
+        versionCode = 53
+        versionName = "0.7.3"
     }
 
     signingConfigs {
@@ -111,7 +111,6 @@ dependencies {
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
-    implementation(libs.compose.icons.extended)
     debugImplementation(libs.compose.ui.tooling)
 
     implementation(libs.navigation.compose)

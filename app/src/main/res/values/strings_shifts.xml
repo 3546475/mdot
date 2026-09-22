@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="shifts_drag_hint">拖六点手柄排序；开关控制显示/隐藏；点名称改名；删班次不影响已有记录。</string>
+    <string name="shifts_drag_hint">长按拖动排序 · 点名称改名 · 删班次不影响已有记录</string>
     <string name="shifts_add">新建</string>
     <string name="shifts_empty">还没有班次，点右上角「新建」添加</string>
-    <string name="shifts_drag_reorder">拖动排序</string>
     <string name="shifts_rest_badge">休息</string>
     <string name="shifts_builtin">预置</string>
     <string name="shifts_custom">自定义</string>

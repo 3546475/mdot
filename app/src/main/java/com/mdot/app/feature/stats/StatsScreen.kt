@@ -66,6 +66,7 @@ import com.mdot.app.R
 import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.Radius
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.SiteMoneyColors
 import com.mdot.app.core.designsystem.component.AnimatedMoneyText
@@ -539,7 +540,7 @@ private fun StatsContent(
                 Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s),
             ) {
                 StatsDimension.entries.forEach { dim ->
                     FilterChip(
@@ -551,7 +552,7 @@ private fun StatsContent(
             }
             if (state.dimension == StatsDimension.CUSTOM) {
                 Spacer(Modifier.height(Spacing.s))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                     OutlinedButton(onClick = { picking = "from" }) {
                         Text(
                             stringResource(
@@ -581,13 +582,13 @@ private fun StatsContent(
                 modifier = Modifier
                     .clip(RoundedCornerShape(Radius.pill))
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                    .padding(horizontal = Spacing.m, vertical = Spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     painterResource(R.drawable.ic_ms_calendar_month), null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier.size(IconSpec.inline),
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
@@ -880,7 +881,7 @@ private fun PieCard(state: StatsUiState, pieMode: PieMode, onPieMode: (PieMode) 
     SectionCard {
         Column {
             if (!isSite) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                     PieMode.entries.forEach { mode ->
                         FilterChip(
                             selected = pieMode == mode,
@@ -921,7 +922,7 @@ private fun PieCard(state: StatsUiState, pieMode: PieMode, onPieMode: (PieMode) 
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 2.dp),
+                            .padding(vertical = Spacing.xs),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Box(

@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- 工地记工（feature/settings 切换页与制度卡 / v0.6.1 Phase 1，12 文档） -->
-    <string name="site_system_desc">记工天、工时、借支、结算，工地对账一本明白账</string>
-    <string name="site_switch_confirm">工天按 天/半天 记，加班按小时另算；工地数据独立保存，切换制度不丢记录。</string>
-    <string name="site_onboarding_desc">记工天（全天/半天）、加班按小时；项目制台账，借支结算分开记。</string>
+    <string name="site_system_desc">按项目记工天、加班、借支和结算</string>
+    <string name="site_onboarding_desc">记工天（全天/半天）、加班按小时，借支结算分开记</string>
 
     <!-- 记录/首页制度化文案（when 补齐） -->
     <string name="site_record_hero">记 工</string>
@@ -14,19 +13,16 @@
     <string name="site_projects_archived">已归档</string>
     <string name="site_projects_restore">恢复</string>
     <string name="site_project_purge_title">彻底删除项目？</string>
-    <string name="site_project_purge_body">将永久删除「%1$s」及其全部出勤、包工、借支与结算数据，不可恢复。</string>
+    <string name="site_project_purge_body">永久删除「%1$s」及其全部出勤、包工、借支与结算数据，不可恢复。</string>
     <string name="site_project_purge_confirm">彻底删除</string>
-    <string name="site_projects_empty">还没有项目，点右上角「创建新项目」开始记工</string>
-    <string name="site_project_drag_hint">按住六点手柄拖动排序</string>
-    <string name="site_project_edit">修改</string>
+    <string name="site_projects_empty">还没有项目，点右上角「创建新项目」</string>
+    <string name="site_project_drag_hint">长按拖动排序</string>
     <string name="site_project_delete">删除</string>
-    <string name="site_project_delete_title">删除这个项目？</string>
-    <string name="site_project_delete_body">有记录的项目将转为「归档」（数据保留，可在项目管理页恢复）；空项目直接删除。</string>
     <string name="site_project_current_badge">当前</string>
-    <string name="site_project_summary_format">上班 %1$d 小时 = 1 个工 = %2$s 元 · 加班 %3$d 小时 = 1 工</string>
+    <string name="site_project_summary_format">%1$dh = 1 工 · ¥%2$s/工 · 加班 %3$dh = 1 工</string>
     <string name="site_settlement_title">结算与借支</string>
     <string name="site_settlement_loading">加载中…</string>
-    <string name="site_settlement_empty">切换到工地记工后，这里显示当前项目的借支与结算</string>
+    <string name="site_settlement_empty">切到工地记工后，这里显示借支与结算</string>
     <string name="site_settlement_pending_title">本期待结 · %1$s</string>
     <string name="site_settlement_works">出勤与加班</string>
     <string name="site_settlement_works_value">%1$s 工 · 加班 %2$s</string>
@@ -40,7 +36,7 @@
     <string name="site_settlement_partial_deduct">已部分结算</string>
     <string name="site_settlement_partial_paid">本次实付</string>
     <string name="site_settlement_settle_all">结清</string>
-    <string name="site_settlement_settle_all_hint">把当前全部未结算记录锁定归档，一次性结清剩余待结余额。</string>
+    <string name="site_settlement_settle_all_hint">未结算记录全部锁定归档，一次结清待结余额。</string>
     <string name="site_settlement_settle_all_action">结清全部</string>
     <string name="site_settlement_advances">借支流水（未结算）</string>
     <string name="site_settlement_pieces">包工流水（未结算）</string>
@@ -49,10 +45,10 @@
     <string name="site_settlement_row_detail">工资 %1$s · 借支 %2$s · 应结 %3$s</string>
     <string name="site_settlement_revert">撤销</string>
     <string name="site_settlement_revert_title">撤销这张结算单？</string>
-    <string name="site_settlement_revert_body">撤销后该区间记录解锁，可继续修改；历史金额口径不再保留。</string>
+    <string name="site_settlement_revert_body">撤销后区间解锁可继续改；历史金额不再保留。</string>
     <string name="site_settlement_preview_title">结算单预览</string>
     <string name="site_settlement_preview_period">结算周期：%1$d月%2$d日 – %3$d月%4$d日</string>
-    <string name="site_settlement_lock_hint">确认后区间内记录锁定，如需修改请先撤销结算单。</string>
+    <string name="site_settlement_lock_hint">确认后区间记录锁定；要改先撤销结算单。</string>
     <string name="site_settlement_confirm">确认结算</string>
     <string name="site_delete">删除</string>
     <string name="site_delete_confirm">确认删除</string>
@@ -77,8 +73,7 @@
     <string name="site_project_create">创建新项目</string>
     <string name="site_project_name_label">项目名称</string>
     <string name="site_project_archive">删除项目</string>
-    <string name="site_project_archive_title">删除这个项目？</string>
-    <string name="site_project_archive_body">有记录的项目将转为「归档」（数据保留，不再出现在列表）；空项目直接删除。</string>
+    <string name="site_project_archive_body">有记录的项目转为「归档」（数据保留，不再出现在列表）；空项目直接删除。</string>
     <string name="site_ot_by_day">按加班工</string>
     <string name="site_ot_by_hour">按小时算</string>
     <string name="site_save">保存</string>
@@ -100,7 +95,7 @@
     <string name="site_row_date">日期</string>
     <string name="site_today">今天</string>
     <string name="site_multi_select">可多选</string>
-    <string name="site_multi_select_hint">勾选其他日期，保存时逐日批量记工</string>
+    <string name="site_multi_select_hint">勾选其他日期可批量记工</string>
     <string name="site_sub_day">点工</string>
     <string name="site_planned">规划中</string>
     <string name="site_work">上班</string>
@@ -116,9 +111,8 @@
     <string name="site_pay_summary_work">上班 %1$s元/个工</string>
     <string name="site_pay_summary_ot">加班 %1$d小时/个工</string>
     <string name="site_note">备注</string>
-    <string name="site_note_hint">请输入，100字以内</string>
+    <string name="site_note_hint">100 字以内</string>
     <string name="site_photos">照片</string>
-    <string name="site_photo_hint">律师提醒：记工时最好能拍摄工作照片</string>
     <string name="site_add_photo">添加图片</string>
     <string name="site_photo_evidence">留证</string>
     <string name="site_advance_amount_label">本次借支金额</string>
@@ -161,9 +155,9 @@
     <string name="site_std_eq_ot_day">1 个加班工 =</string>
     <string name="site_std_eq_ot_hours">小时</string>
     <string name="site_std_eq_ot_hour">1 小时 =</string>
-    <string name="site_project_standard_hint">改动只影响新记录，历史记录金额不重算。</string>
-    <string name="site_project_summary_hour_format">上班 %1$s 小时 = 1 个工 = %2$s 元 · 加班 %3$s 元/小时</string>
-    <string name="site_project_summary_day_format">上班 %1$s 小时 = 1 个工 = %2$s 元 · 加班 %3$s 小时 = 1 个工</string>
+    <string name="site_project_standard_hint">只影响新记录，历史金额不重算。</string>
+    <string name="site_project_summary_hour_format">%1$sh = 1 工 · ¥%2$s/工 · 加班 ¥%3$s/h</string>
+    <string name="site_project_summary_day_format">%1$sh = 1 工 · ¥%2$s/工 · 加班 %3$sh = 1 工</string>
     <!-- 显示单位偏好（F-S11） -->
     <string name="site_cycle_label_hour">本月工时</string>
 </resources>

@@ -225,7 +225,7 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Spacer(Modifier.height(16.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                             MultField(stringResource(R.string.onboarding_tier_weekday), hourlyWeekday) { hourlyWeekday = it.filter { c -> c.isDigit() || c == '.' } }
                             MultField(stringResource(R.string.onboarding_tier_weekend), hourlyWeekend) { hourlyWeekend = it.filter { c -> c.isDigit() || c == '.' } }
                             MultField(stringResource(R.string.onboarding_tier_statutory), hourlyStatutory) { hourlyStatutory = it.filter { c -> c.isDigit() || c == '.' } }
@@ -253,7 +253,7 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
                         Spacer(Modifier.height(16.dp))
                         Text(stringResource(R.string.onboarding_multiplier_title), style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                             MultField(stringResource(R.string.onboarding_tier_overtime), weekdayText) { weekdayText = it.filter { c -> c.isDigit() || c == '.' } }
                             MultField(stringResource(R.string.onboarding_tier_statutory), statutoryText) { statutoryText = it.filter { c -> c.isDigit() || c == '.' } }
                         }
@@ -280,7 +280,7 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
                         Spacer(Modifier.height(16.dp))
                         Text(stringResource(R.string.onboarding_multiplier_title), style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                             MultField(stringResource(R.string.onboarding_tier_weekday), weekdayText) { weekdayText = it.filter { c -> c.isDigit() || c == '.' } }
                             MultField(stringResource(R.string.onboarding_tier_weekend), weekendText) { weekendText = it.filter { c -> c.isDigit() || c == '.' } }
                             MultField(stringResource(R.string.onboarding_tier_holiday), statutoryText) { statutoryText = it.filter { c -> c.isDigit() || c == '.' } }
@@ -307,7 +307,7 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
                         Spacer(Modifier.height(16.dp))
                         Text(stringResource(R.string.onboarding_multiplier_title), style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                             MultField(stringResource(R.string.onboarding_tier_weekday), weekdayText) { weekdayText = it.filter { c -> c.isDigit() || c == '.' } }
                             MultField(stringResource(R.string.onboarding_tier_weekend), weekendText) { weekendText = it.filter { c -> c.isDigit() || c == '.' } }
                             MultField(stringResource(R.string.onboarding_tier_holiday), statutoryText) { statutoryText = it.filter { c -> c.isDigit() || c == '.' } }
@@ -323,7 +323,7 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
 
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.m),
         ) {
             // 第二屏左侧变「上一步」回改制度；跳过收纳为最右侧文字入口
             if (step > 0) {
@@ -399,7 +399,7 @@ private fun OnboardingSystemCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
     ) {
-        Column(Modifier.padding(20.dp)) {
+        Column(Modifier.padding(Spacing.xl)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     title,

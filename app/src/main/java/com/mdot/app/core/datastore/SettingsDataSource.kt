@@ -160,7 +160,7 @@ class SettingsDataSource @Inject constructor(
         if (value == null) prefs.remove(AVATAR_PATH) else prefs[AVATAR_PATH] = value
     }
 
-    // ---- 底栏仅图标模式（v0.6.21 起**出厂默认关闭**：与「更多选项」其余三项一致，四个开关默认全关）----
+    // ---- 底栏仅图标模式（v0.6.21 起**出厂默认关闭**：与「More」其余三项一致，四个开关默认全关）----
     val bottomBarIconOnlyFlow: Flow<Boolean> = dataStore.data.map { it[BOTTOM_BAR_ICON_ONLY] ?: false }
     suspend fun setBottomBarIconOnly(value: Boolean) =
         dataStore.edit { it[BOTTOM_BAR_ICON_ONLY] = value }

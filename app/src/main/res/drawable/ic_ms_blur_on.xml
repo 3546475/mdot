@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 毛玻璃（底栏毛玻璃开关）：Material Symbols Rounded 风格的 3×3 点阵，中心最大 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M4 5 a1 1 0 1 0 2 0 a1 1 0 1 0 -2 0 Z M18 5 a1 1 0 1 0 2 0 a1 1 0 1 0 -2 0 Z M4 19 a1 1 0 1 0 2 0 a1 1 0 1 0 -2 0 Z M18 19 a1 1 0 1 0 2 0 a1 1 0 1 0 -2 0 Z M10.4 5 a1.6 1.6 0 1 0 3.2 0 a1.6 1.6 0 1 0 -3.2 0 Z M3.4 12 a1.6 1.6 0 1 0 3.2 0 a1.6 1.6 0 1 0 -3.2 0 Z M17.4 12 a1.6 1.6 0 1 0 3.2 0 a1.6 1.6 0 1 0 -3.2 0 Z M10.4 19 a1.6 1.6 0 1 0 3.2 0 a1.6 1.6 0 1 0 -3.2 0 Z M9.2 12 a2.8 2.8 0 1 0 5.6 0 a2.8 2.8 0 1 0 -5.6 0 Z" android:fillColor="#FF000000" android:fillType="nonZero" />
+</vector>

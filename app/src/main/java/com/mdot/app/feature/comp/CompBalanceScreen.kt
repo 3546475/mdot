@@ -206,7 +206,7 @@ fun CompBalancePane(
         SectionCard {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
                 Text(stringResource(R.string.comp_adjust_title), style = MaterialTheme.typography.titleSmall)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                     FilterChip(
                         selected = add,
                         onClick = { add = true },
@@ -269,7 +269,7 @@ fun CompBalancePane(
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp),
+                                .padding(vertical = Spacing.xs),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(Modifier.weight(1f)) {

@@ -37,6 +37,7 @@ import androidx.lifecycle.viewModelScope
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.SiteMoneyColors
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.designsystem.component.AnimatedMoneyText
@@ -235,13 +236,13 @@ fun DetailPane(
                     modifier = Modifier
                         .clip(RoundedCornerShape(Radius.pill))
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                        .padding(horizontal = Spacing.m, vertical = Spacing.xs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         painterResource(R.drawable.ic_ms_calendar_month), null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(14.dp),
+                        modifier = Modifier.size(IconSpec.inline),
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
@@ -414,7 +415,7 @@ internal fun TierChip(tier: RateTier, out: PayrollCalculator.Output, modifier: M
         modifier
             .clip(RoundedCornerShape(Radius.pill))
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+            .padding(horizontal = Spacing.m, vertical = Spacing.xs),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -481,11 +482,11 @@ private fun NormalDetailRow(
                 indication = null,
                 onClick = onOpen,
             )
-            .padding(vertical = 8.dp),
+            .padding(vertical = Spacing.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                 Text(
                     "${TimeUtils.md(r.date)} ${TimeUtils.weekdayCn(r.date)}" +
                         (r.shiftName?.let { " · $it" } ?: if (isOt) " · " + stringResource(R.string.stats_ot) else " · " + stringResource(R.string.stats_leave)),
@@ -499,7 +500,7 @@ private fun NormalDetailRow(
                             Modifier
                                 .clip(RoundedCornerShape(Radius.pill))
                                 .background(MaterialTheme.colorScheme.error.copy(alpha = 0.12f))
-                                .padding(horizontal = 6.dp, vertical = 1.dp),
+                                .padding(horizontal = Spacing.s, vertical = 1.dp),
                         ) {
                             Text(
                                 type.displayName,
@@ -563,7 +564,7 @@ private fun SiteDetailRowItem(row: SiteDetailRow) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = Spacing.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -605,7 +606,7 @@ private fun TierBadge(tier: RateTier) {
         Modifier
             .clip(RoundedCornerShape(Radius.pill))
             .background(tierTint(tier).copy(alpha = 0.12f))
-            .padding(horizontal = 6.dp, vertical = 1.dp),
+            .padding(horizontal = Spacing.s, vertical = 1.dp),
     ) {
         Text(
             tier.displayName,

@@ -9,7 +9,7 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,7 +53,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -63,6 +65,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.Duration
 import com.mdot.app.core.designsystem.Radius
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.InlineConfirmButton
 import com.mdot.app.core.designsystem.component.InlineConfirmStyle
@@ -105,7 +108,7 @@ fun CyclePane(vm: CycleViewModel = hiltViewModel()) {
                         example,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = Spacing.m, vertical = 10.dp),
+                        modifier = Modifier.padding(horizontal = Spacing.m, vertical = Spacing.m),
                     )
                 }
             }
@@ -132,7 +135,7 @@ fun CyclePane(vm: CycleViewModel = hiltViewModel()) {
                 (1..31).chunked(7).forEach { week ->
                     Row(
                         Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.s),
                     ) {
                         week.forEach { day ->
                             DayCell(
@@ -274,6 +277,7 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
     var dragY by remember { mutableFloatStateOf(0f) }
     var dragMoved by remember { mutableStateOf(false) }
     val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
 
     // 数据源变化且未在拖拽中时同步草稿顺序
     LaunchedEffect(shifts) {
@@ -309,14 +313,14 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
                                 indication = LocalIndication.current,
                                 onClick = { showCreate = true },
                             )
-                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                            .padding(horizontal = Spacing.m, vertical = Spacing.s),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
                     ) {
                         Icon(
                             painterResource(R.drawable.ic_ms_add), contentDescription = null,
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(15.dp),
+                            modifier = Modifier.size(IconSpec.inline),
                         )
                         Text(
                             stringResource(R.string.shifts_add),
@@ -328,9 +332,9 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
             }
             Spacer(Modifier.height(Spacing.m))
 
-            // 班次排序卡：六点手柄拖动 + 显示开关 + ⋮ 菜单
+            // 班次排序卡：长按拖动（整行）+ 显示开关 + ⋮ 菜单
             SectionCard {
-                Column(Modifier.padding(vertical = 4.dp)) {
+                Column(Modifier.padding(vertical = Spacing.xs)) {
                     if (draftIds.isEmpty()) {
                         Text(
                             stringResource(R.string.shifts_empty),
@@ -362,93 +366,81 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
                                             scaleX = dragScale
                                             scaleY = dragScale
                                         }
-                                        .zIndex(if (isDragged) 1f else 0f),
+                                        .zIndex(if (isDragged) 1f else 0f)
+                                        // 整行都可以长按拖动（原六点手柄已删，见 docs/03 §14）
+                                        .pointerInput(id) {
+                                            detectDragGesturesAfterLongPress(
+                                                onDragStart = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    dragFrom = currentIndex
+                                                    draggingId = id
+                                                    dragY = 0f
+                                                    dragMoved = false
+                                                },
+                                                onDragEnd = {
+                                                    if (dragFrom >= 0) {
+                                                        val moved = dragMoved
+                                                        dragFrom = -1
+                                                        draggingId = null
+                                                        dragY = 0f
+                                                        dragMoved = false
+                                                        if (moved) vm.reorder(draftIds)
+                                                    }
+                                                },
+                                                onDragCancel = {
+                                                    if (dragFrom >= 0) {
+                                                        val moved = dragMoved
+                                                        dragFrom = -1
+                                                        draggingId = null
+                                                        dragY = 0f
+                                                        dragMoved = false
+                                                        if (moved) vm.reorder(draftIds)
+                                                    }
+                                                },
+                                            ) { change, dragAmount ->
+                                                change.consume()
+                                                dragY += dragAmount.y
+                                                if (cellPx > 0 && dragFrom >= 0) {
+                                                    var swapped = true
+                                                    while (swapped) {
+                                                        swapped = false
+                                                        val f = dragFrom
+                                                        if (dragY > cellPx * 0.5f) {
+                                                            if (f + 1 < currentSize) {
+                                                                draftIds = draftIds.toMutableList()
+                                                                    .apply { add(f + 1, removeAt(f)) }
+                                                                dragFrom = f + 1
+                                                                dragY -= cellPx
+                                                                dragMoved = true
+                                                                swapped = true
+                                                            } else {
+                                                                dragY = cellPx * 0.5f
+                                                            }
+                                                        } else if (dragY < -cellPx * 0.5f) {
+                                                            if (f - 1 >= 0) {
+                                                                draftIds = draftIds.toMutableList()
+                                                                    .apply { add(f - 1, removeAt(f)) }
+                                                                dragFrom = f - 1
+                                                                dragY += cellPx
+                                                                dragMoved = true
+                                                                swapped = true
+                                                            } else {
+                                                                dragY = -cellPx * 0.5f
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        },
                                     contentAlignment = Alignment.CenterStart,
                                 ) {
                                     Row(
                                         Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 4.dp),
+                                            .padding(horizontal = Spacing.xs),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
-                                        // 六点拖动手柄：拖动手势只挂手柄上，不挡页面滚动
-                                        Box(
-                                            Modifier
-                                                .size(width = 28.dp, height = 56.dp)
-                                                .pointerInput(id) {
-                                                    detectVerticalDragGestures(
-                                                        onDragStart = {
-                                                            dragFrom = currentIndex
-                                                            draggingId = id
-                                                            dragY = 0f
-                                                            dragMoved = false
-                                                        },
-                                                        onDragEnd = {
-                                                            if (dragFrom >= 0) {
-                                                                val moved = dragMoved
-                                                                dragFrom = -1
-                                                                draggingId = null
-                                                                dragY = 0f
-                                                                dragMoved = false
-                                                                if (moved) vm.reorder(draftIds)
-                                                            }
-                                                        },
-                                                        onDragCancel = {
-                                                            if (dragFrom >= 0) {
-                                                                val moved = dragMoved
-                                                                dragFrom = -1
-                                                                draggingId = null
-                                                                dragY = 0f
-                                                                dragMoved = false
-                                                                if (moved) vm.reorder(draftIds)
-                                                            }
-                                                        },
-                                                    ) { change, dragAmount ->
-                                                        change.consume()
-                                                        dragY += dragAmount
-                                                        if (cellPx > 0 && dragFrom >= 0) {
-                                                            var swapped = true
-                                                            while (swapped) {
-                                                                swapped = false
-                                                                val f = dragFrom
-                                                                if (dragY > cellPx * 0.5f) {
-                                                                    if (f + 1 < currentSize) {
-                                                                        draftIds = draftIds.toMutableList()
-                                                                            .apply { add(f + 1, removeAt(f)) }
-                                                                        dragFrom = f + 1
-                                                                        dragY -= cellPx
-                                                                        dragMoved = true
-                                                                        swapped = true
-                                                                    } else {
-                                                                        dragY = cellPx * 0.5f
-                                                                    }
-                                                                } else if (dragY < -cellPx * 0.5f) {
-                                                                    if (f - 1 >= 0) {
-                                                                        draftIds = draftIds.toMutableList()
-                                                                            .apply { add(f - 1, removeAt(f)) }
-                                                                        dragFrom = f - 1
-                                                                        dragY += cellPx
-                                                                        dragMoved = true
-                                                                        swapped = true
-                                                                    } else {
-                                                                        dragY = -cellPx * 0.5f
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                },
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            Icon(
-                                                painterResource(R.drawable.ic_ms_drag_indicator),
-                                                contentDescription = stringResource(R.string.shifts_drag_reorder),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(20.dp),
-                                            )
-                                        }
-                                        Spacer(Modifier.width(Spacing.m))
-                                        // 行主体点击 = 改名（把原 ⋮ 菜单里的「改名」提到明面；拖拽手柄独立，不冲突）
+                                        // 行主体点击 = 改名（把原 ⋮ 菜单里的「改名」提到明面；行整块长按才拖，与点按不冲突）
                                         val bodyInteraction = remember { MutableInteractionSource() }
                                         Column(
                                             Modifier
@@ -465,7 +457,7 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
                                         ) {
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(Spacing.s),
                                             ) {
                                                 Text(shift.name, style = MaterialTheme.typography.titleSmall)
                                                 if (shift.rest) {
@@ -475,7 +467,7 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
                                                                 MaterialTheme.colorScheme.surfaceContainerHighest,
                                                                 RoundedCornerShape(Radius.pill),
                                                             )
-                                                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                                                            .padding(horizontal = Spacing.s, vertical = Spacing.xs),
                                                     ) {
                                                         Text(
                                                             stringResource(R.string.shifts_rest_badge),

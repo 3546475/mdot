@@ -76,7 +76,7 @@ internal fun MultiDateDialog(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(Spacing.s))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
             days.forEach { d ->
                 FilterChip(
                     selected = d in selected,

@@ -13,11 +13,9 @@
     <string name="appearance_sheet_backdrop_dim">压暗</string>
     <string name="appearance_sheet_backdrop_blur">模糊</string>
     <string name="appearance_sheet_backdrop_blur_scale">模糊缩小</string>
-    <string name="appearance_sheet_backdrop_desc">压暗：整屏变暗；模糊：背景失焦；模糊缩小：退后成卡片</string>
-    <string name="appearance_sheet_backdrop_no_blur">Android 11 及以下无模糊能力，将自动回退为压暗</string>
+    <string name="appearance_sheet_backdrop_no_blur">Android 11 及以下自动回退为压暗</string>
     <string name="appearance_calendar_heading">日历</string>
     <string name="appearance_hide_lunar">隐藏农历日期</string>
-    <string name="appearance_hide_lunar_desc">开启后日历格只显示节日名，不再显示农历日期</string>
 
     <!-- 首页卡片 + 底栏配置合并页（v0.6.7 双页签） -->
     <string name="home_bottom_tab_home">首页</string>
@@ -28,8 +26,8 @@
     <string name="appearance_frosted">毛玻璃</string>
     <string name="appearance_side_action">按钮右置</string>
     <string name="appearance_fixed_width">固定长度</string>
-    <string name="appearance_options">更多选项</string>
-    <string name="appearance_slots_home_fixed">首页固定显示，不在此列表</string>
+    <string name="appearance_options">More</string>
+    <string name="appearance_drag_hint">长按拖动排序</string>
+    <string name="appearance_slots_home_fixed">首页固定显示，不在此列表；长按拖动排序</string>
     <string name="appearance_preview">预览</string>
-    <string name="appearance_drag_reorder">拖动排序</string>
 </resources>

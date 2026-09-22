@@ -54,7 +54,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.mdot.app.R
 import com.mdot.app.feature.record.toText
+import com.mdot.app.core.designsystem.IconBoxSpec
 import com.mdot.app.core.designsystem.Radius
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.InlineConfirmButton
 import com.mdot.app.core.designsystem.component.InlineConfirmStyle
@@ -237,14 +239,14 @@ fun SiteProjectEditScreen(
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             Modifier
-                                .size(36.dp)
+                                .size(IconBoxSpec.tile.box)
                                 .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(Radius.small)),
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
                                 painterResource(R.drawable.ic_ms_paid), null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(IconBoxSpec.tile.icon),
                             )
                         }
                         Spacer(Modifier.width(Spacing.m))
@@ -371,7 +373,7 @@ internal fun ProjectStandardDialog(
                 Modifier
                     .clip(RoundedCornerShape(Radius.pill))
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(4.dp),
+                    .padding(Spacing.xs),
             ) {
                 SegmentPill(stringResource(R.string.site_ot_by_day), mode == SiteOtMode.BY_DAY) {
                     mode = SiteOtMode.BY_DAY
@@ -428,21 +430,21 @@ private fun EquationCard(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
-                    .size(36.dp)
+                    .size(IconBoxSpec.tile.box)
                     .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(Radius.small)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     painterResource(iconRes), null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(IconBoxSpec.tile.icon),
                 )
             }
             Spacer(Modifier.width(Spacing.m))
             Row(
                 Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s),
                 content = content,
             )
         }

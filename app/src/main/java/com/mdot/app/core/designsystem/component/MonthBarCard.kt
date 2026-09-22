@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mdot.app.R
+import com.mdot.app.core.designsystem.ChartSpec
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.domain.util.TimeUtils
@@ -151,13 +152,13 @@ fun MonthBarCard(
                                                     ) else Brush.verticalGradient(
                                                         listOf(barTopColor, barBottomColor),
                                                     ),
-                                                    RoundedCornerShape(3.dp),
+                                                    RoundedCornerShape(ChartSpec.cellRadius),
                                                 )
                                                 .then(
                                                     if (selected) Modifier.border(
                                                         1.5.dp,
                                                         MaterialTheme.colorScheme.onPrimary,
-                                                        RoundedCornerShape(3.dp),
+                                                        RoundedCornerShape(ChartSpec.cellRadius),
                                                     ) else Modifier
                                                 ),
                                         )
@@ -170,7 +171,7 @@ fun MonthBarCard(
                                                 .border(
                                                     1.5.dp,
                                                     MaterialTheme.colorScheme.onPrimary,
-                                                    RoundedCornerShape(3.dp),
+                                                    RoundedCornerShape(ChartSpec.cellRadius),
                                                 ),
                                         )
                                     }

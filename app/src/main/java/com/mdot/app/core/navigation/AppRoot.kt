@@ -1,5 +1,6 @@
 package com.mdot.app.core.navigation
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.res.stringResource
@@ -74,6 +75,7 @@ import androidx.navigation.navArgument
 import androidx.activity.compose.PredictiveBackHandler
 import kotlinx.coroutines.CancellationException
 import com.mdot.app.AppViewModel
+import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.AdaptiveContainer
 import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.Duration
@@ -98,7 +100,6 @@ import com.mdot.app.feature.calendar.CalendarScreen
 import com.mdot.app.feature.export.ExportScreen
 import com.mdot.app.feature.home.HomeScreen
 import com.mdot.app.feature.onboarding.OnboardingScreen
-import com.mdot.app.feature.payroll.PayrollScreen
 import com.mdot.app.feature.profile.ProfileScreen
 import com.mdot.app.feature.record.RecordSheet
 import com.mdot.app.feature.settings.AboutScreen
@@ -465,18 +466,6 @@ private fun AppRootContent(
                             )
                         }
                     }
-                    composable(Routes.PAYROLL) {
-                        SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.PAYROLL, onNavigate = { navTo(navController, it, slots) }) {
-                            AdaptiveContainer {
-                                PayrollScreen(
-                                    canBack = !inBar("payroll"),
-                                    onBack = { navController.popBackStack() },
-                                    onOpenSiteProjects = { navTo(navController, Routes.SITE_PROJECTS, slots) },
-                                    onOpenSiteSettlement = { navTo(navController, Routes.SITE_SETTLEMENT, slots) },
-                                )
-                            }
-                        }
-                    }
                     composable(Routes.EXPORT) {
                         SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.EXPORT, onNavigate = { navTo(navController, it, slots) }) {
                             AdaptiveContainer {
@@ -753,7 +742,7 @@ private fun AppRootContent(
                             appVm.recordSheetController.open(calSelDate)
                         }
                     },
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(Radius.textField),
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ) {

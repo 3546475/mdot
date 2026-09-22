@@ -377,7 +377,7 @@ fun SiteSettlementPane(
                                         valueColor = SiteMoneyColors.ReceivedGreen,
                                         animatedCents = summary.advanceTotalCents,
                                     )
-                                    HorizontalDivider(Modifier.padding(vertical = 6.dp))
+                                    HorizontalDivider(Modifier.padding(vertical = Spacing.s))
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(
                                             stringResource(R.string.site_settlement_net),
@@ -598,7 +598,7 @@ fun SiteSettlementPane(
                             valueColor = SiteMoneyColors.ReceivedGreen,
                         )
                     }
-                    HorizontalDivider(Modifier.padding(vertical = 6.dp))
+                    HorizontalDivider(Modifier.padding(vertical = Spacing.s))
                     SummaryLine(
                         stringResource(R.string.site_settlement_partial_paid),
                         Money.yuanWithSign(p.netCents),
@@ -649,7 +649,7 @@ private fun SummaryLine(
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp),
+            .padding(vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))

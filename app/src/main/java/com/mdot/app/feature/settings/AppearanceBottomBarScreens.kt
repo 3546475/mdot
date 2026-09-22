@@ -161,12 +161,7 @@ fun AppearancePane(vm: AppearanceViewModel = hiltViewModel()) {
                     onSelect = { vm.setSheetBackdrop(SheetBackdropOrder[it]) },
                     fillWidth = true,
                 )
-                Spacer(Modifier.height(Spacing.xs))
-                Text(
-                    stringResource(R.string.appearance_sheet_backdrop_desc),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                // 选项效果不再逐条解释：三个段位标签（压暗/模糊/模糊缩小）本身就是效果的直述。
                 // 回退说明只对 Android 11 及以下有意义：常驻渲染等于对绝大多数用户放噪音
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
                     Text(
@@ -189,7 +184,6 @@ fun AppearancePane(vm: AppearanceViewModel = hiltViewModel()) {
                 Spacer(Modifier.height(Spacing.s))
                 SwitchRow(
                     title = stringResource(R.string.appearance_hide_lunar),
-                    desc = stringResource(R.string.appearance_hide_lunar_desc),
                     checked = appearance.hideLunarDate,
                     onCheckedChange = { vm.setHideLunar(it) },
                 )

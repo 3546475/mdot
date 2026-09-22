@@ -48,6 +48,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.Duration
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.component.pressScale
@@ -63,12 +64,12 @@ private fun presetLabels(steps: Int): List<String> = (1..steps).map { i ->
 
 private const val CUSTOM_LABEL = "…"
 
-/** 单元格 44dp + 行间距 6dp = 行距 pitch，用于滚动定位选中行 */
-private const val ROW_PITCH_DP = 50
+/** 单元格 44dp + 行间距 8dp（= `Spacing.s`）= 行距 pitch，用于滚动定位选中行。⚠️ 改行间距必须同步改这里 */
+private const val ROW_PITCH_DP = 52
 
 /**
  * 时长选择网格（纯小时，6 列）：预设 0.5–24 + 末位自定义输入格。
- * 可视 3 行（44×3+6×2 ≈144dp，与分钟滚轮等高），其余行在组件内上下滚动，不影响外围弹层。
+ * 可视 3 行（44×3+8×2 ≈148dp，与分钟滚轮等高），其余行在组件内上下滚动，不影响外围弹层。
  * 输入格默认显示"…"，点击进入输入态、键入数字直接生效；选中预设后输入格回到"…"。
  */
 @Composable
@@ -118,12 +119,12 @@ fun DurationGrid(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(max = 44.dp * 3 + 6.dp * 2)
+            .heightIn(max = 44.dp * 3 + Spacing.s * 2)
             .verticalScroll(scroll),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s),
     ) {
         (presets + CUSTOM_LABEL).chunked(COLUMNS).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                 row.forEach { label ->
                     if (label == CUSTOM_LABEL) {
                         // 末位自定义输入格
