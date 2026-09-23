@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -51,12 +52,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.Radius
+import com.mdot.app.core.designsystem.IconSpec
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.SolidColor
 import com.mdot.app.core.designsystem.HeroAmountTier
@@ -69,6 +72,7 @@ import com.mdot.app.core.designsystem.component.JiabanButton
 import com.mdot.app.core.designsystem.component.JiabanButtonRole
 import com.mdot.app.core.designsystem.component.JiabanButtonSize
 import com.mdot.app.core.designsystem.component.MessageSnackbarHost
+import com.mdot.app.core.designsystem.component.MonthPickDialog
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import com.mdot.app.domain.TaxCalculator
@@ -82,7 +86,7 @@ import java.time.YearMonth
  * 而它又依赖「累计收入 / 累计社保公积金 / 累计已预缴」这些**App 自己就有**的数（硬规则 12），
  * 所以这里只让用户勾一次专项附加扣除。
  *
- * ⚠️ 结果只是估算（各单位专项扣除口径、年终奖计税方式不同），页面顶部写明仅供参考。
+ * ⚠️ 结果只是估算（各单位专项扣除口径、年终奖计税方式不同），**页面底部**写明仅供参考。
  */
 @Composable
 fun TaxEstimateScreen(
@@ -99,6 +103,7 @@ fun TaxEstimateScreen(
         onClear = vm::clearMessage,
     )
     // 「填入记月」的保存反馈（触感 + 按钮收缩到 ✓）：与工资页保存同一套
+    var showMonthPicker by remember { mutableStateOf(false) }
     val applyHaptic = rememberSaveWithHaptic()
     var applyFlash by remember { mutableStateOf(false) }
     LaunchedEffect(applyFlash) {
@@ -117,15 +122,10 @@ fun TaxEstimateScreen(
                 .padding(horizontal = Spacing.page),
         ) {
             JiabanTopBar(title = stringResource(R.string.tax_title), onBack = onBack)
-            Text(
-                stringResource(R.string.tax_disclaimer),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = Spacing.s),
-            )
-            Spacer(Modifier.height(Spacing.m))
 
-            // 月份导航**独立成行**（与记月页同款）：原先挤在结果卡标题行里，和「9月个税」抢位置
+            // ---- 月份导航（**与记月页同一套**）：标题可点 → 月份选择器；非本月时旁边给「回本月」----
+            // （用户 2026-09-23 定：不放在顶栏，且选择器要与记月一致）
+            val isCurrentMonth = state.month == YearMonth.now()
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
@@ -135,20 +135,46 @@ fun TaxEstimateScreen(
                     Icon(
                         painterResource(R.drawable.ic_ms_keyboard_arrow_left),
                         stringResource(R.string.paymonth_prev_cd),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Text(
-                    taxMonthLabel(state.month),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(horizontal = Spacing.s),
-                )
+                Row(
+                    Modifier
+                        .widthIn(min = 120.dp)
+                        .clip(RoundedCornerShape(Radius.pill))
+                        .clickable { showMonthPicker = true }
+                        .padding(horizontal = Spacing.s, vertical = Spacing.xs),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        taxMonthLabel(state.month),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(Modifier.width(Spacing.xs))
+                    Icon(
+                        painterResource(R.drawable.ic_ms_expand_more),
+                        contentDescription = stringResource(R.string.paymonth_picker_title),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(IconSpec.inline),
+                    )
+                }
+                if (!isCurrentMonth) {
+                    Spacer(Modifier.width(Spacing.xs))
+                    AssistChip(
+                        onClick = { vm.onMonth(YearMonth.now()) },
+                        label = {
+                            Text(
+                                stringResource(R.string.paymonth_this_month),
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        },
+                    )
+                }
                 IconButton(onClick = { vm.onMonth(state.month.plusMonths(1)) }) {
                     Icon(
                         painterResource(R.drawable.ic_ms_keyboard_arrow_right),
                         stringResource(R.string.paymonth_next_cd),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -295,7 +321,27 @@ fun TaxEstimateScreen(
             // ---- 专项附加扣除（选项优先：勾选，不让人查标准）----
             DeductionSection(state = state, onToggle = vm::toggleDeduction)
 
+            // 免责说明移到**页脚**（脚注位）：首屏先给结果，声明仍在页面内可见（合规文案不可删）
+            Spacer(Modifier.height(Spacing.m))
+            Text(
+                stringResource(R.string.tax_disclaimer),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Spacer(Modifier.height(Spacing.l))
+        }
+
+        // 月份选择器（与记月页共用同一个组件 `MonthPickDialog`）
+        if (showMonthPicker) {
+            MonthPickDialog(
+                title = stringResource(R.string.paymonth_picker_title),
+                selected = state.month,
+                onPick = { ym ->
+                    vm.onMonth(ym)
+                    showMonthPicker = false
+                },
+                onDismiss = { showMonthPicker = false },
+            )
         }
 
         MessageSnackbarHost(snackbarHostState, snackbarIsError, Modifier.align(Alignment.BottomCenter))

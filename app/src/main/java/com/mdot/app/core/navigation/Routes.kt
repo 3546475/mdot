@@ -6,6 +6,9 @@ object Routes {
     const val HOME = "home"
     const val CALENDAR_PATTERN = "calendar?month={month}"
     const val STATS = "stats"
+    /** 日历页（底栏槽位里用的是同一个字符串，这里给个常量便于页面间跳转） */
+    const val CALENDAR = "calendar"
+
     /** 统计页带初始页签：tab=1 工地制度「明细」、tab=2 非工地「明细」；0=统计 */
     const val STATS_PATTERN = "stats?tab={tab}"
 
@@ -41,6 +44,11 @@ object Routes {
     const val TAX_ESTIMATE = "tax/estimate"
 
     const val SYSTEM = "settings/system"
+
+    /** 制度设定带初始页签（如 tab=COMP 直达「调休」页签）；与统计页 `stats?tab=` 同一范式 */
+    const val SYSTEM_TAB_PATTERN = "settings/system?tab={tab}"
+
+    fun systemTab(tab: String): String = "settings/system?tab=$tab"
     const val SYSTEM_SWITCH = "settings/system/switch"
     const val APPEARANCE = "settings/appearance"
     const val DATASOURCE = "settings/datasource"

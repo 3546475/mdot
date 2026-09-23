@@ -663,12 +663,17 @@ private fun SliceBar(
     }
 }
 
-/** 占比段的配色（与分组卡同源：基本＝primary、加班＝tertiary、其他应发＝secondary） */
+/**
+ * 占比段的配色：**同在 `primaryContainer` 卡上，用同色系的不同透明度分层**（不是三个色相）。
+ * ⚠️ 早先「基本＝primary / 加班＝tertiary / 其他＝secondary」在卡底换成 `primaryContainer` 后被批量替换
+ * 成同一个 `onPrimaryContainer`，两段颜色完全一样（用户 2026-09-23 反馈「基本工资/加班工资对比条颜色相近不好区分」）。
+ * 现取值 1.0 / 0.5 / 0.22——保证对比足够、层次清楚；图例同时给出名称与百分比，不只靠颜色。
+ */
 @Composable
 private fun sliceColor(kind: IncomeSliceKind): Color = when (kind) {
     IncomeSliceKind.BASE -> MaterialTheme.colorScheme.onPrimaryContainer
-    IncomeSliceKind.OVERTIME -> MaterialTheme.colorScheme.onPrimaryContainer
-    IncomeSliceKind.OTHER_INCOME -> MaterialTheme.colorScheme.secondary
+    IncomeSliceKind.OVERTIME -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f)
+    IncomeSliceKind.OTHER_INCOME -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.22f)
 }
 
 private fun sliceLabelRes(kind: IncomeSliceKind): Int = when (kind) {

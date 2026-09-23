@@ -96,12 +96,21 @@ class ProfileViewModel @Inject constructor(
     val nickname: StateFlow<String> = settings.nicknameFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsDataSource.DEFAULT_NICKNAME)
 
+    /** 个性签名（座右铭）；未设置过 = 出厂那句 */
+    val motto: StateFlow<String> = settings.mottoFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsDataSource.DEFAULT_MOTTO)
+
     val avatarPath: StateFlow<String?> = settings.avatarPathFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** 修改昵称（空则回落默认） */
     fun setNickname(text: String) = viewModelScope.launch {
         settings.setNickname(text.trim().take(24))
+    }
+
+    /** 保存个性签名（空 → 回落出厂那句，与昵称同一套语义） */
+    fun setMotto(text: String) {
+        viewModelScope.launch { settings.setMotto(text.ifBlank { SettingsDataSource.DEFAULT_MOTTO }) }
     }
 
     /** 预生成裁剪输出目标文件（时间戳命名，避免路径复用导致的缓存）并返回 uri；确认后写库 */

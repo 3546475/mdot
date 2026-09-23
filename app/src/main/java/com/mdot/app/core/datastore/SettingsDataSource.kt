@@ -177,6 +177,15 @@ class SettingsDataSource @Inject constructor(
 
     // ---- 我的页资料（昵称 / 自定义头像路径） ----
     val nicknameFlow: Flow<String> = dataStore.data.map { it[NICKNAME] ?: DEFAULT_NICKNAME }
+
+    /**
+     * 「我的」页个性签名（座右铭）。空 = 用出厂那句。
+     * ⚠️ [DEFAULT_MOTTO] 必须与 `R.string.profile_motto` 一致（dataStore 层拿不到资源，故两边各写一份）。
+     */
+    val mottoFlow: Flow<String> = dataStore.data.map { it[MOTTO] ?: DEFAULT_MOTTO }
+
+    suspend fun setMotto(v: String) =
+        dataStore.edit { prefs -> prefs[MOTTO] = v.trim().take(MOTTO_MAX) }
     suspend fun setNickname(value: String) = dataStore.edit { prefs ->
         val v = value.trim()
         prefs[NICKNAME] = v.ifEmpty { DEFAULT_NICKNAME }
@@ -253,6 +262,7 @@ class SettingsDataSource @Inject constructor(
         private val LAST_ETAG = stringPreferencesKey("last_etag")
         private val DB_FAST_KDF = booleanPreferencesKey("db_fast_kdf")
         private val NICKNAME = stringPreferencesKey("nickname")
+        private val MOTTO = stringPreferencesKey("profile_motto")
         private val AVATAR_PATH = stringPreferencesKey("avatar_path")
         private val BOTTOM_BAR_ICON_ONLY = booleanPreferencesKey("bottom_bar_icon_only")
         private val BOTTOM_BAR_SIDE_ACTION = booleanPreferencesKey("bottom_bar_side_action")
@@ -260,5 +270,9 @@ class SettingsDataSource @Inject constructor(
         private val BOTTOM_BAR_FROSTED = booleanPreferencesKey("bottom_bar_frosted")
 
         const val DEFAULT_NICKNAME = "即兴生长"
+
+        /** 出厂个性签名（与 `R.string.profile_motto` 同文案）；字数上限 24，与昵称一致 */
+        const val DEFAULT_MOTTO = "记录每一次努力，看见每一份成长"
+        const val MOTTO_MAX = 24
     }
 }

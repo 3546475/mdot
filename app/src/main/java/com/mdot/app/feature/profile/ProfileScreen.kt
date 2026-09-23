@@ -30,6 +30,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -75,6 +76,7 @@ import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.KeyValue
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.SettingRow
+import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.designsystem.component.TopBarHeight
 import com.mdot.app.core.navigation.Routes
 import com.mdot.app.core.navigation.contentBottomPadding
@@ -85,6 +87,12 @@ import com.mdot.app.feature.record.rememberSaveWithHaptic
 import com.mdot.app.feature.settings.SettingsHubViewModel
 import com.mdot.app.feature.settings.appearanceSummary
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material3.FilterChip
+import com.mdot.app.core.designsystem.component.JiabanButton
+import com.mdot.app.core.designsystem.component.JiabanButtonRole
+import com.mdot.app.core.designsystem.component.JiabanButtonSize
 
 /**
  * 我的页：资料卡（头像可换/昵称可改）+ 本年数据摘要 + 常用入口。
@@ -110,7 +118,9 @@ fun ProfileScreen(
     var avatarMenu by remember { mutableStateOf(false) }
     // T2-2：长按重置头像触觉（docs/15）
     val saveHaptic = rememberSaveWithHaptic()
+    val motto by vm.motto.collectAsStateWithLifecycle()
     var editingName by remember { mutableStateOf(false) }
+    var editingMotto by remember { mutableStateOf(false) }
     var nameText by remember { mutableStateOf("") }
     var nameOverLimit by remember { mutableStateOf(false) }
     LaunchedEffect(editingName) {
@@ -239,10 +249,18 @@ fun ProfileScreen(
                     )
                 }
                 Spacer(Modifier.height(Spacing.xs))
+                // 个性签名：可点改（与昵称同款交互；**不带箭头**——用户定「能点就行，不用引导」）
+                val mottoInteraction = remember { MutableInteractionSource() }
                 Text(
-                    stringResource(R.string.profile_motto),
+                    motto,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .pressScale(mottoInteraction)
+                        .clickable(interactionSource = mottoInteraction, indication = null) {
+                            editingMotto = true
+                        },
                 )
                 Spacer(Modifier.height(Spacing.s))
             }
@@ -254,49 +272,53 @@ fun ProfileScreen(
         SectionCard {
             if (workSystem == WorkSystem.SITE) {
                 Row {
-                    KeyValue(
-                        stringResource(R.string.profile_site_days_label),
-                        stringResource(R.string.profile_days_value, siteSummary.yearWorkDays),
+                    StatCell(
+                        label = stringResource(R.string.profile_site_days_label),
+                        value = stringResource(R.string.profile_days_value, siteSummary.yearWorkDays),
                         valueColor = MaterialTheme.colorScheme.primary,
+                        onClick = { onOpen(Routes.stats(0)) },
                         modifier = Modifier.weight(1f),
-                        alignment = Alignment.CenterHorizontally,
                     )
-                    KeyValue(
-                        stringResource(R.string.profile_site_projects_label),
-                        stringResource(R.string.profile_count_value, siteSummary.completedProjects),
+                    StatCell(
+                        label = stringResource(R.string.profile_site_projects_label),
+                        value = stringResource(R.string.profile_count_value, siteSummary.completedProjects),
                         valueColor = MaterialTheme.colorScheme.primary,
+                        onClick = { onOpen(Routes.SITE_PROJECTS) },
                         modifier = Modifier.weight(1f),
-                        alignment = Alignment.CenterHorizontally,
                     )
-                    KeyValue(
-                        stringResource(R.string.profile_site_pay_label),
-                        stringResource(R.string.profile_yuan_value, Money.yuanText(siteSummary.yearPayCents)),
+                    StatCell(
+                        label = stringResource(R.string.profile_site_pay_label),
+                        value = stringResource(R.string.profile_yuan_value, Money.yuanText(siteSummary.yearPayCents)),
                         valueColor = MaterialTheme.colorScheme.tertiary,
+                        onClick = { onOpen(Routes.stats(0)) },
                         modifier = Modifier.weight(1f),
-                        alignment = Alignment.CenterHorizontally,
                     )
                 }
             } else {
                 Row {
-                    KeyValue(
-                        stringResource(R.string.profile_year_ot_label), stringResource(R.string.profile_hours_value, TimeUtils.hoursDecimal(summary.yearOtMinutes)),
+                    StatCell(
+                        label = stringResource(R.string.profile_year_ot_label),
+                        value = stringResource(R.string.profile_hours_value, TimeUtils.hoursDecimal(summary.yearOtMinutes)),
                         valueColor = MaterialTheme.colorScheme.primary,
+                        onClick = { onOpen(Routes.stats(0)) },
                         modifier = Modifier.weight(1f),
-                        alignment = Alignment.CenterHorizontally,
                     )
-                    KeyValue(
-                        stringResource(R.string.profile_year_days_label), stringResource(R.string.profile_days_value, summary.yearDays),
+                    StatCell(
+                        label = stringResource(R.string.profile_year_days_label),
+                        value = stringResource(R.string.profile_days_value, summary.yearDays),
                         valueColor = MaterialTheme.colorScheme.primary,
+                        onClick = { onOpen(Routes.CALENDAR) },
                         modifier = Modifier.weight(1f),
-                        alignment = Alignment.CenterHorizontally,
                     )
-                    KeyValue(
-                        stringResource(R.string.profile_comp_balance_label),
-                        if (summary.compBalanceMinutes < 0) "-" + TimeUtils.prettyDuration(-summary.compBalanceMinutes)
+                    StatCell(
+                        label = stringResource(R.string.profile_comp_balance_label),
+                        // 余额为 0 时写「0」而不是 TimeUtils 给的「0分」（读着怪）
+                        value = if (summary.compBalanceMinutes == 0) "0"
+                        else if (summary.compBalanceMinutes < 0) "-" + TimeUtils.prettyDuration(-summary.compBalanceMinutes)
                         else TimeUtils.prettyDuration(summary.compBalanceMinutes),
                         valueColor = MaterialTheme.colorScheme.tertiary,
+                        onClick = { onOpen(Routes.systemTab("COMP")) },
                         modifier = Modifier.weight(1f),
-                        alignment = Alignment.CenterHorizontally,
                     )
                 }
             }
@@ -327,6 +349,14 @@ fun ProfileScreen(
     }
 
     // ---- 昵称编辑对话框 ----
+    if (editingMotto) {
+        MottoDialog(
+            current = motto,
+            onSave = { vm.setMotto(it); editingMotto = false },
+            onDismiss = { editingMotto = false },
+        )
+    }
+
     if (editingName) {
         AlertDialog(
             onDismissRequest = { editingName = false },
@@ -464,6 +494,116 @@ private fun AvatarCropDialog(
             }
         }
     }
+}
+
+/**
+ * 「我的」页数据条里的一格：**可点**（去统计 / 日历 / 调休余额等）。
+ * 样式对齐共用组件 `KeyValue`（labelMedium 降色 + titleMedium 值）。
+ * 刻意**不带箭头**（用户 2026-09-23 定：能点就行，不用引导）；靠 `pressScale` 的按压反馈表达可点。
+ */
+@Composable
+private fun StatCell(
+    label: String,
+    value: String,
+    valueColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    Column(
+        modifier = modifier
+            .minimumInteractiveComponentSize()
+            .pressScale(interaction)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(Spacing.xs))
+        Text(value, style = MaterialTheme.typography.titleMedium, color = valueColor)
+    }
+}
+
+/**
+ * 个性签名弹窗：**选项优先**（硬规则 12）——先给几个预设，想写自己的再选「自定义」。
+ * 保存键与其它弹窗同款（实心 primary pill）。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MottoDialog(
+    current: String,
+    onSave: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val presets = listOf(
+        stringResource(R.string.profile_motto),
+        stringResource(R.string.profile_motto_preset_2),
+        stringResource(R.string.profile_motto_preset_3),
+        stringResource(R.string.profile_motto_preset_4),
+    )
+    // ⚠️ 必须自己记住「选了哪个预设」：先前 selected 拿的是外部传入的 current（弹窗开着时不会变），
+    // 点 chip 等于没记录 → 看着像点不动、保存也还是旧值（用户 2026-09-23 反馈）
+    var picked by remember { mutableStateOf(current) }
+    var custom by remember { mutableStateOf(current !in presets) }
+    var text by remember { mutableStateOf(if (current in presets) "" else current) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.profile_motto_title)) },
+        text = {
+            Column {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                ) {
+                    presets.forEach { p ->
+                        FilterChip(
+                            selected = !custom && picked == p,
+                            onClick = { custom = false; picked = p },
+                            label = { Text(p, style = MaterialTheme.typography.labelMedium) },
+                        )
+                    }
+                    FilterChip(
+                        selected = custom,
+                        onClick = { custom = true },
+                        label = {
+                            Text(
+                                stringResource(R.string.profile_motto_custom),
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        },
+                    )
+                }
+                if (custom) {
+                    Spacer(Modifier.height(Spacing.m))
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { text = it.take(24) },
+                        label = { Text(stringResource(R.string.profile_motto_label)) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(Radius.textField),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            JiabanButton(
+                text = stringResource(R.string.profile_save),
+                onClick = { onSave(if (custom) text else picked) },
+                enabled = !custom || text.isNotBlank(),
+                role = JiabanButtonRole.PRIMARY,
+                size = JiabanButtonSize.M,
+            )
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.profile_cancel)) }
+        },
+    )
 }
 
 @Composable

@@ -8,6 +8,12 @@
     <string name="profile_nickname_label">昵称</string>
     <string name="profile_nickname_limit">昵称最多 24 个字</string>
     <string name="profile_motto">记录每一次努力，看见每一份成长</string>
+    <string name="profile_motto_title">个性签名</string>
+    <string name="profile_motto_preset_2">加班有据，工资有数</string>
+    <string name="profile_motto_preset_3">今日事，今日毕</string>
+    <string name="profile_motto_preset_4">少加班，多生活</string>
+    <string name="profile_motto_custom">自定义</string>
+    <string name="profile_motto_label">签名（24 字以内）</string>
     <string name="profile_year_ot_label">本年加班</string>
     <string name="profile_hours_value">%1$s 小时</string>
     <string name="profile_year_days_label">记录天数</string>

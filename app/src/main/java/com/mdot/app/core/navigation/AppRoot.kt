@@ -33,6 +33,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -60,6 +61,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import com.mdot.app.core.designsystem.component.pressScale
+import com.mdot.app.core.designsystem.component.JiabanTopBar
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -503,6 +505,18 @@ private fun AppRootContent(
                                     onOpen = { route -> navTo(navController, route, slots) },
                                 )
                             }
+                        }
+                    }
+                    composable(
+                        Routes.SYSTEM_TAB_PATTERN,
+                        arguments = listOf(navArgument("tab") { type = NavType.StringType; defaultValue = "" }),
+                    ) { entry ->
+                        AdaptiveContainer {
+                            SystemSettingsScreen(
+                                onBack = { navController.popBackStack() },
+                                onOpenProject = { id -> navTo(navController, Routes.siteProjectEdit(id), slots) },
+                                initialTabKey = entry.arguments?.getString("tab"),
+                            )
                         }
                     }
                     composable(Routes.SYSTEM) {

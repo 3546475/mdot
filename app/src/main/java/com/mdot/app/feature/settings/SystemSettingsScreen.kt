@@ -50,6 +50,8 @@ private enum class SystemTab(val labelRes: Int) {
 fun SystemSettingsScreen(
     onBack: () -> Unit,
     onOpenProject: (Long) -> Unit = {},
+    /** 初始页签（`SystemTab.name`，如 "COMP" = 调休）；空或不匹配则停在第 0 个页签 */
+    initialTabKey: String? = null,
     hub: SettingsHubViewModel = hiltViewModel(),
 ) {
     val salary by hub.salary.collectAsStateWithLifecycle()
@@ -68,7 +70,11 @@ fun SystemSettingsScreen(
         else -> 58.dp
     }
     val scope = rememberCoroutineScope()
-    val pagerState = rememberPagerState(pageCount = { tabs.size })
+    // 初始页签：按名字定位（「我的」页点「调休余额」→ 直达调休页签）；不匹配就停在第 0 个
+    val pagerState = rememberPagerState(
+        initialPage = tabs.indexOfFirst { it.name == initialTabKey }.coerceAtLeast(0),
+        pageCount = { tabs.size },
+    )
 
     Column(Modifier.fillMaxSize()) {
         JiabanTopBar(title = system.displayName, onBack = onBack)
