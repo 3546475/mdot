@@ -1,16 +1,16 @@
 {
-  "versionName": "0.7.5",
-  "versionCode": 55,
-  "tag": "v0.7.5",
-  "releaseNotes": "## 更新内容\n\n**「我的」页：数字都能点了**\n\n- 本年数据三列**全部变成入口**：\n  - 上班制度为工地记工时：点「工天」进统计页、点「完工项目」进项目列表、点「工钱」进统计页\n  - 其余制度：点「加班」进统计页、点「天数」进日历、点「调休余额」**直达制度设定的「调休」页签**（此前这个余额没有任何入口）\n- **个性签名可以改了**：点头像下方的签名即可编辑，先给一批现成短句选（也支持自定义，24 字以内）\n- 数据条的数字格子去掉了小箭头，点格子即可跳转\n\n**个人所得税估算页**\n\n- **月份导航可以点月份直接选**（弹出与记月页同一套月份选择器），不在当前月时旁边还有「回本月」\n- 页面瘦身：免责声明移到页脚，首屏先出结果，滚动更短\n\n**记月页**\n\n- 实发占比条三段配色改为同色系**深浅分层**（此前基本工资与加班工资两段几乎同色，不好区分）\n\n**修复**\n\n- 个性签名弹窗点「保存」偶尔不生效\n\n\n系统要求：Android 10（API 29）及以上。",
+  "versionName": "0.7.6",
+  "versionCode": 56,
+  "tag": "v0.7.6",
+  "releaseNotes": "## 更新内容\n\n**自动检查更新**\n\n- 打开 App 会自动检查有没有新版本（每 24 小时最多查一次）：发现新版会在屏幕底部弹出\n  「发现新版本 vX」提示，点「**去更新**」直达关于页；关于页的版本号旁也会亮起红色星芒标记，\n  更新完成或确认已是最新后自动消失\n\n**记加班弹层**\n\n- 删除记录改为**原地确认**：点删除后按钮就地展开「取消 / 确认删除」，不再弹出对话框；\n  删除后屏幕底部提示可**撤销**（误删可一键找回）。按钮外观与已发布版本保持一致\n- 时长不是半格倍数的记录（如 1 小时 40 分）打开弹层时也能正确选中回显了：\n  末位自定义格显示该时长并高亮，网格自动滚到那一行（此前这种记录打开后看不到选中状态）\n\n**外观页**\n\n- 「深浅色」与「弹层背景」两处选择改成**图标 + 文字的选项药丸**，一眼看清、点选更直观；\n  深浅色顺序调整为 跟随系统 / 浅色 / 深色\n\n\n系统要求：Android 10（API 29）及以上。",
   "apkUrl": {
-    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.7.5/MDOT-RELEASE-0.7.5-v8a.apk",
-    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.7.5/MDOT-RELEASE-0.7.5-v7a.apk",
-    "universal": "https://github.com/3546475/mdot/releases/download/v0.7.5/MDOT-RELEASE-0.7.5-dual.apk"
+    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.7.6/MDOT-RELEASE-0.7.6-v8a.apk",
+    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.7.6/MDOT-RELEASE-0.7.6-v7a.apk",
+    "universal": "https://github.com/3546475/mdot/releases/download/v0.7.6/MDOT-RELEASE-0.7.6-dual.apk"
   },
   "apkSha256": {
-    "arm64-v8a": "77da147e6a7a57e773b9b45f6f2b5f3f62dbe8b769c7fcef1226f0cb347a8c59",
-    "armeabi-v7a": "2a09fb20ec9fd8394fb04410fcf2c316134becad7b7149ebd993541083baa8e5",
-    "universal": "7576f4e1323446ecbc4bb113165c9e6b7e575a1275d4b77d5e1b26b7d863f76e"
+    "arm64-v8a": "87693eb5529ac1d65f910b70e0e5341f79bf0a52561b43f14bc3a0cc716ac917",
+    "armeabi-v7a": "e9d2e3b80dfc91bceb48df3766541112ecafc8644ef540a7d4424e52df9f57f0",
+    "universal": "b4f2a73de9cd248f49116439991a279cffe3ccf819cef3fe43fb052a3bd0c098"
   }
 }
