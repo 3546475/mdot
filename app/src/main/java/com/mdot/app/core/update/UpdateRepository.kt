@@ -54,12 +54,26 @@ class UpdateRepository @Inject constructor(
         const val TAG = "UpdateRepository"
     }
 
-    /** 检查更新：有新版本返回 [UpdateInfo]，已是最新返回 null；网络/解析失败返回 Failure。 */
+    /**
+     * 检查更新：有新版本返回 [UpdateInfo]，已是最新返回 null；网络/解析失败返回 Failure。
+     *
+     * **成功即落盘**（v0.7.6 冷启动自动检查）：发现新版记「已知新版本」（关于页版本号红星 +
+     * 底部悬浮提示的数据源），已是最新则清掉；同时刷新 `lastCheckAt`（24h 节流，
+     * 见 [shouldAutoCheckUpdate]）。失败不落 → 下次冷启动立即重试。
+     */
     suspend fun check(): AppResult<UpdateInfo?> = try {
         val url = settings.updateUrlFlow.first()
         cleartextGate.allowUrl(url) // 用户配置的更新源允许明文（13 文档 B2-04）
         val info = json.decodeFromString<UpdateInfo>(jsonFetcher.fetchText(url))
-        if (info.versionCode > BuildConfig.VERSION_CODE) Success(info) else Success(null)
+        if (info.versionCode > BuildConfig.VERSION_CODE) {
+            settings.setUpdateKnown(info.versionCode, info.versionName)
+            settings.setLastUpdateCheckAt(System.currentTimeMillis())
+            Success(info)
+        } else {
+            settings.clearUpdateKnown()
+            settings.setLastUpdateCheckAt(System.currentTimeMillis())
+            Success(null)
+        }
     } catch (c: kotlinx.coroutines.CancellationException) {
         throw c
     } catch (e: Exception) {
@@ -289,3 +303,12 @@ fun pickApkUrl(abis: Array<String>, urls: ApkUrls): String? = when {
     abis.contains("armeabi-v7a") -> urls.armeabiV7a
     else -> urls.universal
 } ?: urls.universal
+
+/** 冷启动自动检查的节流间隔：距上次**成功**检查不足 24h 则跳过（纯函数，单测覆盖）。
+ *  失败不落 lastCheckAt，故离线设备每个冷启动各试一次（单个静态 JSON，代价可忽略）。 */
+const val AUTO_CHECK_INTERVAL_MS = 24L * 60 * 60 * 1000
+
+/** 是否该做冷启动自动检查（[lastCheckAt]=0 表示从未检查过 → 立即查；纯函数，单测覆盖）。
+ *  [lastCheckAt] 落在未来（时钟回拨）视为异常 → 也查一次兜底，否则会永久跳过。 */
+fun shouldAutoCheckUpdate(lastCheckAt: Long, now: Long): Boolean =
+    lastCheckAt > now || now - lastCheckAt >= AUTO_CHECK_INTERVAL_MS

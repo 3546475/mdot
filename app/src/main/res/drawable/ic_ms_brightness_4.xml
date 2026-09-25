@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 压暗（外观页弹层背景药丸）：半明半暗圆盘、无光芒（Material Symbols brightness_4 风格）——
+     背景「只压暗」的直述；与跟随系统（同盘 + 光芒）分处两行、各自可辨。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M6.5 12 a5.5 5.5 0 1 0 11 0 a5.5 5.5 0 1 0 -11 0 Z M8 12 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0 Z M12 8 A4 4 0 0 0 12 16 Z" android:fillColor="#FF000000" android:fillType="evenOdd" />
+</vector>

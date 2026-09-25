@@ -42,18 +42,19 @@ import com.mdot.app.core.designsystem.SwatchSpec
 import com.mdot.app.core.designsystem.onColorFor
 import com.mdot.app.core.designsystem.paletteOptions
 import com.mdot.app.core.designsystem.palettePrimary
+import com.mdot.app.core.designsystem.component.ChoicePillOption
+import com.mdot.app.core.designsystem.component.ChoicePillRow
 import com.mdot.app.core.designsystem.component.HorizontalScrollRow
 import com.mdot.app.core.designsystem.component.SectionCard
-import com.mdot.app.core.designsystem.component.SegmentBar
 import com.mdot.app.core.designsystem.component.SwitchRow
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.domain.model.SheetBackdropMode
 import com.mdot.app.domain.model.ThemeMode
 
-/** 深浅色三档的固定顺序（索引即 SegmentBar 的段位） */
-private val ThemeModeOrder = listOf(ThemeMode.LIGHT, ThemeMode.DARK, ThemeMode.SYSTEM)
+/** 深浅色三档的固定顺序（索引即 ChoicePillRow 的选项位）：跟随系统 / 浅色 / 深色（参考图顺序） */
+private val ThemeModeOrder = listOf(ThemeMode.SYSTEM, ThemeMode.LIGHT, ThemeMode.DARK)
 
-/** 弹层背景三档的固定顺序（索引即 SegmentBar 的段位） */
+/** 弹层背景三档的固定顺序（索引即 ChoicePillRow 的选项位） */
 private val SheetBackdropOrder =
     listOf(SheetBackdropMode.DIM, SheetBackdropMode.BLUR, SheetBackdropMode.BLUR_SCALE)
 
@@ -67,8 +68,10 @@ private val SheetBackdropOrder =
  * 卡内「标题 → 内容」8dp、「内容 → 说明」4dp，**卡与卡之间 12dp**——
  * 组内恒小于组间，分组由间距 + 卡片底色断口双重表达。
  *
- * 选择控件只用 [SegmentBar] 与色卡（不再用 FilterChip）：后者「描边 → 实心填充」的语言
- * 与全 app 的滑块不一致，块宽还随标签长度变化（实测 60/60/88dp）。
+ * 选择控件：深浅色 / 弹层背景用 [ChoicePillRow] 图标选项药丸（2026-09-23 按用户参考图改造：
+ * 「图标 + 文字」并排独立药丸、选中整颗实底，替代这两处的 SegmentBar），配色用色卡，
+ * 其余开关用 SwitchRow（不再用 FilterChip：其「描边 → 实心填充」的语言与全 app 的滑块不一致，
+ * 块宽还随标签长度变化——实测 60/60/88dp）。
  */
 @Composable
 fun AppearancePane(vm: AppearanceViewModel = hiltViewModel()) {
@@ -95,11 +98,10 @@ fun AppearancePane(vm: AppearanceViewModel = hiltViewModel()) {
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Spacer(Modifier.height(Spacing.s))
-                SegmentBar(
-                    labels = ThemeModeOrder.map { stringResource(it.labelRes()) },
+                ChoicePillRow(
+                    options = ThemeModeOrder.map { ChoicePillOption(it.iconRes(), it.labelRes()) },
                     selected = ThemeModeOrder.indexOf(appearance.themeMode).coerceAtLeast(0),
                     onSelect = { vm.setMode(ThemeModeOrder[it]) },
-                    fillWidth = true,
                 )
             }
         }
@@ -155,11 +157,10 @@ fun AppearancePane(vm: AppearanceViewModel = hiltViewModel()) {
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Spacer(Modifier.height(Spacing.s))
-                SegmentBar(
-                    labels = SheetBackdropOrder.map { stringResource(it.labelRes()) },
+                ChoicePillRow(
+                    options = SheetBackdropOrder.map { ChoicePillOption(it.iconRes(), it.labelRes()) },
                     selected = SheetBackdropOrder.indexOf(appearance.sheetBackdropMode).coerceAtLeast(0),
                     onSelect = { vm.setSheetBackdrop(SheetBackdropOrder[it]) },
-                    fillWidth = true,
                 )
                 // 选项效果不再逐条解释：三个段位标签（压暗/模糊/模糊缩小）本身就是效果的直述。
                 // 回退说明只对 Android 11 及以下有意义：常驻渲染等于对绝大多数用户放噪音
@@ -203,6 +204,20 @@ private fun SheetBackdropMode.labelRes(): Int = when (this) {
     SheetBackdropMode.DIM -> R.string.appearance_sheet_backdrop_dim
     SheetBackdropMode.BLUR -> R.string.appearance_sheet_backdrop_blur
     SheetBackdropMode.BLUR_SCALE -> R.string.appearance_sheet_backdrop_blur_scale
+}
+
+/** 深浅色药丸图标：半明半暗圆盘 + 光芒 / 实心太阳 / 实心弯月（编译期引用，硬规则「位图资源禁用动态查找」） */
+private fun ThemeMode.iconRes(): Int = when (this) {
+    ThemeMode.SYSTEM -> R.drawable.ic_ms_contrast
+    ThemeMode.LIGHT -> R.drawable.ic_ms_light_mode
+    ThemeMode.DARK -> R.drawable.ic_ms_dark_mode
+}
+
+/** 弹层背景药丸图标：半明半暗圆盘（只压暗）/ 点阵（模糊）/ 四向内收箭头（模糊并缩小成卡片） */
+private fun SheetBackdropMode.iconRes(): Int = when (this) {
+    SheetBackdropMode.DIM -> R.drawable.ic_ms_brightness_4
+    SheetBackdropMode.BLUR -> R.drawable.ic_ms_blur_on
+    SheetBackdropMode.BLUR_SCALE -> R.drawable.ic_ms_close_in_full
 }
 
 /**

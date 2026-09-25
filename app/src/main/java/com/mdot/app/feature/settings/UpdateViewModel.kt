@@ -4,14 +4,18 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mdot.app.BuildConfig
+import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.core.update.UpdateInfo
 import com.mdot.app.core.update.UpdateRepository
 import com.mdot.app.core.util.AppResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -30,11 +34,17 @@ sealed interface UpdateState {
 @HiltViewModel
 class UpdateViewModel @Inject constructor(
     private val updateRepo: UpdateRepository,
+    private val settings: SettingsDataSource,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val state: StateFlow<UpdateState> = _state.asStateFlow()
+
+    /** 已知有新版本未更新（关于页 hero 版本号后上方的星形红点；更新后 versionCode 赶上自动消失） */
+    val hasKnownUpdate: StateFlow<Boolean> = settings.updateKnownCodeFlow
+        .map { it > BuildConfig.VERSION_CODE }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     private val _notice = MutableStateFlow<String?>(null)
     val notice: StateFlow<String?> = _notice.asStateFlow()

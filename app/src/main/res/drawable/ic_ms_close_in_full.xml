@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 模糊缩小（外观页弹层背景药丸）：四向内收箭头（Material Symbols close_in_full 风格）——
+     「背景缩小成卡片」的直述；模糊语义由相邻「模糊」药丸的点阵图标承担。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M11.1 2.2 H12.9 V7 H15 L12 9.5 L9 7 H11.1 Z M11.1 21.8 H12.9 V17 H15 L12 14.5 L9 17 H11.1 Z M2.2 11.1 H7 V9 L9.5 12 L7 15 V12.9 H2.2 Z M21.8 11.1 H17 V9 L14.5 12 L17 15 V12.9 H21.8 Z" android:fillColor="#FF000000" android:fillType="nonZero" />
+</vector>

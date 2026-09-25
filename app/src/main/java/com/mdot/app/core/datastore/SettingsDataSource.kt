@@ -147,6 +147,21 @@ class SettingsDataSource @Inject constructor(
     val lastUpdateCheckAtFlow: Flow<Long> = dataStore.data.map { it[LAST_UPDATE_CHECK_AT] ?: 0 }
     suspend fun setLastUpdateCheckAt(at: Long) = dataStore.edit { it[LAST_UPDATE_CHECK_AT] = at }
 
+    // ---- 冷启动自动检查更新（v0.7.6）：已知「有新版本未更新」——
+    // 关于页版本号红星与底部悬浮提示的数据源；检查到已是最新即清，更新后 code 赶上自动失效 ----
+    val updateKnownCodeFlow: Flow<Int> = dataStore.data.map { it[UPDATE_KNOWN_CODE] ?: 0 }
+    val updateKnownNameFlow: Flow<String> = dataStore.data.map { it[UPDATE_KNOWN_NAME] ?: "" }
+
+    suspend fun setUpdateKnown(code: Int, name: String) = dataStore.edit {
+        it[UPDATE_KNOWN_CODE] = code
+        it[UPDATE_KNOWN_NAME] = name
+    }
+
+    suspend fun clearUpdateKnown() = dataStore.edit {
+        it.remove(UPDATE_KNOWN_CODE)
+        it.remove(UPDATE_KNOWN_NAME)
+    }
+
     // ---- 同步 ----
     val lastBackupAtFlow: Flow<Long> = dataStore.data.map { it[LAST_BACKUP_AT] ?: 0 }
     suspend fun setLastBackupAt(at: Long) = dataStore.edit { it[LAST_BACKUP_AT] = at }
@@ -255,6 +270,8 @@ class SettingsDataSource @Inject constructor(
         private val HOLIDAY_URLS = stringPreferencesKey("holiday_urls")
         private val HOLIDAY_LAST_FETCH_AT = longPreferencesKey("holiday_last_fetch_at")
         private val LAST_UPDATE_CHECK_AT = longPreferencesKey("last_update_check_at")
+        private val UPDATE_KNOWN_CODE = intPreferencesKey("update_known_version_code")
+        private val UPDATE_KNOWN_NAME = stringPreferencesKey("update_known_version_name")
         private val AUTO_BACKUP_ENABLED = booleanPreferencesKey("auto_backup_enabled")
         private val LAST_BACKUP_AT = longPreferencesKey("last_backup_at")
         private val LAST_LOCAL_CHANGE_AT = longPreferencesKey("last_local_change_at")

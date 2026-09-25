@@ -2,13 +2,16 @@ package com.mdot.app.core.update
 
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
  * 更新逻辑纯函数测试：
  * - update.json 解析（字段名/SerialName 映射与发布工作流生成的结构一致）
  * - pickApkUrl：按设备 ABI 选包，arm64 优先、armv7 次之、其余兜底双架构包，缺地址回退
+ * - shouldAutoCheckUpdate：冷启动自动检查的 24h 节流边界（v0.7.6）
  */
 class UpdateInfoTest {
 
@@ -76,5 +79,20 @@ class UpdateInfoTest {
         )
         val url = pickApkUrl(arrayOf("arm64-v8a"), info.apkUrl)
         assertEquals("https://example.com/dual.apk", url)
+    }
+
+    @Test
+    fun auto_check_throttles_within_24h() {
+        val now = 1_000_000_000_000L
+        // 从未检查（0）→ 立即查
+        assertTrue(shouldAutoCheckUpdate(0L, now))
+        // 刚查过（不足 24h）→ 跳过
+        assertFalse(shouldAutoCheckUpdate(now - 1L, now))
+        assertFalse(shouldAutoCheckUpdate(now - AUTO_CHECK_INTERVAL_MS + 1, now))
+        // 恰好 24h 及以上 → 查（边界含等号）
+        assertTrue(shouldAutoCheckUpdate(now - AUTO_CHECK_INTERVAL_MS, now))
+        assertTrue(shouldAutoCheckUpdate(now - AUTO_CHECK_INTERVAL_MS - 1, now))
+        // 时钟回拨（lastCheckAt 在未来）→ 视为异常，查一次兜底
+        assertTrue(shouldAutoCheckUpdate(now + 60_000L, now))
     }
 }

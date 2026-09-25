@@ -237,6 +237,22 @@ class RecordSheetViewModel @Inject constructor(
 
     fun onNote(text: String) = _state.update { it.copy(note = text.take(200)) }
 
+    // ---- 删除消息（硬规则 11 行内删除范式：原地确认按钮只确认，撤销走底部提示窗，同调休删调整） ----
+
+    data class SheetMessage(val text: String, val isError: Boolean = false, val canUndo: Boolean = false)
+
+    private val _message = MutableStateFlow<SheetMessage?>(null)
+
+    /** 供宿主（AppRoot 全局提示窗）收集：删除成功后 canUndo=true 携带「撤销」动作 */
+    val messageFlow: StateFlow<SheetMessage?> = _message
+
+    fun clearMessage() {
+        _message.value = null
+    }
+
+    /** 最近一次删除的记录（撤销回填用） */
+    private var lastDeleted: DailyRecord? = null
+
     // ---- 保存 / 删除 ----
 
     fun save() {
@@ -275,9 +291,52 @@ class RecordSheetViewModel @Inject constructor(
 
     fun delete() {
         val s = _state.value
+        // 快照先落（同 CompBalanceViewModel.delete 的教训，docs/16 坑 15）：
+        // 弹层随即关闭、下次 bind 会重置 existingRecord，撤销必须靠这份删除前快照回填
+        lastDeleted = existingRecord
         viewModelScope.launch {
             recordRepo.delete(s.date, s.tab)
+                .onSuccess { _message.value = SheetMessage("已删除记录", canUndo = true) }
+                .onFailure { err ->
+                    lastDeleted = null
+                    _message.value = SheetMessage(err.toText(), isError = true)
+                }
             _closeRequests.tryEmit(Unit)
+        }
+    }
+
+    /** 撤销最近一次删除：按删除前快照原样回填（(date,type) 唯一 → save 即 upsert 恢复；仅最近一次有效） */
+    fun undoDelete() {
+        val rec = lastDeleted ?: return
+        lastDeleted = null
+        viewModelScope.launch {
+            val r = if (rec.type == RecordType.OT) {
+                recordRepo.saveOt(
+                    OtDraft(
+                        date = rec.date,
+                        shiftId = rec.shiftId,
+                        shiftName = rec.shiftName,
+                        durationMinutes = rec.durationMinutes,
+                        tier = rec.tier ?: RateTier.WEEKDAY,
+                        tierSource = rec.tierSource ?: TierSource.AUTO,
+                        toCompMinutes = rec.toCompMinutes,
+                        note = rec.note,
+                    )
+                )
+            } else {
+                recordRepo.saveLeave(
+                    LeaveDraft(
+                        date = rec.date,
+                        shiftId = rec.shiftId,
+                        shiftName = rec.shiftName,
+                        durationMinutes = rec.durationMinutes,
+                        leaveType = rec.leaveType ?: LeaveType.PERSONAL,
+                        note = rec.note,
+                    )
+                )
+            }
+            r.onSuccess { _message.value = SheetMessage("已撤销删除") }
+                .onFailure { err -> _message.value = SheetMessage(err.toText(), isError = true) }
         }
     }
 

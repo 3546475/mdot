@@ -196,6 +196,8 @@ internal fun UpdateHeroCard(
     val updateUrl by dsVm.updateUrl.collectAsStateWithLifecycle()
     val updateUrls by dsVm.updateUrls.collectAsStateWithLifecycle()
     val updateState by updateVm.state.collectAsStateWithLifecycle()
+    // 已知有新版本未更新 → 版本号后上方星形红点（数据源 = UpdateRepository.check() 落盘的 known）
+    val showNewBadge by updateVm.hasKnownUpdate.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val versionText = remember {
         runCatching {
@@ -215,6 +217,7 @@ internal fun UpdateHeroCard(
                 updateUrls = updateUrls,
                 updateUrl = updateUrl,
                 updateState = updateState,
+                showNewBadge = showNewBadge,
                 onCheck = updateVm::check,
                 onDownload = updateVm::downloadAndInstall,
                 onInstall = updateVm::installDownloaded,
@@ -241,6 +244,7 @@ internal fun UpdateHeroCard(
                     updateUrls = updateUrls,
                     updateUrl = updateUrl,
                     updateState = updateState,
+                    showNewBadge = showNewBadge,
                     onCheck = updateVm::check,
                     onDownload = updateVm::downloadAndInstall,
                     onInstall = updateVm::installDownloaded,
@@ -291,6 +295,8 @@ private fun UpdateHeroContent(
     updateUrls: List<String>,
     updateUrl: String,
     updateState: UpdateState,
+    /** 已知有新版本未更新：版本号后上方的星形红点（更新成功或检查到已是最新即消失） */
+    showNewBadge: Boolean,
     onCheck: () -> Unit,
     onDownload: () -> Unit,
     onInstall: () -> Unit,
@@ -315,6 +321,19 @@ private fun UpdateHeroContent(
                 fontWeight = FontWeight.Bold,
                 color = onContainer,
             )
+            if (showNewBadge) {
+                // 已知有新版本未更新：版本号后上方的星芒红点（致谢卡同款 auto_awesome；
+                // 提示动作在下方「检查更新」按钮）
+                Icon(
+                    painterResource(R.drawable.ic_ms_auto_awesome),
+                    contentDescription = stringResource(R.string.update_new_badge_cd),
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier
+                        .size(IconSpec.inline)
+                        .align(Alignment.Top)
+                        .padding(top = Spacing.xs),
+                )
+            }
             if (updateState is UpdateState.BackgroundDownloading) {
                 Spacer(Modifier.width(Spacing.m))
                 Row(

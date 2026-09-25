@@ -23,6 +23,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -67,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
+import com.mdot.app.core.designsystem.ButtonSpec
 import com.mdot.app.core.designsystem.LocalWindowSpec
 import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.WindowSpec
@@ -75,7 +77,8 @@ import com.mdot.app.core.designsystem.Duration
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.DayPickDialog
-import com.mdot.app.core.designsystem.component.ConfirmDialog
+import com.mdot.app.core.designsystem.component.InlineConfirmButton
+import com.mdot.app.core.designsystem.component.InlineConfirmStyle
 import com.mdot.app.core.designsystem.component.SunkenWell
 import com.mdot.app.core.designsystem.component.TierRow
 import com.mdot.app.domain.PayrollCalculator
@@ -112,7 +115,6 @@ fun RecordSheet(
     // 两段式：简洁面板（类型+时长）⇄ 完整面板；点箭头或上拉展开
     var expanded by rememberSaveable { mutableStateOf(false) }
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
-    var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
     // T1-1：保存类重动作统一 LongPress 触觉（docs/15，共享扩展）
     val saveHaptic = rememberSaveWithHaptic()
 
@@ -489,11 +491,19 @@ fun RecordSheet(
                         Spacer(Modifier.height(Spacing.m))
 
                         // ---- 操作区（两态共用；编辑态展开时含删除） ----
+                        // 样式对齐已发布版（2026-09-25 用户要求）：取消 weight(1f)、
+                        // 保存 weight(1.6f) 默认 contentPadding，删除 idle = M3 OutlinedButton
+                        // 观感（描边胶囊 + error 文字，经 InlineConfirmStyle.Outlined）——
+                        // 仅点击交互换成原地确认（硬规则 11，不回 ConfirmDialog）。
+                        // 取消 contentPadding 横向收紧只为压低最小宽：删除展开「取消/确认删除」
+                        // 询问态变宽后，取消/保存按 1:1.6 分余量会被挤窄，360dp 窄屏下
+                        // 不收紧会挤到「取消」两字换行；按钮拉伸显示时文字居中，与已发布版无差。
                         // 间距不走 spacedBy：删除钮与取消之间的间距放在 AnimatedVisibility
                         // 内容内部（随收合一起归零）——否则收合完成后子项移除、spacedBy 间隙
                         // 消失，取消/保存会再跳一截（用户反馈的迟滞位移）
                         Row(
                             Modifier.fillMaxWidth().padding(bottom = Spacing.l),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             // 删除钮随面板展开/收起同拍进出（水平展开/收合 + 淡入淡出，
                             // 与上方面板同一 motionScheme 弹簧）：出现/消失都不再瞬时跳变
@@ -509,14 +519,27 @@ fun RecordSheet(
                                         shrinkTowards = Alignment.Start,
                                     ) + fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
                                 ) {
-                                    OutlinedButton(
-                                        onClick = { showDeleteConfirm = true },
+                                    // 删除：样式同旧版描边删除钮、交互改原地确认（硬规则 11——
+                                    // 删除后弹层即关、触发元素消失 → 只确认，撤销走宿主底部提示窗，
+                                    // 同调休删调整；原 ConfirmDialog 已废）
+                                    InlineConfirmButton(
+                                        idleText = stringResource(R.string.record_delete),
+                                        confirmText = stringResource(R.string.record_delete_confirm),
+                                        cancelText = stringResource(R.string.record_cancel),
+                                        undoText = stringResource(R.string.record_undo),
+                                        onConfirm = { vm.delete() },
+                                        style = InlineConfirmStyle.Outlined,
+                                        height = ButtonSpec.heightM,
                                         modifier = Modifier.padding(end = Spacing.m),
-                                    ) { Text(stringResource(R.string.record_delete), color = MaterialTheme.colorScheme.error) }
+                                    )
                                 }
                             }
                             OutlinedButton(
                                 onClick = { requestDismiss() },
+                                contentPadding = PaddingValues(
+                                    horizontal = Spacing.s,
+                                    vertical = Spacing.s,
+                                ),
                                 modifier = Modifier.weight(1f).padding(end = Spacing.m),
                             ) { Text(stringResource(R.string.record_cancel)) }
                             Button(
@@ -540,25 +563,6 @@ fun RecordSheet(
             initial = state.date,
             onPick = { vm.onDateChange(it); showDatePicker = false },
             onDismiss = { showDatePicker = false },
-        )
-    }
-
-    if (showDeleteConfirm) {
-        ConfirmDialog(
-            title = stringResource(R.string.record_delete_title),
-            text = stringResource(
-                R.string.record_delete_confirm_text,
-                TimeUtils.mdCn(state.date),
-                stringResource(
-                    if (state.tab == RecordType.OT) otLabel(state.salary.workSystem)
-                    else R.string.record_tab_leave
-                ),
-            ),
-            onConfirm = {
-                showDeleteConfirm = false
-                vm.delete()
-            },
-            onDismiss = { showDeleteConfirm = false },
         )
     }
 }

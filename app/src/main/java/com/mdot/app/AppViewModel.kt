@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.core.holiday.HolidayRepository
+import com.mdot.app.core.update.UpdateRepository
+import com.mdot.app.core.update.shouldAutoCheckUpdate
 import com.mdot.app.domain.model.AppearanceConfig
 import com.mdot.app.domain.model.BottomBarConfig
 import com.mdot.app.domain.model.WorkSystem
@@ -13,23 +15,51 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
 
-/** 应用壳级状态：外观、底栏配置、引导标记、全局记录弹层请求 */
+/** 应用壳级状态：外观、底栏配置、引导标记、全局记录弹层请求、冷启动更新提示 */
 @HiltViewModel
 class AppViewModel @Inject constructor(
-    settings: SettingsDataSource,
+    private val settings: SettingsDataSource,
     val recordSheetController: RecordSheetController,
     private val holidayRepo: HolidayRepository,
+    private val updateRepo: UpdateRepository,
 ) : ViewModel() {
+
+    /** 已知有新版本未更新时的提示载体（新版 versionName）；null = 无/已处理。
+     *  每次冷启动、只要 known 赶不上当前版本就置一条（AppRoot 渲染成底部悬浮「去更新」→ 关于页）；
+     *  关于页的星形红点由 [SettingsDataSource.updateKnownCodeFlow] 持久承担，更新后自动消失。 */
+    private val _updateAvailable = MutableStateFlow<String?>(null)
+    val updateAvailable: StateFlow<String?> = _updateAvailable.asStateFlow()
+
+    fun dismissUpdateAvailable() {
+        _updateAvailable.value = null
+    }
 
     init {
         // 启动即触发节假日库远程刷新（内置资产/现缓存兜底，失败静默；7 天节流）
         viewModelScope.launch { holidayRepo.refreshIfStale() }
+        // 冷启动自动检查更新（v0.7.6）：24h 节流；发现新版**只**走底部悬浮提示，不弹窗
+        viewModelScope.launch { autoCheckUpdate() }
+    }
+
+    private suspend fun autoCheckUpdate() {
+        // 首启引导期间不检查（新装必为最新，没必要打请求）
+        if (!settings.firstLaunchDoneFlow.first()) return
+        val now = System.currentTimeMillis()
+        if (shouldAutoCheckUpdate(settings.lastUpdateCheckAtFlow.first(), now)) {
+            updateRepo.check() // 成功才落 known/lastCheckAt；失败不落 → 下次冷启动重试
+        }
+        val code = settings.updateKnownCodeFlow.first()
+        val name = settings.updateKnownNameFlow.first()
+        if (code > BuildConfig.VERSION_CODE && name.isNotEmpty()) {
+            _updateAvailable.value = name
+        }
     }
 
     val appearance: StateFlow<AppearanceConfig> = settings.appearanceFlow

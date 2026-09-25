@@ -64,6 +64,10 @@ private fun presetLabels(steps: Int): List<String> = (1..steps).map { i ->
 
 private const val CUSTOM_LABEL = "…"
 
+/** 自定义格回显值：与 RecordSheetViewModel.minutesToHoursText 同款归一（100 分 → "1.67"） */
+private fun formatHoursCell(h: Double): String =
+    String.format(java.util.Locale.US, "%.2f", h).trimEnd('0').trimEnd('.')
+
 /** 单元格 44dp + 行间距 8dp（= `Spacing.s`）= 行距 pitch，用于滚动定位选中行。⚠️ 改行间距必须同步改这里 */
 private const val ROW_PITCH_DP = 52
 
@@ -71,6 +75,7 @@ private const val ROW_PITCH_DP = 52
  * 时长选择网格（纯小时，6 列）：预设 0.5–24 + 末位自定义输入格。
  * 可视 3 行（44×3+8×2 ≈148dp，与分钟滚轮等高），其余行在组件内上下滚动，不影响外围弹层。
  * 输入格默认显示"…"，点击进入输入态、键入数字直接生效；选中预设后输入格回到"…"。
+ * 既有值为非 0.5 网格时（如 1 小时 40 分），自定义格**回显该值并呈选中态**、网格滚到末行。
  */
 @Composable
 fun DurationGrid(
@@ -82,6 +87,9 @@ fun DurationGrid(
 ) {
     val haptic = LocalHapticFeedback.current
     val presets = remember(presetSteps) { presetLabels(presetSteps) }
+    // 非 0.5 网格的既有值（如 1 小时 40 分 = 1.67）：预设格里没有它，
+    // 由末位自定义格承担「选中」表现（回显值 + 高亮）——打开弹层预选当天记录时用
+    val isCustomSelected = selectedHours != null && presets.none { it.toDoubleOrNull() == selectedHours }
     var editing by remember { mutableStateOf(false) }
     var text by remember { mutableStateOf("") }
     // onFocusChanged 首次组合会以"未聚焦"回调一次，需等真正获得过焦点后才允许失焦提交
@@ -104,14 +112,19 @@ fun DurationGrid(
         if (editing) focusRequester.requestFocus()
     }
 
-    // 进入时已有选中值（补改/编辑历史记录）→ 滚到对应行让高亮可见
+    // 进入时已有选中值（补改/编辑历史记录）→ 滚到对应行让高亮可见；
+    // 非网格值滚到末行，让自定义格的回显选中态可见
     LaunchedEffect(Unit) {
         val sel = selectedHours ?: return@LaunchedEffect
         val idx = presets.indexOfFirst { it.toDoubleOrNull() == sel }
-        if (idx >= COLUMNS) {
+        val row = when {
+            idx >= 0 -> idx / COLUMNS
+            isCustomSelected -> (presets.size + COLUMNS - 1) / COLUMNS // 自定义格所在末行
+            else -> return@LaunchedEffect
+        }
+        if (row >= 1) {
             // 等首次布局算出可滚动范围后再定位
             snapshotFlow { scroll.maxValue }.filter { it > 0 }.first()
-            val row = idx / COLUMNS
             scroll.scrollTo(with(density) { (row * ROW_PITCH_DP).dp.roundToPx() })
         }
     }
@@ -127,18 +140,35 @@ fun DurationGrid(
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                 row.forEach { label ->
                     if (label == CUSTOM_LABEL) {
-                        // 末位自定义输入格
+                        // 末位自定义输入格：有非网格既有值时呈选中态（同预设格的高亮语言）
                         val inputInteraction = remember { MutableInteractionSource() }
+                        val customSelected = !editing && isCustomSelected
+                        val customBg by animateColorAsState(
+                            targetValue = if (customSelected) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
+                            label = "customCellBg",
+                        )
+                        val customStroke by animateColorAsState(
+                            targetValue = if (customSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                            animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
+                            label = "customCellStroke",
+                        )
+                        val customTextColor by animateColorAsState(
+                            targetValue = if (customSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
+                            label = "customCellText",
+                        )
+                        val cellShape = RoundedCornerShape(Radius.button)
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .pressScale(inputInteraction, pressedScale = 0.93f)
                                 .height(44.dp)
-                                .background(
-                                    MaterialTheme.colorScheme.surfaceContainerHigh,
-                                    RoundedCornerShape(Radius.button),
-                                )
-                                .clip(RoundedCornerShape(Radius.button))
+                                .background(customBg, cellShape)
+                                .border(1.5.dp, customStroke, cellShape)
+                                .clip(cellShape)
                                 .clickable(
                                     interactionSource = inputInteraction,
                                     indication = LocalIndication.current,
@@ -146,6 +176,10 @@ fun DurationGrid(
                                 ) {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     hasBeenFocused = false
+                                    // 已有非网格值时点自定义格 → 回显该值继续编辑
+                                    if (text.isEmpty()) {
+                                        text = selectedHours?.let { formatHoursCell(it) } ?: ""
+                                    }
                                     editing = true
                                 },
                             contentAlignment = Alignment.Center,
@@ -181,10 +215,14 @@ fun DurationGrid(
                                 )
                             } else {
                                 Text(
-                                    if (text.isEmpty()) "…" else text,
+                                    when {
+                                        text.isNotEmpty() -> text
+                                        isCustomSelected -> formatHoursCell(selectedHours!!)
+                                        else -> CUSTOM_LABEL
+                                    },
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = customTextColor,
                                 )
                             }
                         }

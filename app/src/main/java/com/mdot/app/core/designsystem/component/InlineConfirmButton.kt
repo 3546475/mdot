@@ -53,9 +53,13 @@ enum class InlineConfirmPhase { Idle, Asking, Done }
  *                `secondaryContainer`（用于「已移出主内容卡」的页面级动作，
  *                如记月页「同步本月考勤」「导入上月」）；
  * - [Compact]    行内紧凑：外壳随内容（不预留、不挤压同行信息）+ 右对齐 + idle 为 error 色朴素文字
- *                （如列表行「删除」，与原先的 TextButton 观感一致）。
+ *                （如列表行「删除」，与原先的 TextButton 观感一致）；
+ * - [Outlined]    行内描边：idle 与 M3 `OutlinedButton` 同款观感（透明底 + `outlineVariant`
+ *                1dp 描边 + error 文字 + 24dp 横内边距 + 40dp 高）+ 询问/完成态沿用 [Compact]
+ *                的紧凑单元格——用于「样式须与旧版描边删除钮一致、交互改原地确认」的场景
+ *                （记加班弹层删除，见 docs/03 §5.2）。
  */
-enum class InlineConfirmStyle { Standalone, Tonal, Compact }
+enum class InlineConfirmStyle { Standalone, Tonal, Compact, Outlined }
 
 /** 胶囊最小高度（48dp = Spacing.xl × 2） */
 private val ButtonHeight = Spacing.xl * 2
@@ -106,6 +110,9 @@ private val BurnBarHeight = 3.dp
  * done 中性面 + 主色可撤销），按压反馈统一 [pressScale]。
  *
  * @param onUndo 撤销回调；null = 只做原地确认（撤销交给调用方的信息提示窗）。
+ * @param height 胶囊高度（默认 48 = 全局主按钮档）。与同行其它按钮并排时传同高档位
+ *   （如记加班弹层传 `ButtonSpec.heightM` = 40 对齐取消/保存），否则行内高低不齐、
+ *   变形时行高跳动（2026-09-24 用户反馈）。
  * @param resetKey 变化时强制回到 [startPhase]（如翻月/换目标），未完成的撤销窗口随之作废。
  * @param undoWindowMs 撤销窗口时长（进度条 1 → 0 线性走完的时长）。
  * @param startPhase 初始相位；[InlineConfirmPhase.Asking] 用于「由外部动作触发确认」
@@ -125,6 +132,7 @@ fun InlineConfirmButton(
     modifier: Modifier = Modifier,
     onUndo: (() -> Unit)? = null,
     style: InlineConfirmStyle = InlineConfirmStyle.Standalone,
+    height: Dp = ButtonHeight,
     resetKey: Any? = null,
     undoWindowMs: Long = 5_000L,
     startPhase: InlineConfirmPhase = InlineConfirmPhase.Idle,
@@ -142,9 +150,14 @@ fun InlineConfirmButton(
 
     val standalone = style == InlineConfirmStyle.Standalone
     val tonal = style == InlineConfirmStyle.Tonal
+    val outlined = style == InlineConfirmStyle.Outlined
     // 只有 Standalone 预留固定外壳（其余：宽度随内容、定位交给调用方）
     val shellWidth: Dp? = if (standalone) ShellWidth else null
-    val cellMinWidth: Dp = if (style == InlineConfirmStyle.Compact) 0.dp else MinWidth
+    // 行内两式（Compact/Outlined）不设最小宽：宽度随内容，不挤压同行按钮
+    val cellMinWidth: Dp = if (standalone || tonal) MinWidth else 0.dp
+    // 询问态单元格间距：行内两式用紧凑档（Outlined 的展开宽与 Compact 一致，
+    // 不给同行的取消/保存多挤出一截）
+    val compactCells = style == InlineConfirmStyle.Compact || outlined
 
     // ---- 宽度：单一 Animatable 驱动；首次测量 snap、之后相位切换动画 ----
     var naturalWidthPx by remember(resetKey) { mutableStateOf(0) }
@@ -191,7 +204,8 @@ fun InlineConfirmButton(
     )
     val borderColor by animateColorAsState(
         targetValue = when (phase) {
-            InlineConfirmPhase.Idle -> Color.Transparent
+            // Outlined：idle 补 outlineVariant 描边（对齐 M3 OutlinedButton，旧版删除钮观感）
+            InlineConfirmPhase.Idle -> if (outlined) cs.outlineVariant else Color.Transparent
             InlineConfirmPhase.Asking -> cs.error.copy(alpha = 0.45f)
             InlineConfirmPhase.Done -> cs.primary.copy(alpha = 0.45f)
         },
@@ -219,7 +233,7 @@ fun InlineConfirmButton(
                         Modifier
                     },
                 )
-                .height(ButtonHeight)
+                .height(height)
                 .clip(pill)
                 .background(container)
                 .border(BorderStroke(1.dp, borderColor), pill),
@@ -233,6 +247,9 @@ fun InlineConfirmButton(
                             text = idleText,
                             contentColor = idleContentColor,
                             minWidth = cellMinWidth,
+                            minHeight = height,
+                            // 非 Compact（含 Outlined）走 Spacing.xl(24dp) 横内边距
+                            // = M3 OutlinedButton 内容边距 → 自然宽与旧版描边删除钮一致
                             compact = style == InlineConfirmStyle.Compact,
                             onClick = { phase = InlineConfirmPhase.Asking },
                         )
@@ -240,7 +257,8 @@ fun InlineConfirmButton(
                         InlineConfirmPhase.Asking -> AskingRow(
                             cancelText = cancelText,
                             confirmText = confirmText,
-                            compact = style == InlineConfirmStyle.Compact,
+                            compact = compactCells,
+                            minHeight = height,
                             onCancel = { settle() },
                             onConfirm = {
                                 onConfirm()
@@ -256,6 +274,7 @@ fun InlineConfirmButton(
                             text = undoText,
                             contentColor = cs.primary,
                             minWidth = cellMinWidth,
+                            minHeight = height,
                             compact = style == InlineConfirmStyle.Compact,
                             onClick = {
                                 onUndo?.invoke()
@@ -295,6 +314,7 @@ private fun IdleRow(
     text: String,
     contentColor: Color,
     minWidth: Dp,
+    minHeight: Dp,
     compact: Boolean,
     onClick: () -> Unit,
 ) {
@@ -309,7 +329,7 @@ private fun IdleRow(
                 role = Role.Button,
                 onClick = onClick,
             )
-            .heightIn(min = ButtonHeight)
+            .heightIn(min = minHeight)
             .padding(horizontal = if (compact) Spacing.m else Spacing.xl),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
@@ -324,6 +344,7 @@ private fun AskingRow(
     cancelText: String,
     confirmText: String,
     compact: Boolean,
+    minHeight: Dp,
     onCancel: () -> Unit,
     onConfirm: () -> Unit,
 ) {
@@ -347,7 +368,7 @@ private fun AskingRow(
                     role = Role.Button,
                     onClick = onCancel,
                 )
-                .heightIn(min = ButtonHeight - Spacing.s)
+                .heightIn(min = minHeight - Spacing.s)
                 .padding(horizontal = if (compact) Spacing.m else Spacing.l),
             contentAlignment = Alignment.Center,
         ) {
@@ -366,7 +387,7 @@ private fun AskingRow(
                     role = Role.Button,
                     onClick = onConfirm,
                 )
-                .heightIn(min = ButtonHeight - Spacing.s)
+                .heightIn(min = minHeight - Spacing.s)
                 .padding(horizontal = if (compact) Spacing.m else Spacing.l),
             contentAlignment = Alignment.Center,
         ) {
@@ -381,6 +402,7 @@ private fun DoneRow(
     text: String,
     contentColor: Color,
     minWidth: Dp,
+    minHeight: Dp,
     compact: Boolean,
     onClick: () -> Unit,
 ) {
@@ -395,7 +417,7 @@ private fun DoneRow(
                 role = Role.Button,
                 onClick = onClick,
             )
-            .heightIn(min = ButtonHeight)
+            .heightIn(min = minHeight)
             .padding(horizontal = if (compact) Spacing.m else Spacing.xl),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,

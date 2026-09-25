@@ -89,6 +89,8 @@ import com.mdot.app.core.designsystem.WindowSpec
 import com.mdot.app.core.designsystem.rememberContentSideInset
 import com.mdot.app.core.designsystem.rememberWindowSpec
 import com.mdot.app.core.designsystem.component.JiabanBottomBar
+import com.mdot.app.core.designsystem.component.MessageSnackbarHost
+import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import com.mdot.app.core.designsystem.component.BackdropBlurState
 import com.mdot.app.core.designsystem.component.RecordCircleButton
 import com.mdot.app.core.designsystem.component.RecordPillButton
@@ -104,6 +106,7 @@ import com.mdot.app.feature.home.HomeScreen
 import com.mdot.app.feature.onboarding.OnboardingScreen
 import com.mdot.app.feature.profile.ProfileScreen
 import com.mdot.app.feature.record.RecordSheet
+import com.mdot.app.feature.record.RecordSheetViewModel
 import com.mdot.app.feature.settings.AboutScreen
 import com.mdot.app.feature.settings.DataSourceScreen
 import com.mdot.app.feature.settings.SystemSettingsScreen
@@ -293,6 +296,9 @@ private fun AppRootContent(
     pageBackInterception: androidx.compose.runtime.MutableState<Boolean>,
 ) {
     val navController = rememberNavController()
+    // 记录弹层 VM 为 Activity 级（弹层在 NavHost 外组合）——此处取同一实例，
+    // 弹层关闭后仍能收它的删除撤销消息（硬规则 11：撤销住底部提示窗）
+    val recordVm: RecordSheetViewModel = hiltViewModel()
     val request by appVm.recordRequest.collectAsStateWithLifecycle()
     // 记录弹层可见性状态提升到此处：背景「模糊 + 缩小」层（SheetBackdropLayer）与弹层自身
     // 共享同一过渡状态，进出场严格同步（弹层内部负责置 targetState）
@@ -772,6 +778,53 @@ private fun AppRootContent(
                     Icon(painterResource(R.drawable.ic_ms_add), contentDescription = stringResource(R.string.nav_fab_cd))
                 }
             }
+        }
+
+        // ---- 全局底部提示（一个宿主两条消息；优先级：记录删除撤销 > 冷启动新版本）----
+        // 记录删除撤销：弹层已关、触发元素消失，按硬规则 11 撤销住提示窗（同调休删调整）；
+        // 新版本「去更新」：只在首页渲染（冷启动落点），避免与各页面自带 MessageSnackbar 叠罗汉。
+        // 底部抬高 = 底栏占位（与 bottomBarContentPaddingValues 同式，宿主内部已另加导航栏避让）
+        val recordMessage by recordVm.messageFlow.collectAsStateWithLifecycle()
+        val updateAvailable by appVm.updateAvailable.collectAsStateWithLifecycle()
+        val rMsg = recordMessage
+        val showUpdatePrompt =
+            firstLaunchDone && updateAvailable != null && currentBase == Routes.HOME
+        val globalMessage: String? = when {
+            rMsg != null -> rMsg.text
+            showUpdatePrompt -> stringResource(R.string.update_available_msg, "v$updateAvailable")
+            else -> null
+        }
+        val (globalSnackbarState, globalIsError) = rememberMessageSnackbar(
+            message = globalMessage,
+            isError = rMsg?.isError == true,
+            onClear = {
+                if (recordMessage != null) recordVm.clearMessage()
+                else appVm.dismissUpdateAvailable()
+            },
+            actionLabel = when {
+                rMsg?.canUndo == true -> stringResource(R.string.record_undo)
+                showUpdatePrompt -> stringResource(R.string.update_available_action)
+                else -> null
+            },
+            onAction = {
+                if (recordMessage?.canUndo == true) {
+                    recordVm.undoDelete()
+                } else {
+                    appVm.dismissUpdateAvailable()
+                    navController.navigate(Routes.ABOUT) { launchSingleTop = true }
+                }
+            },
+        )
+        if (globalMessage != null) {
+            MessageSnackbarHost(
+                globalSnackbarState,
+                isError = globalIsError,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    // 底栏占位（= bottomBarContentPaddingValues 减导航栏——宿主内部已另加导航栏避让）；
+                    // 8dp 用 Spacing.s：SpacingContractTest 禁 padding 行出现 dp 字面量
+                    .padding(bottom = BottomBarSpec.height + BottomBarSpec.bottomMargin + Spacing.s),
+            )
         }
 
         request?.let { req ->
