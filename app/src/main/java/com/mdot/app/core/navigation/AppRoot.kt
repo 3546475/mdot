@@ -424,6 +424,10 @@ private fun AppRootContent(
                                 onOpenCalendar = { navTo(navController, Routes.CALENDAR_PATTERN, slots) },
                                 onOpenStats = { navTo(navController, Routes.statsDetail(0), slots) },
                                 onOpenDetail = { navTo(navController, Routes.statsDetail(if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) 1 else 2), slots) },
+                                // 快捷入口的「记月」→ 记月页签（统计/记月/明细 = 0/1/2）；
+                                // 工地制度下该入口不渲染（无记月概念），故这里不必按制度分支
+                                onOpenPayMonth = { navTo(navController, Routes.statsDetail(1), slots) },
+                                onOpenProfile = { navTo(navController, Routes.PROFILE, slots) },
                                 onOpenRecord = {
                                     if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
                                         navTo(navController, Routes.SITE_RECORD, slots)

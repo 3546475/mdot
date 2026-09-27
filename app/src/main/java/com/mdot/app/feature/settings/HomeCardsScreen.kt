@@ -17,13 +17,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,6 +50,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -56,11 +60,16 @@ import com.mdot.app.core.designsystem.IconBoxSpec
 import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.component.ChoicePillOption
+import com.mdot.app.core.designsystem.component.ChoicePillRow
+import com.mdot.app.core.designsystem.component.HomeCardContentRegistry
+import com.mdot.app.core.designsystem.component.HomeCardContentUi
 import com.mdot.app.core.designsystem.component.HomeCardRegistry
 import com.mdot.app.core.designsystem.component.HomeCardSpec
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.navigation.contentBottomPadding
+import com.mdot.app.domain.model.HomeCardContents
 import com.mdot.app.domain.model.HomeCardsConfig
 
 /**
@@ -73,6 +82,9 @@ fun HomeCardsPane(
     vm: HomeCardsViewModel = hiltViewModel(),
 ) {
     val config by vm.config.collectAsStateWithLifecycle()
+
+    // 正在编辑内容的卡片 id（卡片内容编辑；null = 没在编辑）
+    var editingCard by remember { mutableStateOf<String?>(null) }
 
     // 本地编辑草稿（**完整顺序**，含已隐藏项）：拖动实时换位先改草稿，松手一次性持久化（同底栏配置页）
     var draft by remember { mutableStateOf(config.order) }
@@ -114,8 +126,125 @@ fun HomeCardsPane(
             },
             onDragEnd = { vm.setOrder(draft) },
             onToggle = { id, enabled -> vm.setEnabled(id, enabled) },
+            onEditContent = { editingCard = it },
         )
         Spacer(Modifier.height(Spacing.xl))
+    }
+
+    // 卡片内容选项：单选点一下即生效并收起；多选（快捷入口）改完点「确定」
+    editingCard?.let { cardId ->
+        HomeCardContentDialog(
+            cardId = cardId,
+            current = config.contentList(cardId),
+            onApply = { vm.setContents(cardId, it) },
+            onDismiss = { editingCard = null },
+        )
+    }
+}
+
+/**
+ * 卡片内容选项（卡片内容编辑）：
+ * - **单选**（数据区）= `ChoicePillRow` 图标药丸（docs/03 §16），点一下即生效并收起；
+ * - **多选**（快捷入口）= 勾选行，改完点「确定」。
+ * 多选不用 `ChoicePillRow`：那是多选一的形状，五个选项挤一行也会把药丸压糊。
+ */
+@Composable
+private fun HomeCardContentDialog(
+    cardId: String,
+    current: List<String>,
+    onApply: (List<String>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val options = HomeCardContentRegistry.of(cardId)
+    if (options.isEmpty()) return
+    val multi = HomeCardContents.isMultiSelect(cardId)
+    // 多选用本地草稿（弹层内先改、确定才落盘，取消能真取消）
+    var draft by remember(cardId) { mutableStateOf(current) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(stringResource(if (multi) R.string.home_card_content_entries_title else R.string.home_card_content_title))
+        },
+        text = {
+            if (multi) {
+                Column {
+                    options.forEach { opt ->
+                        val on = opt.id in draft
+                        EntryChoiceRow(
+                            ui = opt,
+                            checked = on,
+                            // 至少留一个：全关掉首页那张卡就空了
+                            onToggle = {
+                                draft = if (on) (draft - opt.id).ifEmpty { draft } else draft + opt.id
+                            },
+                        )
+                    }
+                }
+            } else {
+                ChoicePillRow(
+                    options = options.map { ChoicePillOption(iconRes = it.iconRes, labelRes = it.labelRes) },
+                    selected = options.indexOfFirst { it.id in draft }.coerceAtLeast(0),
+                    onSelect = { index ->
+                        onApply(listOf(options[index].id))
+                        onDismiss()
+                    },
+                )
+            }
+        },
+        confirmButton = {
+            if (multi) {
+                TextButton(onClick = { onApply(draft); onDismiss() }) {
+                    Text(stringResource(R.string.home_card_content_done))
+                }
+            } else {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.home_card_content_cancel)) }
+            }
+        },
+    )
+}
+
+/** 多选用的勾选行：图标 tonal 方块 + 名称 + 右侧勾（整行可点） */
+@Composable
+private fun EntryChoiceRow(ui: HomeCardContentUi, checked: Boolean, onToggle: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .toggleable(
+                value = checked,
+                role = Role.Checkbox,
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                onValueChange = { onToggle() },
+            )
+            .padding(vertical = Spacing.s),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(IconBoxSpec.tile.box)
+                .background(
+                    if (checked) MaterialTheme.colorScheme.secondaryContainer
+                    else MaterialTheme.colorScheme.surfaceContainerHighest,
+                    RoundedCornerShape(Radius.small),
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painterResource(ui.iconRes), null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(IconBoxSpec.tile.icon),
+            )
+        }
+        Spacer(Modifier.width(Spacing.m))
+        Text(stringResource(ui.labelRes), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        if (checked) {
+            Icon(
+                painterResource(R.drawable.ic_ms_check), null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(IconSpec.inline),
+            )
+        }
     }
 }
 
@@ -135,6 +264,8 @@ private fun HomeCardsConfigCard(
     onSwap: (from: Int, to: Int) -> Unit,
     onDragEnd: () -> Unit,
     onToggle: (String, Boolean) -> Unit,
+    /** 点某张卡 → 改它显示什么（只对支持内容自定义的卡生效） */
+    onEditContent: (String) -> Unit,
 ) {
     var dragFrom by remember { mutableIntStateOf(-1) }
     var draggingId by remember { mutableStateOf<String?>(null) }
@@ -243,6 +374,7 @@ private fun HomeCardsConfigCard(
                             isOn = isOn,
                             closable = closable,
                             onToggle = { onToggle(id, !isOn) },
+                            onEdit = if (HomeCardContents.supports(id)) ({ onEditContent(id) }) else null,
                         )
                     }
                 }
@@ -251,7 +383,10 @@ private fun HomeCardsConfigCard(
     }
 }
 
-/** 单行：图标 tonal 方块 + 名称 + 开关（视觉对齐底栏配置行，开关切换） */
+/** 单行：图标 tonal 方块 + 名称 + 开关（视觉对齐底栏配置行，开关切换）。
+ *  可自定义内容的卡片（当前只「数据区」）**图标方块 + 名称 + 行尾铅笔整块可点**打开内容选项。
+ *  铅笔也要能点——只当指示图标的写法被用户实测当成坏按钮（“修改按钮实际上不能点击”）。
+ *  刻意不加 IconButton：行高被拖拽换位的 56dp 判定单元锁住，加 48dp 热区会把行撑高。 */
 @Composable
 private fun HomeCardRow(
     spec: HomeCardSpec,
@@ -259,6 +394,8 @@ private fun HomeCardRow(
     /** 可关闭（「数据区」=false：开关置灰，保证首页至少一张卡） */
     closable: Boolean,
     onToggle: () -> Unit,
+    /** 内容可自定义时给编辑入口；null = 该卡不支持内容自定义 */
+    onEdit: (() -> Unit)? = null,
 ) {
     // 颜色随开关切换过渡（原先瞬间跳变）
     val colorSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Color>()
@@ -281,27 +418,54 @@ private fun HomeCardRow(
             .padding(vertical = Spacing.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // 图标 tonal 容器（03 文档 §3.4）：secondaryContainer 底 + primary 图标，盒+图标成对
-        Box(
+        val rowInteraction = remember { MutableInteractionSource() }
+        // 点击区 = 图标方块 + 名称 + 行尾铅笔（开关留在区外，免得想点编辑却拨了开关）
+        Row(
             modifier = Modifier
-                .size(IconBoxSpec.tile.box)
-                .background(iconBoxColor, RoundedCornerShape(Radius.small)),
-            contentAlignment = Alignment.Center,
+                .weight(1f)
+                .then(
+                    if (onEdit != null) {
+                        Modifier.clickable(
+                            interactionSource = rowInteraction,
+                            indication = LocalIndication.current,
+                            onClick = onEdit,
+                        )
+                    } else Modifier
+                ),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                painterResource(spec.iconRes),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(IconBoxSpec.tile.icon),
+            // 图标 tonal 容器（03 文档 §3.4）：secondaryContainer 底 + primary 图标，盒+图标成对
+            Box(
+                modifier = Modifier
+                    .size(IconBoxSpec.tile.box)
+                    .background(iconBoxColor, RoundedCornerShape(Radius.small)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painterResource(spec.iconRes),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(IconBoxSpec.tile.icon),
+                )
+            }
+            Spacer(Modifier.width(Spacing.m))
+            Text(
+                stringResource(spec.labelRes),
+                style = MaterialTheme.typography.bodyLarge,
+                color = contentColor,
+                modifier = Modifier.weight(1f),
             )
+            // 内容自定义的可见指示（点击走上方整块点击区，它自己也是那块的一部分）
+            if (onEdit != null) {
+                Icon(
+                    painterResource(R.drawable.ic_ms_edit),
+                    contentDescription = stringResource(R.string.home_card_content_edit_cd),
+                    tint = contentColor,
+                    modifier = Modifier.size(IconSpec.dense),
+                )
+                Spacer(Modifier.width(Spacing.s))
+            }
         }
-        Spacer(Modifier.width(Spacing.m))
-        Text(
-            stringResource(spec.labelRes),
-            style = MaterialTheme.typography.bodyLarge,
-            color = contentColor,
-            modifier = Modifier.weight(1f),
-        )
         Switch(checked = isOn, onCheckedChange = if (closable) { { onToggle() } } else null, enabled = closable)
     }
 }

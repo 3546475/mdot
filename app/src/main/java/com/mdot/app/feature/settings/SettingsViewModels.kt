@@ -487,6 +487,19 @@ class HomeCardsViewModel @Inject constructor(
         settings.setHomeCards(cfg.copy(disabled = disabled.distinct()))
     }
 
+    /** 换某张卡显示什么（卡片内容自定义）：只动 content，不动 order/disabled。
+     *  [ids] = **选中的内容项**（单选卡传单元素列表；多选卡传多个，顺序即显示顺序） */
+    fun setContents(cardId: String, ids: List<String>) = viewModelScope.launch {
+        val valid = ids.distinct().filter { com.mdot.app.domain.model.HomeCardContents.isValid(cardId, it) }
+        if (valid.isEmpty()) return@launch
+        val cfg = config.value
+        val next = cfg.content.toMutableMap()
+        // 回到出厂默认就不留记录（存储最小化，以后升/降级归一化也简单）
+        if (valid == com.mdot.app.domain.model.HomeCardContents.defaultsOf(cardId)) next.remove(cardId)
+        else next[cardId] = valid
+        settings.setHomeCards(cfg.copy(content = next))
+    }
+
     /** 拖拽排序后的顺序提交（disabled 原样保留；池内其余项补在后面，不丢项） */
     fun setOrder(order: List<String>) = viewModelScope.launch {
         val cfg = config.value

@@ -1,7 +1,9 @@
 package com.mdot.app.core.designsystem.component
 
 import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import com.mdot.app.R
+import com.mdot.app.domain.model.HomeCardContents
 import com.mdot.app.domain.model.HomeCardsConfig
 
 /**
@@ -35,4 +37,37 @@ object HomeCardRegistry {
     val POOL_SPECS: List<HomeCardSpec> = HomeCardsConfig.POOL.mapNotNull { ALL[it] }
 
     fun resolveSpec(id: String): HomeCardSpec? = ALL[id]
+}
+
+/**
+ * 卡片内容项的 UI 资源（卡片内容编辑）。**id 在 domain 的 [HomeCardContents]**（硬规则 1：
+ * domain 零 Android 依赖），这里只负责 id → 文案/图标，显示点才解析。
+ *
+ * 当前只「数据区」开放内容自定义；以后其他卡要开放，往 [ALL] 加行 + 在 [HomeCardContents.OPTIONS]
+ * 里给它列选项即可，模型与配置页不用改。
+ */
+data class HomeCardContentUi(
+    val id: String,
+    @StringRes val labelRes: Int,
+    @DrawableRes val iconRes: Int,
+)
+
+object HomeCardContentRegistry {
+    val ALL = listOf(
+        // 数据区（单选）
+        HomeCardContentUi(HomeCardContents.DATA_OT_HOURS, R.string.home_content_ot_hours, R.drawable.ic_ms_more_time),
+        HomeCardContentUi(HomeCardContents.DATA_NET_PAY, R.string.home_content_net_pay, R.drawable.ic_ms_account_balance_wallet),
+        // 快捷入口（多选；选中项渲染成入口卡，图标/文案与这里同源）
+        HomeCardContentUi(HomeCardContents.ENTRY_CALENDAR, R.string.home_entry_calendar, R.drawable.ic_ms_calendar_month),
+        HomeCardContentUi(HomeCardContents.ENTRY_STATS, R.string.home_entry_stats, R.drawable.ic_ms_bar_chart),
+        HomeCardContentUi(HomeCardContents.ENTRY_PAYMONTH, R.string.home_entry_paymonth, R.drawable.ic_ms_paid),
+        HomeCardContentUi(HomeCardContents.ENTRY_DETAIL, R.string.home_entry_detail, R.drawable.ic_ms_table_chart),
+        HomeCardContentUi(HomeCardContents.ENTRY_PROFILE, R.string.home_entry_profile, R.drawable.ic_ms_person),
+    )
+
+    /** 某张卡可选的内容项（顺序与 domain 的 [HomeCardContents.optionsOf] 一致） */
+    fun of(cardId: String): List<HomeCardContentUi> =
+        HomeCardContents.optionsOf(cardId).mapNotNull { id -> ALL.find { it.id == id } }
+
+    fun resolve(id: String): HomeCardContentUi? = ALL.find { it.id == id }
 }

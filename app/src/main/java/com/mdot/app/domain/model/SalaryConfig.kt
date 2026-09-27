@@ -140,6 +140,55 @@ data class BottomBarConfig(
 }
 
 /**
+ * 首页卡片的**内容项** id（卡片内容编辑）：纯字符串常量，**零 Android 依赖**（硬规则 1）。
+ * 对应的文案/图标映射在 `core/designsystem/component/HomeCardRegistry.kt` 的 [HomeCardContentsUi]。
+ *
+ * 当前只「数据区」开放内容自定义（用户 2026-09-27 要求「数据区可自定义编辑」，其余卡暂未开放）。
+ */
+object HomeCardContents {
+    /** 数据区 hero 可显示的内容（**单选**） */
+    const val DATA_OT_HOURS = "otHours"
+    const val DATA_NET_PAY = "netPay"
+
+    /** 快捷入口卡可放的入口（**多选**，选中项按序全部渲染成入口卡） */
+    const val ENTRY_CALENDAR = "calendar"
+    const val ENTRY_STATS = "stats"
+    const val ENTRY_PAYMONTH = "paymonth"
+    const val ENTRY_DETAIL = "detail"
+    const val ENTRY_PROFILE = "profile"
+
+    /** 每张卡可选的内容项（列表顺序 = 展示顺序）；不在表里的卡 = 不支持内容自定义。
+     *  「本月收入」**不入列**：收入卡已经有它，数据区再给一份是重复（用户 2026-09-27 定）。 */
+    val OPTIONS: Map<String, List<String>> = mapOf(
+        HomeCardsConfig.DATA to listOf(DATA_OT_HOURS, DATA_NET_PAY),
+        HomeCardsConfig.ENTRIES to listOf(ENTRY_CALENDAR, ENTRY_STATS, ENTRY_PAYMONTH, ENTRY_DETAIL, ENTRY_PROFILE),
+    )
+
+    /** 出厂默认内容（用户没选过就用它） */
+    val DEFAULTS: Map<String, List<String>> = mapOf(
+        HomeCardsConfig.DATA to listOf(DATA_OT_HOURS),
+        HomeCardsConfig.ENTRIES to listOf(ENTRY_CALENDAR, ENTRY_STATS),
+    )
+
+    /** **多选**卡：选中的内容项**都**渲染出来（快捷入口）；其余卡单选、只取第一个 */
+    val MULTI_SELECT: Set<String> = setOf(HomeCardsConfig.ENTRIES)
+
+    fun optionsOf(cardId: String): List<String> = OPTIONS[cardId].orEmpty()
+
+    /** 该卡的出厂默认内容（没登记则回落到全部可选项） */
+    fun defaultsOf(cardId: String): List<String> = DEFAULTS[cardId] ?: optionsOf(cardId)
+
+    /** 该卡是否支持内容自定义 */
+    fun supports(cardId: String): Boolean = cardId in OPTIONS
+
+    /** 该卡是否多选 */
+    fun isMultiSelect(cardId: String): Boolean = cardId in MULTI_SELECT
+
+    /** 校验某个内容项是否属于该卡（存储里可能有旧/未知值，一律否掉） */
+    fun isValid(cardId: String, contentId: String): Boolean = contentId in optionsOf(cardId)
+}
+
+/**
  * 首页卡片配置（v0.6.0 首页卡片可编辑）。
  * cards = 显示中的卡片 id 按显示顺序；null = 用户未配置过（走各页内置默认布局，向后兼容旧数据）。
  * 配置页交互对齐底栏配置：点选开/关 + 拖拽排序；至少保留一张卡片。
@@ -150,6 +199,9 @@ data class HomeCardsConfig(
     val order: List<String> = DEFAULT_ORDER,
     /** 已隐藏（不在首页显示）的卡片 id；缺省 = 出厂默认隐藏（月柱状 / 热点图） */
     val disabled: List<String> = DEFAULT_DISABLED,
+    /** 卡片内容自定义（卡片内容编辑）：卡片 id → **选中的内容项 id 列表**（顺序即显示顺序）。
+     *  单选卡（数据区）长度恒为 1；多选卡（快捷入口）选中项按序都渲染。只存**偏离默认**的项。 */
+    val content: Map<String, List<String>> = emptyMap(),
     /** 旧字段（≤v0.6.21）：null=未配置、非 null=显式启用列表。仅迁移用，见 [migrated] */
     @kotlinx.serialization.SerialName("cards")
     private val legacyCards: List<String>? = null,
@@ -161,20 +213,40 @@ data class HomeCardsConfig(
             return if (DATA in on) on else listOf(DATA) + on
         }
 
+    /** 某张卡当前选中的内容项（过滤未知值、去重；没配置 / 全非法 = 该卡出厂默认） */
+    fun contentList(cardId: String): List<String> {
+        val valid = content[cardId].orEmpty().filter { HomeCardContents.isValid(cardId, it) }.distinct()
+        return valid.ifEmpty { HomeCardContents.defaultsOf(cardId) }
+    }
+
+    /** 单选卡的当前内容项（多选卡取第一个） */
+    fun contentOf(cardId: String): String = contentList(cardId).firstOrNull().orEmpty()
+
     /** 旧格式 → 新格式：显式配置过的按原顺序在前、其余按默认顺序补后；未启用的进 [disabled]。
-     *  旧格式 `cards == null`（未配置 = 出厂默认布局）→ 原样返回。 */
+     *  旧格式 `cards == null`（未配置 = 出厂默认布局）→ 只做 content 归一化。 */
     fun migrated(): HomeCardsConfig {
-        val legacy = legacyCards ?: return this
-        val enabled = legacy.filter { it in POOL }.distinct()
-        return HomeCardsConfig(
-            order = enabled + DEFAULT_ORDER.filter { it !in enabled },
-            disabled = POOL.filter { it !in enabled },
-        )
+        val base = legacyCards?.let { legacy ->
+            val enabled = legacy.filter { it in POOL }.distinct()
+            HomeCardsConfig(
+                order = enabled + DEFAULT_ORDER.filter { it !in enabled },
+                disabled = POOL.filter { it !in enabled },
+            )
+        } ?: this
+        // content 归一化：丢掉已下线的卡片 id 与不属于该卡的内容项（升级/降级后存里可能有残留）
+        val clean = buildMap {
+            base.content.forEach { (cardId, ids) ->
+                val valid = ids.filter { HomeCardContents.isValid(cardId, it) }.distinct()
+                if (cardId in POOL && valid.isNotEmpty()) put(cardId, valid)
+            }
+        }
+        return if (clean == base.content) base else base.copy(content = clean)
     }
 
     companion object {
         /** 固定显示、不可隐藏（保证首页至少有一张卡） */
         const val DATA = "data"
+        /** 「快捷入口」卡（v0.7.8 由「日历/统计入口」改名；内容可自定义，见 [HomeCardContents]） */
+        const val ENTRIES = "entries"
         /** 卡片功能池（v0.6.21 起顺序 = 出厂默认顺序） */
         val POOL = listOf("data", "income", "entries", "weekbar", "monthbar", "heatmap")
         /** 出厂默认顺序（用户定 2026-09-20）：数据区（不可关闭）- 收入卡 - 日历统计入口 - 周柱状 - 月柱状 - 热点图 */

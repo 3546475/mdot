@@ -12,6 +12,7 @@ import com.mdot.app.domain.toCalcLite
 import com.mdot.app.domain.CycleCalculator
 import com.mdot.app.domain.PayrollCalculator
 import com.mdot.app.domain.model.BottomBarConfig
+import com.mdot.app.domain.model.HomeCardContents
 import com.mdot.app.domain.model.HomeCardsConfig
 import com.mdot.app.domain.model.SalaryConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -39,6 +40,12 @@ data class HomeUiState(
     val compBalanceMinutes: Int = 0,
     /** 首页卡片显示序列（v0.6.0 首页卡片可编辑；未配置时经旧逻辑推导） */
     val cards: List<String> = HomeCardsConfig().enabledCards,
+    /** 数据区 hero 显示的内容项 id（卡片内容自定义，[HomeCardContents]） */
+    val dataContent: String = HomeCardContents.DATA_OT_HOURS,
+    /** 快捷入口卡显示的入口项（多选，顺序即显示顺序；[HomeCardContents]） */
+    val entries: List<String> = HomeCardContents.defaultsOf(HomeCardsConfig.ENTRIES),
+    /** 记月本月实发（分）；null = 记月未填 → 数据区选「实发工资」时显示 "-" */
+    val netPayCents: Long? = null,
     // ---- 工地记工（12 文档 F-S6）----
     val siteLoading: Boolean = false,
     val siteProjectName: String = "",
@@ -80,19 +87,25 @@ class HomeViewModel @Inject constructor(
         settings.workdaysFlow,
         combine(
             engine.status,
-            combine(settings.bottomBarFlow, recordRepo.observeCompBalance(), settings.homeCardsFlow) { bar, bal, homeCards ->
-                Triple(bar, bal, homeCards)
+            combine(
+                settings.bottomBarFlow,
+                recordRepo.observeCompBalance(),
+                settings.homeCardsFlow,
+                // 记月单据（数据区可选「实发工资」时用；硬规则 12：只取 domain getter，UI 不另算）
+                settings.payMonthFlow(today.toYearMonth().toString()),
+            ) { bar, bal, homeCards, payMonth ->
+                HomeSettingsExtra(bar, bal, homeCards, payMonth)
             },
             // 云端恢复导入等大规模替换后 bump → 强制本页全量重算
             dataRevision.version,
         ) { sync: com.mdot.app.core.sync.SyncStatus,
-            extra2: Triple<com.mdot.app.domain.model.BottomBarConfig, Int, com.mdot.app.domain.model.HomeCardsConfig>,
+            extra2: HomeSettingsExtra,
             _: Int ->
             sync to extra2
         },
     ) { cycle, monthRecords, salary, workdays, extra ->
         val (sync, extra0) = extra
-        val (bar, compBalance, homeCards) = extra0
+        val (bar, compBalance, homeCards, payMonth) = extra0
         val (period, cycleRecords) = cycle
         val tierOf: (LocalDate) -> com.mdot.app.domain.model.RateTier =
             { date -> holidayRepo.tierFor(date, workdays) }
@@ -142,6 +155,10 @@ class HomeViewModel @Inject constructor(
             monthIncomeCents = if (showMoney) monthOut.incomeCents else null,
             compBalanceMinutes = compBalance,
             cards = cards,
+            dataContent = homeCards.contentOf(HomeCardsConfig.DATA),
+            entries = homeCards.contentList(HomeCardsConfig.ENTRIES),
+            // 与记月页同口径：单据全 0 = 未填（不当 ¥0.00 显示，会误导）
+            netPayCents = payMonth?.takeIf { it.netCents != 0L || it.incomeCents != 0L }?.netCents,
             backupConfigured = sync.configured,
             backupConflict = sync.conflict,
             lastBackupAt = sync.lastBackupAt,
@@ -235,6 +252,14 @@ class HomeViewModel @Inject constructor(
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SiteHomeUi())
 }
+
+/** 首页设置态合集（bottomBar / 调休余额 / 首页卡片配置 / 记月单据）；单独成类以免 combine 层级越嵌越深 */
+private data class HomeSettingsExtra(
+    val bar: BottomBarConfig,
+    val compBalance: Int,
+    val homeCards: HomeCardsConfig,
+    val payMonth: com.mdot.app.domain.model.PayMonthSheet?,
+)
 
 /** 工地记工首页数据（12 文档 F-S6；独立通道，SiteHomeUi 空实例=非 SITE 制度） */
 data class SiteHomeUi(

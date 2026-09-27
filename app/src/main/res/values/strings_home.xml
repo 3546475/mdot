@@ -6,9 +6,14 @@
     <string name="home_overtime_standard_suffix">" · 标准 %1$sh（至今）"</string>
     <string name="home_today_empty">今日还没记，点此去记</string>
     <string name="home_today_ot">今日 %1$sh</string>
+    <!-- 数据区 hero 换成金额后，时长不再占大数字 → 今日胶囊旁补一颗同款「总 Xh」把时长留住 -->
+    <string name="home_total_ot">总 %1$sh</string>
     <string name="home_cycle_period">周期 %1$s</string>
     <string name="home_entry_calendar">日历</string>
     <string name="home_entry_stats">统计</string>
+    <string name="home_entry_paymonth">记月</string>
+    <string name="home_entry_detail">明细</string>
+    <string name="home_entry_profile">我的</string>
     <string name="home_record_hourly">记工作</string>
     <string name="home_record_comprehensive">记上班</string>
     <string name="home_record_standard">记加班</string>
@@ -26,8 +31,16 @@
     <!-- 首页卡片名（HomeCardRegistry，配置页与预览用） -->
     <string name="home_card_data">数据区</string>
     <string name="home_card_income">收入卡</string>
-    <string name="home_card_entries">日历/统计入口</string>
+    <string name="home_card_entries">快捷入口</string>
     <string name="home_card_heatmap">热点图</string>
     <string name="home_card_weekbar">本周柱状</string>
     <string name="home_card_monthbar">月柱状</string>
+    <!-- 卡片内容自定义（卡片内容编辑）：某张卡显示什么，当前「数据区」单选 +「快捷入口」多选 -->
+    <string name="home_card_content_title">选择显示内容</string>
+    <string name="home_card_content_entries_title">选择快捷入口</string>
+    <string name="home_card_content_cancel">取消</string>
+    <string name="home_card_content_done">确定</string>
+    <string name="home_card_content_edit_cd">编辑显示内容</string>
+    <string name="home_content_ot_hours">加班时长</string>
+    <string name="home_content_net_pay">实发工资</string>
 </resources>

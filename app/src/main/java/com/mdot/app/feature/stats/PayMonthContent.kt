@@ -90,9 +90,11 @@ import com.mdot.app.core.designsystem.component.MonthPickDialog
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.domain.PayrollCalculator
 import com.mdot.app.domain.model.IncomeSliceKind
+import com.mdot.app.domain.model.InsuranceKind
 import com.mdot.app.domain.model.PayGroup
 import com.mdot.app.domain.model.PayMonthItem
 import com.mdot.app.domain.model.PayMonthSheet
+import com.mdot.app.domain.model.insuranceKindOf
 import com.mdot.app.domain.model.RateTier
 import com.mdot.app.domain.model.reconciliations
 import com.mdot.app.domain.model.PayMonthSource
@@ -279,7 +281,10 @@ fun PayMonthContent(
                 onToggleCollapse = { vm.toggleCollapsed(PayGroup.OTHER) },
                 // 「个人所得税」行 → 独立个税估算页（docs/20 P3-5）
                 onEdit = { item ->
-                    if (item.id == PayMonthSheet.TAX_ROW_ID) onOpenTax() else editing = PayGroup.OTHER to item
+                    // ⚠️ 行 id 只在**组内**唯一，故叠上 builtin 判定（用户行永不是 builtin）——
+                    // 只看 id 会被用户行撞上（同下方 insurance 判定，2026-09-27 用户报的 bug）
+                    if (item.builtin && item.id == PayMonthSheet.TAX_ROW_ID) onOpenTax()
+                    else editing = PayGroup.OTHER to item
                 },
                 onAdd = { adding = PayGroup.OTHER },
             )
@@ -290,20 +295,23 @@ fun PayMonthContent(
     }
     editing?.let { (group, item) ->
         // 社保 / 公积金行：比例与基数就在**它自己的弹窗**里设（工资设定页不再放这张卡，见 docs/20）
-        val insurance = when (item.id) {
-            PayMonthSheet.SOCIAL_ROW_ID -> InsuranceEditUi(
+        // 「社保 / 公积金」设置放进它自己那一行的弹窗（docs/20）。
+        // 辨识走 domain 的 insuranceKindOf——行 id 只在**组内**唯一、跨组会撞车：
+        // 扣款组用户加的两行就拿到 id 8/9（= SOCIAL/FUND_ROW_ID），只看 id 时会误弹社保/公积金设置
+        val insurance = when (item.insuranceKindOf(group)) {
+            InsuranceKind.SOCIAL -> InsuranceEditUi(
                 social = true,
                 rateBp = salary.socialInsuranceRateBp,
                 baseCents = salary.socialInsuranceBaseCents,
                 baseSalaryCents = salary.baseSalaryCents,
             )
-            PayMonthSheet.FUND_ROW_ID -> InsuranceEditUi(
+            InsuranceKind.FUND -> InsuranceEditUi(
                 social = false,
                 rateBp = salary.housingFundRateBp,
                 baseCents = salary.housingFundBaseCents,
                 baseSalaryCents = salary.baseSalaryCents,
             )
-            else -> null
+            null -> null
         }
         EditItemDialog(
             item = item,

@@ -67,11 +67,13 @@ import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.WindowSpec
 import com.mdot.app.core.designsystem.component.AnimatedMoneyText
 import com.mdot.app.core.designsystem.component.AnimatedNumberText
+import com.mdot.app.core.designsystem.component.HomeCardContentRegistry
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.WorkHeatmap
 import com.mdot.app.core.designsystem.component.TopBarHeight
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.navigation.contentBottomPadding
+import com.mdot.app.domain.model.HomeCardContents
 import com.mdot.app.domain.model.WorkSystem
 import com.mdot.app.domain.util.Money
 import com.mdot.app.domain.util.TimeUtils
@@ -86,6 +88,8 @@ fun HomeScreen(
     onOpenCalendar: () -> Unit,
     onOpenStats: () -> Unit,
     onOpenDetail: () -> Unit,
+    onOpenPayMonth: () -> Unit,
+    onOpenProfile: () -> Unit,
     onOpenRecord: () -> Unit,
     homeVm: HomeViewModel = hiltViewModel(),
 ) {
@@ -117,7 +121,7 @@ fun HomeScreen(
                     Spacer(Modifier.height(Spacing.xl))
                     var firstData = true
                     cardIds.forEach { id ->
-                        val content = HomeCardContent(id, state, site, onOpenCalendar, onOpenStats, onOpenDetail, onOpenRecord, onChartDay = onChartDay, stackedEntries = true)
+                        val content = HomeCardContent(id, state, site, onOpenCalendar, onOpenStats, onOpenDetail, onOpenPayMonth, onOpenProfile, onOpenRecord, onChartDay = onChartDay, stackedEntries = true)
                         if (content != null) {
                             if (!firstData) Spacer(Modifier.height(Spacing.l))
                             content()
@@ -137,7 +141,7 @@ fun HomeScreen(
                 if (!state.loading) {
                     cardIds.forEach { id ->
                         if (id == "entries" || id == "record") {
-                            HomeCardContent(id, state, site, onOpenCalendar, onOpenStats, onOpenDetail, onOpenRecord, onChartDay = onChartDay, stackedEntries = true)?.let {
+                            HomeCardContent(id, state, site, onOpenCalendar, onOpenStats, onOpenDetail, onOpenPayMonth, onOpenProfile, onOpenRecord, onChartDay = onChartDay, stackedEntries = true)?.let {
                                 it()
                                 Spacer(Modifier.height(Spacing.m))
                             }
@@ -171,7 +175,7 @@ fun HomeScreen(
             // 按配置序列渲染卡片；卡间距沿用原节奏：数据区之后 l，其余 m
             var prev: String? = null
             cardIds.forEach { id ->
-                val content = HomeCardContent(id, state, site, onOpenCalendar, onOpenStats, onOpenDetail, onOpenRecord, onChartDay = onChartDay, stackedEntries = false)
+                val content = HomeCardContent(id, state, site, onOpenCalendar, onOpenStats, onOpenDetail, onOpenPayMonth, onOpenProfile, onOpenRecord, onChartDay = onChartDay, stackedEntries = false)
                 if (content != null) {
                     if (prev != null) {
                         Spacer(Modifier.height(if (prev == "data") Spacing.l else Spacing.m))
@@ -196,6 +200,8 @@ private fun HomeCardContent(
     onOpenCalendar: () -> Unit,
     onOpenStats: () -> Unit,
     onOpenDetail: () -> Unit,
+    onOpenPayMonth: () -> Unit,
+    onOpenProfile: () -> Unit,
     onOpenRecord: () -> Unit,
     /** 图表长按某日 → 记录（与统计页同一接线） */
     onChartDay: (LocalDate) -> Unit,
@@ -220,21 +226,37 @@ private fun HomeCardContent(
             )
         }
     })
+    // 快捷入口：按配置的入口项逐个渲染（多选，顺序即显示顺序），图标/文案与配置弹窗同源。
+    // 工地制度没有「记月」概念（同记月页签的处理），该入口在工地下不渲染
     "entries" -> ({
+        val visible = state.entries.filterNot {
+            it == HomeCardContents.ENTRY_PAYMONTH && state.salary.workSystem == WorkSystem.SITE
+        }
+        val onClickOf: (String) -> Unit = { entryId ->
+            when (entryId) {
+                HomeCardContents.ENTRY_CALENDAR -> onOpenCalendar()
+                HomeCardContents.ENTRY_STATS -> onOpenStats()
+                HomeCardContents.ENTRY_PAYMONTH -> onOpenPayMonth()
+                HomeCardContents.ENTRY_DETAIL -> onOpenDetail()
+                HomeCardContents.ENTRY_PROFILE -> onOpenProfile()
+                else -> {}
+            }
+        }
         if (stackedEntries) {
-            EntryCard(onOpenCalendar, R.drawable.ic_ms_calendar_month, R.string.home_entry_calendar)
-            Spacer(Modifier.height(Spacing.m))
-            EntryCard(onOpenStats, R.drawable.ic_ms_bar_chart, R.string.home_entry_stats)
+            visible.forEachIndexed { i, entryId ->
+                val ui = HomeCardContentRegistry.resolve(entryId) ?: return@forEachIndexed
+                if (i > 0) Spacer(Modifier.height(Spacing.m))
+                EntryCard(onClick = { onClickOf(entryId) }, iconRes = ui.iconRes, labelRes = ui.labelRes)
+            }
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
-                EntryCard(
-                    onOpenCalendar, R.drawable.ic_ms_calendar_month, R.string.home_entry_calendar,
-                    modifier = Modifier.weight(1f),
-                )
-                EntryCard(
-                    onOpenStats, R.drawable.ic_ms_bar_chart, R.string.home_entry_stats,
-                    modifier = Modifier.weight(1f),
-                )
+                visible.forEach { entryId ->
+                    val ui = HomeCardContentRegistry.resolve(entryId) ?: return@forEach
+                    EntryCard(
+                        onClick = { onClickOf(entryId) }, iconRes = ui.iconRes, labelRes = ui.labelRes,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
     })
@@ -314,25 +336,35 @@ private fun DataSection(state: HomeUiState, onOpenStats: () -> Unit, onOpenRecor
                 )
             }
             Spacer(Modifier.height(6.dp))
-            // 数值变化时滚动滑入（与工地记工工钱同款滑动动画，docs/15 统一数字反馈）
-            Row(verticalAlignment = Alignment.Bottom) {
-                AnimatedNumberText(
-                    value = state.cycleOtMinutes,
-                    text = { TimeUtils.hoursDecimal(it) },
-                    style = MaterialTheme.typography.displayLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold,
-                    label = "otBigNumber",
-                )
-                Text(
-                    stringResource(R.string.detail_worked_hours_unit),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = Spacing.s, start = Spacing.xs),
-                )
+            // hero 数字：**显示什么由用户在「首页卡片 → 数据区」里选**（卡片内容自定义）。
+            // 时长走 AnimatedNumberText（与工地记工工钱同款滚动反馈），金额走 AnimatedMoneyText。
+            when (state.dataContent) {
+                HomeCardContents.DATA_NET_PAY -> DataMoneyHero(state.netPayCents, label = "netPayBigNumber")
+                else -> {
+                    // 数值变化时滚动滑入（与工地记工工钱同款滑动动画，docs/15 统一数字反馈）
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        AnimatedNumberText(
+                            value = state.cycleOtMinutes,
+                            text = { TimeUtils.hoursDecimal(it) },
+                            style = MaterialTheme.typography.displayLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold,
+                            label = "otBigNumber",
+                        )
+                        Text(
+                            stringResource(R.string.detail_worked_hours_unit),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = Spacing.s, start = Spacing.xs),
+                        )
+                    }
+                }
             }
-            // 综合工时副行：超时部分 primary 强调（10 文档 F-Z5；月中为预演值）
-            if (state.salary.workSystem == WorkSystem.COMPREHENSIVE && state.cycleOtMinutes > 0) {
+            // 综合工时副行：超时部分 primary 强调（10 文档 F-Z5；月中为预演值）。
+            // 它解释的是**上面那个时长数字**（超时 X · 标准 Y），hero 被换成金额时就不再适用
+            if (state.dataContent == HomeCardContents.DATA_OT_HOURS &&
+                state.salary.workSystem == WorkSystem.COMPREHENSIVE && state.cycleOtMinutes > 0
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         stringResource(R.string.home_overtime_prefix),
@@ -352,17 +384,47 @@ private fun DataSection(state: HomeUiState, onOpenStats: () -> Unit, onOpenRecor
                     )
                 }
             }
-            // 今日胶囊两态：已记 → 「今日 Xh」；没记 → 「今日还没记」可点直达记加班
-            if (state.todayOtMinutes > 0) {
-                TodayPill(
-                    text = stringResource(R.string.home_today_ot, TimeUtils.hoursDecimal(state.todayOtMinutes)),
-                    filled = true,
-                    onRecord = onOpenRecord,
-                )
-            } else {
-                TodayPill(text = stringResource(R.string.home_today_empty), filled = false, onRecord = onOpenRecord)
+            // 今日胶囊两态：已记 → 「今日 Xh」；没记 → 「今日还没记」可点直达记加班。
+            // hero 被换成金额（实发工资）后时长不再是大数字 → 旁边补一颗**同款**「总 Xh」把时长留住
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (state.todayOtMinutes > 0) {
+                    TodayPill(
+                        text = stringResource(R.string.home_today_ot, TimeUtils.hoursDecimal(state.todayOtMinutes)),
+                        filled = true,
+                        onRecord = onOpenRecord,
+                    )
+                } else {
+                    TodayPill(text = stringResource(R.string.home_today_empty), filled = false, onRecord = onOpenRecord)
+                }
+                if (state.dataContent != HomeCardContents.DATA_OT_HOURS) {
+                    Spacer(Modifier.width(Spacing.s))
+                    // 同款填充胶囊（filled 态本身不可点，故不接记录动作）
+                    TodayPill(
+                        text = stringResource(R.string.home_total_ot, TimeUtils.hoursDecimal(state.cycleOtMinutes)),
+                        filled = true,
+                        onRecord = {},
+                    )
+                }
             }
         }
+    }
+}
+
+/** 数据区的金额型 hero（实发工资 / 本月收入）：金额未配置或记月未填时给 "-"（同收入卡口径，不显 ¥0.00） */
+@Composable
+private fun DataMoneyHero(cents: Long?, label: String) {
+    val style = MaterialTheme.typography.displaySmall
+    val color = MaterialTheme.colorScheme.onSurface
+    if (cents == null) {
+        Text("-", style = style, color = color, fontWeight = FontWeight.Bold)
+    } else {
+        AnimatedMoneyText(
+            cents,
+            style = style,
+            color = color,
+            fontWeight = FontWeight.Bold,
+            label = label,
+        )
     }
 }
 

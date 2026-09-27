@@ -85,6 +85,22 @@ data class PayMonthSheet(
         ).filter { it.cents > 0 }
     }
 
+    /**
+     * 补齐出厂固定行（builtin）：老版本存的单子没有新加的固定行（如 2026-09-27 新增的「全勤奖」），
+     * 在**读取侧**补上，让已存月份也能看到。固定行本身**不可删除**（UI 层禁了删除入口，见
+     * `PayMonthContent` 的 `if (!item.builtin)`），所以补回来不会与用户操作冲突。
+     * 已有行的相对顺序不动，缺的按**出厂相对位置**插（不是一律堆末尾）。
+     */
+    fun withBuiltinRows(): PayMonthSheet {
+        val d = default()
+        return copy(
+            basic = basic.withMissingBuiltin(d.basic),
+            subsidy = subsidy.withMissingBuiltin(d.subsidy),
+            deduction = deduction.withMissingBuiltin(d.deduction),
+            other = other.withMissingBuiltin(d.other),
+        )
+    }
+
     companion object {
         /** 「基本工资」出厂行 id（「调休折现」的日薪默认值 = 它 ÷ [MONTHLY_PAID_DAYS]） */
         const val BASE_ROW_ID = 1L
@@ -104,15 +120,32 @@ data class PayMonthSheet(
         /** 「个人所得税（新）」出厂行 id（点它进个税估算页） */
         const val TAX_ROW_ID = 10L
 
-        /** 出厂月度工资单（与记月页设计稿一致；id 组内唯一即可） */
-        fun default(): PayMonthSheet = PayMonthSheet(
-            basic = listOf(
-                PayMonthItem(BASE_ROW_ID, "基本工资", builtin = true),
-                PayMonthItem(2, "加班工资", builtin = true),
-                // v0.7.4 由「调休」改名：它在这张单里是**折现金额**（天数 × 日薪），不是余额
-                PayMonthItem(COMP_ROW_ID, "调休折现", builtin = true),
-            ),
-            subsidy = listOf(PayMonthItem(4, "其它补贴", builtin = true)),
+        /** 「全勤奖」出厂行 id（补贴组；手填金额，不参与引擎推导） */
+        const val FULL_ATTENDANCE_ROW_ID = 11L
+
+        /**
+         * **用户新增行**的 id 起点。
+         * ⚠️ 出厂固定行的 id（1–11）只在**组内**唯一、**跨组会撞车**——扣款组出厂是 [5,6,7]，
+         * 用户加的两行就拿到 8/9，恰好是 [SOCIAL_ROW_ID]/[FUND_ROW_ID]，曾致普通扣款行弹出
+         * 社保/公积金设置（2026-09-27 用户报，同 docs/11 005 的跨表 id 教训）。
+         * 用户行从这个号段起自增，**永不**与出厂固定行相撞。
+         */
+        const val USER_ROW_ID_BASE = 1000L
+
+    /** 出厂月度工资单（与记月页设计稿一致；id 组内唯一即可）。
+     *  ⚠️ 补贴组的**固定行**会经 [withBuiltinRows] 补进老单子，故新增固定行只需改这里。 */
+    fun default(): PayMonthSheet = PayMonthSheet(
+        basic = listOf(
+            PayMonthItem(BASE_ROW_ID, "基本工资", builtin = true),
+            PayMonthItem(2, "加班工资", builtin = true),
+            // v0.7.4 由「调休」改名：它在这张单里是**折现金额**（天数 × 日薪），不是余额
+            PayMonthItem(COMP_ROW_ID, "调休折现", builtin = true),
+        ),
+        // 具名项在前、「其它补贴」是兑底项所以在后（用户 2026-09-27 要求默认带全勤奖）
+        subsidy = listOf(
+            PayMonthItem(FULL_ATTENDANCE_ROW_ID, "全勤奖", builtin = true),
+            PayMonthItem(4, "其它补贴", builtin = true),
+        ),
             deduction = listOf(
                 PayMonthItem(5, "其它扣款", builtin = true),
                 PayMonthItem(6, "事假", builtin = true),
@@ -148,6 +181,51 @@ fun PayMonthSheet.reconciliations(): List<Reconciliation> = buildList {
 }
 
 /** 记月分组 */
+/**
+ * 「社保 / 公积金」设置行的辨识。
+ *
+ * ⚠️ **必须连同 [PayGroup] 与 builtin 一起判定**：行 id 只在**组内**唯一、跨组会撞车。
+ * 2026-09-27 用户报的 bug：扣款组出厂是 [5,6,7]，用户加的两行就拿到 id 8/9，
+ * 恰好是 [PayMonthSheet.SOCIAL_ROW_ID]/[PayMonthSheet.FUND_ROW_ID]，只看 id 时
+ * 普通扣款行弹出了社保/公积金设置（同 docs/11 005 的跨表 id 教训）。
+ */
+enum class InsuranceKind { SOCIAL, FUND }
+
+/** 该行是不是「社保 / 公积金」设置行；是则回 [InsuranceKind]，否则 null */
+fun PayMonthItem.insuranceKindOf(group: PayGroup): InsuranceKind? = when {
+    group != PayGroup.OTHER || !builtin -> null
+    id == PayMonthSheet.SOCIAL_ROW_ID -> InsuranceKind.SOCIAL
+    id == PayMonthSheet.FUND_ROW_ID -> InsuranceKind.FUND
+    else -> null
+}
+
+/**
+ * 下一个**用户新增行**的 id：从 [PayMonthSheet.USER_ROW_ID_BASE] 起自增，
+ * **避开出厂固定行的 id 号段**（否则扣款组会撞上 [PayMonthSheet.SOCIAL_ROW_ID]/[PayMonthSheet.FUND_ROW_ID]）。
+ */
+fun List<PayMonthItem>.nextUserRowId(): Long =
+    maxOf((maxOfOrNull { it.id } ?: 0L) + 1L, PayMonthSheet.USER_ROW_ID_BASE)
+
+/** 把 [defaults] 里缺的固定行插进来（按出厂相对位置）；已有行的相对顺序不动，用户加的行不丢 */
+private fun List<PayMonthItem>.withMissingBuiltin(defaults: List<PayMonthItem>): List<PayMonthItem> {
+    val missing = defaults.filter { d -> none { it.id == d.id } }
+    if (missing.isEmpty()) return this
+    val out = ArrayList<PayMonthItem>(size + missing.size)
+    forEach { item ->
+        // 出厂顺序里排在本行之前的缺失固定行 → 先落位
+        val here = defaults.indexOfFirst { it.id == item.id }
+        if (here >= 0) {
+            missing.forEach { m ->
+                if (defaults.indexOf(m) < here && out.none { it.id == m.id }) out.add(m)
+            }
+        }
+        out.add(item)
+    }
+    // 前面找不到落位点的（本组只剩用户行）：末尾补上，不丢项
+    missing.forEach { m -> if (out.none { it.id == m.id }) out.add(m) }
+    return out
+}
+
 enum class PayGroup { BASIC, SUBSIDY, DEDUCTION, OTHER }
 
 /**

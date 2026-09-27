@@ -15,6 +15,7 @@ import com.mdot.app.domain.model.PayMonthSheet
 import com.mdot.app.domain.model.PayMonthSource
 import com.mdot.app.domain.model.SalaryConfig
 import com.mdot.app.domain.model.WorkSystem
+import com.mdot.app.domain.model.nextUserRowId
 import com.mdot.app.domain.toCalcLite
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -243,9 +244,10 @@ class PayMonthViewModel @Inject constructor(
     /** 新增条目（名称必填，金额可为 0） */
     fun addItem(group: PayGroup, name: String, cents: Long) = addItems(group, listOf(name), cents)
 
-    /** 批量新增（预选项多选一次添加，docs/20 P2-3）：名称去重去空，id 依次递增 */
+    /** 批量新增（预选项多选一次添加，docs/20 P2-3）：名称去重去空，id 依次递增。
+     *  id 从 `USER_ROW_ID_BASE` 起（避开出厂固定行号段，否则扣款组会撞上社保/公积金的 id） */
     fun addItems(group: PayGroup, names: List<String>, cents: Long) = mutate(group) { list ->
-        var next = (list.maxOfOrNull { it.id } ?: 0) + 1
+        var next = list.nextUserRowId()
         list + names.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
             .map { name -> PayMonthItem(next++, name, cents) }
     }

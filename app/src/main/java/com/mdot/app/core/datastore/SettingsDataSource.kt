@@ -42,12 +42,14 @@ class SettingsDataSource @Inject constructor(
     suspend fun setSalary(config: SalaryConfig) = dataStore.edit { it[SALARY] = json.encodeToString(config) }
 
     // ---- 记月（月度工资单，按月键存 JSON；键形如 paymonth_2026-09）。
-    //      解码显式用非空 T——此处若走 decode(text, null) 的可空推断，设备端会解出非 Sheet 对象回落默认 ----
+    //      解码显式用非空 T——此处若走 decode(text, null) 的可空推断，设备端会解出非 Sheet 对象回落默认。
+    //      读取侧统一 `withBuiltinRows()`：补上老单子缺的出厂固定行（如「全勤奖」），
+    //      记月页 / 导出 / 个税页三个读取点自动一致 ----
     fun payMonthFlow(monthKey: String): Flow<PayMonthSheet?> =
         dataStore.data.map { prefs ->
             prefs[stringPreferencesKey("paymonth_$monthKey")]?.let { text ->
                 runCatching { json.decodeFromString<PayMonthSheet>(text) }.getOrNull()
-            }
+            }?.withBuiltinRows()
         }
 
     suspend fun setPayMonth(monthKey: String, sheet: PayMonthSheet) =
@@ -71,7 +73,7 @@ class SettingsDataSource @Inject constructor(
         buildMap {
             for (m in 1..12) {
                 prefs[stringPreferencesKey("paymonth_$year-${m.toString().padStart(2, '0')}")]?.let { text ->
-                    runCatching { json.decodeFromString<PayMonthSheet>(text) }.getOrNull()?.let { put(m, it) }
+                    runCatching { json.decodeFromString<PayMonthSheet>(text) }.getOrNull()?.withBuiltinRows()?.let { put(m, it) }
                 }
             }
         }

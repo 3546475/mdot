@@ -1,6 +1,9 @@
 package com.mdot.app.core.designsystem.component
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,7 +22,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -126,8 +128,11 @@ private fun MessageSnackbarCapsule(data: SnackbarData, isError: Boolean) {
                 modifier = Modifier.size(IconSpec.dense),
             )
             Spacer(Modifier.width(Spacing.s))
+            // weight：消息吃剩余宽度、按钮按自然宽度先测——否则长消息会把按钮挤成
+            // 逐字竖排、胶囊被撑得极高（记月单据未生成提示，docs/11 长提示复现）。
             Text(
                 data.visuals.message,
+                modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
@@ -136,9 +141,27 @@ private fun MessageSnackbarCapsule(data: SnackbarData, isError: Boolean) {
             val actionLabel = data.visuals.actionLabel
             if (actionLabel != null) {
                 Spacer(Modifier.width(Spacing.m))
-                TextButton(onClick = data::performAction) {
-                    Text(actionLabel, color = accent)
-                }
+                // 动作**不用 M3 TextButton**：它自带 40dp 最小高（再叠 minimumInteractiveComponentSize
+                // 会到 48dp），把「有按钮」的胶囊撑到 56~64dp，而「无按钮」的只有 36dp
+                // （2026-09-27 用户报：两者高度不一致）。改成同款强调色文字 + 点击区，
+                // 两种胶囊都按**内容**走高（1 行 36dp / 2 行 56dp）——统一且尽量低，
+                // 而不是把矮的那颗抬到 48dp。
+                // ⚠️ 代价：动作热区从 48dp 降到约文字高（≈ 20dp）。要更大热区就得把两颗都抬高，
+                // 与「尽量低」相冲，故先按用户要求取矮。
+                val actionInteraction = remember { MutableInteractionSource() }
+                Text(
+                    actionLabel,
+                    color = accent,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier
+                        .pressScale(actionInteraction, pressedScale = 0.9f)
+                        .clickable(
+                            interactionSource = actionInteraction,
+                            indication = LocalIndication.current,
+                            onClick = data::performAction,
+                        )
+                        .padding(horizontal = Spacing.s),
+                )
             }
         }
     }
