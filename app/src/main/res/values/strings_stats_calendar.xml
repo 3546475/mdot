@@ -38,9 +38,9 @@
     <string name="paymonth_period_progress">周期进度 %1$d/%2$d 天</string>
     <string name="paymonth_sum_deduction">扣款</string>
     <string name="paymonth_sum_other">其他项目</string>
-    <string name="paymonth_source_synced">来自考勤 · %1$s 同步</string>
+    <string name="paymonth_source_synced">来自考勤 · 自动计算</string>
     <string name="paymonth_source_edited">已手改（引擎 %1$s）</string>
-    <string name="paymonth_source_synced_derived">来自考勤 · %1$s 同步 · %2$s</string>
+    <string name="paymonth_source_synced_derived">来自考勤 · 自动计算 · %1$s</string>
     <string name="paymonth_source_estimated">来自个税估算 · %1$s</string>
     <string name="paymonth_derivation_comp">本月转调休 %1$s</string>
     <string name="paymonth_derivation_rate">基数 %1$s × %2$s%%</string>
@@ -61,11 +61,9 @@
     <string name="paymonth_close">关闭</string>
     <string name="paymonth_picker_title">选择月份</string>
     <string name="paymonth_this_month">回本月</string>
-    <string name="paymonth_empty_hint">先点「同步本月考勤」，按记录自动回填；再补社保 / 公积金</string>
+    <string name="paymonth_empty_hint">记录会自动算进工资单；先到「工资设定」填基本工资 / 加班基数</string>
     <string name="paymonth_recon_restore">恢复</string>
     <string name="paymonth_recon_restore_all">全部恢复</string>
-    <string name="paymonth_sync">同步本月考勤</string>
-    <string name="paymonth_sync_confirm_action">确认同步</string>
     <!-- 记月添加条目预选项（参考主流记工记账 App 常见工资项） -->
     <string-array name="paymonth_subsidy_presets">
         <item>高温补贴</item>

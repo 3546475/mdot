@@ -48,10 +48,10 @@ enum class InlineConfirmPhase { Idle, Asking, Done }
 
 /**
  * 外观式样：
- * - [Standalone] 独立/整行：固定外壳（宽度动画左右对称）+ 居中 + 实心主色 idle（如记月页「导入上月」）；
+ * - [Standalone] 独立/整行：固定外壳（宽度动画左右对称）+ 居中 + 实心主色 idle（如「工时制度」切换卡）；
  * - [Tonal]      次级强调：**无固定外壳**（宽度随内容、定位交给调用方）+ 居中 + idle 走
  *                `secondaryContainer`（用于「已移出主内容卡」的页面级动作，
- *                如记月页「同步本月考勤」「导入上月」）；
+ *                如记月页「导入上月」）；
  * - [Compact]    行内紧凑：外壳随内容（不预留、不挤压同行信息）+ 右对齐 + idle 为 error 色朴素文字
  *                （如列表行「删除」，与原先的 TextButton 观感一致）；
  * - [Outlined]    行内描边：idle 与 M3 `OutlinedButton` 同款观感（透明底 + `outlineVariant`

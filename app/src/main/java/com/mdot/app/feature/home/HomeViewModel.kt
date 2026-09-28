@@ -10,10 +10,13 @@ import com.mdot.app.core.repository.SiteRepository
 import com.mdot.app.domain.SitePayCalculator
 import com.mdot.app.domain.toCalcLite
 import com.mdot.app.domain.CycleCalculator
+import com.mdot.app.domain.InsuranceFill
 import com.mdot.app.domain.PayrollCalculator
+import com.mdot.app.domain.livePreviewSheet
 import com.mdot.app.domain.model.BottomBarConfig
 import com.mdot.app.domain.model.HomeCardContents
 import com.mdot.app.domain.model.HomeCardsConfig
+import com.mdot.app.domain.model.PayMonthSheet
 import com.mdot.app.domain.model.SalaryConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -44,7 +47,8 @@ data class HomeUiState(
     val dataContent: String = HomeCardContents.DATA_OT_HOURS,
     /** 快捷入口卡显示的入口项（多选，顺序即显示顺序；[HomeCardContents]） */
     val entries: List<String> = HomeCardContents.defaultsOf(HomeCardsConfig.ENTRIES),
-    /** 记月本月实发（分）；null = 记月未填 → 数据区选「实发工资」时显示 "-" */
+    /** 本月实发（分，**实时预览**：引擎行走当前考勤/薪资实时值、手改行保留，见 domain/PayMonthSync.kt 的 livePreviewSheet）；
+     *  null = 无可显示金额（单据与引擎皆空）→ 数据区选「实发工资」时显示 "-" */
     val netPayCents: Long? = null,
     // ---- 工地记工（12 文档 F-S6）----
     val siteLoading: Boolean = false,
@@ -142,6 +146,21 @@ class HomeViewModel @Inject constructor(
         // 卡片序列 = 配置里的「完整顺序」去掉已隐藏项（v0.6.21 起单列表模型：
         // 开关只影响显隐、不影响顺序；旧配置由 HomeCardsConfig.migrated() 自动迁移）。
         // 不再有「底栏放了日历/统计就隐藏入口卡」的旧联动——默认顺序已由用户定死。
+        // 数据区「实发工资」= 记月单的**实时预览**（硬规则 12，domain/PayMonthSync.kt 的 livePreviewSheet）：
+        // 引擎算得出的行走**当前**考勤/薪资实时值（与记月页「同步本月考勤」同一套推导、只算不写盘），
+        // 手改行保留手改值——首页随记随更新，不再等记月页手动同步（2026-09-28 用户要求）。
+        // 工地制度无 PayrollCalculator 引擎值（记月页同样隐藏同步按钮），保持存盘单据原值。
+        val isSite = salary.workSystem == com.mdot.app.domain.model.WorkSystem.SITE
+        val sheetBase = payMonth ?: PayMonthSheet.default()
+        val liveSheet = if (isSite) sheetBase else livePreviewSheet(
+            sheetBase,
+            monthOut,
+            fillBase = salary.includeBase,
+            syncedAt = today.toString(),
+            compCashCents = PayrollCalculator.compCashCents(salary, monthOut),
+            compMinutes = PayrollCalculator.compFromOtMinutes(monthOut),
+            insurance = InsuranceFill.of(salary),
+        )
         val cards = homeCards.enabledCards
         HomeUiState(
             loading = false,
@@ -157,8 +176,8 @@ class HomeViewModel @Inject constructor(
             cards = cards,
             dataContent = homeCards.contentOf(HomeCardsConfig.DATA),
             entries = homeCards.contentList(HomeCardsConfig.ENTRIES),
-            // 与记月页同口径：单据全 0 = 未填（不当 ¥0.00 显示，会误导）
-            netPayCents = payMonth?.takeIf { it.netCents != 0L || it.incomeCents != 0L }?.netCents,
+            // 与记月页同口径：全 0 = 未填（不当 ¥0.00 显示，会误导）——实时预览后仍守这条
+            netPayCents = liveSheet.takeIf { it.netCents != 0L || it.incomeCents != 0L }?.netCents,
             backupConfigured = sync.configured,
             backupConflict = sync.conflict,
             lastBackupAt = sync.lastBackupAt,

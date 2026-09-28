@@ -1,6 +1,5 @@
-package com.mdot.app.feature.stats
+package com.mdot.app.domain
 
-import com.mdot.app.domain.PayrollCalculator
 import com.mdot.app.domain.model.LeaveType
 import com.mdot.app.domain.model.PayGroup
 import com.mdot.app.domain.model.PayMonthItem

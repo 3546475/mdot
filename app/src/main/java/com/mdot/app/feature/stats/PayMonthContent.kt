@@ -106,9 +106,10 @@ import kotlin.math.roundToInt
 import java.time.YearMonth
 
 /**
- * 记月页（统计页第 1 页）：月度工资单编辑。
+ * 记月页（统计页第 1 页）：月度工资单编辑。金额走**实时预览**（与首页数据区同款）：
+ * 引擎算得出的行随当前考勤/薪资实时出数、手改/手填行保留——没有「同步」动作（2026-09-28 起）。
  * 布局仿设计稿：四分组卡（基本/补贴/扣款/其他，头部合计 + 折叠），行点击编辑金额，
- * 补贴/扣款组可添加行（出厂行不可删），底部「导入上月」。
+ * 补贴/扣款组可添加行（出厂行不可删），底部「导入上月」（原尺寸、居中）。
  */
 @Composable
 fun PayMonthContent(
@@ -119,8 +120,9 @@ fun PayMonthContent(
     vm: PayMonthViewModel = hiltViewModel(),
 ) {
     val month by vm.month.collectAsStateWithLifecycle()
-    val sheet by vm.sheet.collectAsStateWithLifecycle()
-    val isSite by vm.isSite.collectAsStateWithLifecycle()
+    // 展示一律读**实时预览**单据（vm.displaySheet）：引擎行走当前考勤/薪资实时值、手改/手填行保留，
+    // 随记随更新——与首页数据区「实发工资」同款推导（2026-09-28 用户要求，「同步本月考勤」按钮已移除）
+    val sheet by vm.displaySheet.collectAsStateWithLifecycle()
     val attendance by vm.attendance.collectAsStateWithLifecycle()
     val collapsedGroups by vm.collapsed.collectAsStateWithLifecycle()
     val prevSheet by vm.prevSheet.collectAsStateWithLifecycle()
@@ -140,7 +142,7 @@ fun PayMonthContent(
     // 切换版式（用户要求：不再弹悬浮提示，直接看形变动画）
     val onToggleCompact: () -> Unit = { compactCard = !compactCard }
     val prevNet = prevSheet
-        ?.takeIf { it.netCents != 0L || it.incomeCents != 0L }
+        .takeIf { it.netCents != 0L || it.incomeCents != 0L }
         ?.netCents
 
     Box(Modifier.fillMaxSize()) {
@@ -204,10 +206,8 @@ fun PayMonthContent(
             }
             Spacer(Modifier.height(Spacing.s))
 
-            // 汇总卡（docs/20 P0-2）：实发大字 + 构成三行 + 「同步本月考勤」主操作。
-            // 「同步」原先长在「基本项目」卡内部——页面级操作不该挂在分组列表里（docs/20 §4）。
-            // 汇总卡（docs/20 P0-2）：实发大字 + 构成 + 考勤摘要。
-            // 两个版式并列（长按卡片头部切换）：完整版=信息全，精简版=高度约一半（用户 A/B 对比用）
+            // 汇总卡（docs/20 P0-2）：实发大字 + 构成 + 考勤摘要（金额随实时预览走，随记随更新）。
+            // 两个版式并列（点头部切换）：完整版=信息全，精简版=高度约一半（用户 A/B 对比用）
             PayMonthSummaryCard(
                 sheet = sheet,
                 attendance = attendance,
@@ -218,38 +218,20 @@ fun PayMonthContent(
                 onOpenDetail = onOpenDetail,
                 onOpenReconcile = { showRecon = true },
             )
-            // 页面级两个动作**并排**（2026-09-23 用户定：导入上月回到同步旁边）：
-            // 两者同为 Tonal（对称、都不与卡里的金额抢主色，卡片保持纯信息展示）；
-            // 工地模式无引擎值 → 同步隐藏，只留导入
+            // 页面级动作（2026-09-28：「同步本月考勤」移除——单据按考勤实时出数，无需手动同步）：
+            // 「导入上月」保持原尺寸、居中（Tonal，不与卡里的金额抢主色，卡片保持纯信息展示）
             Spacer(Modifier.height(Spacing.m))
-            Row(
-                Modifier.align(Alignment.CenterHorizontally),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (!isSite) {
-                    InlineConfirmButton(
-                        idleText = stringResource(R.string.paymonth_sync),
-                        confirmText = stringResource(R.string.paymonth_sync_confirm_action),
-                        cancelText = stringResource(R.string.paymonth_cancel),
-                        undoText = stringResource(R.string.paymonth_undo),
-                        onConfirm = vm::syncFromRecords,
-                        onUndo = vm::undoSync,
-                        resetKey = month,
-                        style = InlineConfirmStyle.Tonal,
-                    )
-                }
-                InlineConfirmButton(
-                    idleText = stringResource(R.string.paymonth_import_prev),
-                    confirmText = stringResource(R.string.paymonth_import_confirm_action),
-                    cancelText = stringResource(R.string.paymonth_cancel),
-                    undoText = stringResource(R.string.paymonth_undo),
-                    onConfirm = vm::importPrevMonth,
-                    onUndo = vm::undoImport,
-                    resetKey = month,
-                    style = InlineConfirmStyle.Tonal,
-                )
-            }
+            InlineConfirmButton(
+                idleText = stringResource(R.string.paymonth_import_prev),
+                confirmText = stringResource(R.string.paymonth_import_confirm_action),
+                cancelText = stringResource(R.string.paymonth_cancel),
+                undoText = stringResource(R.string.paymonth_undo),
+                onConfirm = vm::importPrevMonth,
+                onUndo = vm::undoImport,
+                resetKey = month,
+                style = InlineConfirmStyle.Tonal,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
             Spacer(Modifier.height(Spacing.m))
             PayGroupCard(
                 PayGroup.BASIC, sheet.basic,
@@ -372,7 +354,7 @@ fun PayMonthContent(
 }
 
 /**
- * 汇总卡（docs/20 P0-2）：实发大字 + 应发/扣款/其他构成 + 可选主操作。
+ * 汇总卡（docs/20 P0-2）：实发大字 + 应发/扣款/其他构成。
  * 之前全页只有四个分组小计、没有总数，而扣款/其他两组还是负数展示，用户得心算四项——
  * 工资单最核心的数字不应该让用户自己算。
  */
@@ -542,7 +524,7 @@ private fun PayMonthSummaryCard(
                 }
             }
 
-            // 空态引导（docs/20 P2-7）：考勤有记录、但单据还是空的 → 先同步，别让人手工从头填（仅完整形态）
+            // 空态引导（docs/20 P2-7）：考勤有记录、但实时预览还是全 0 → 引导补薪资设定，别让人手工从头填（仅完整形态）
             AnimatedVisibility(
                 visible = !compact && attendance?.isEmpty == false &&
                     sheet.incomeCents == 0L && sheet.deductionCents == 0L && sheet.otherCents == 0L,
@@ -557,7 +539,7 @@ private fun PayMonthSummaryCard(
                 )
             }
 
-            // 对账入口（docs/20 P1-2）：同步过的行被手改 → 与引擎值有差，点看明细（两形态都有）
+            // 对账入口（docs/20 P1-2）：手改过的引擎行 → 与实时引擎值有差，点看明细（两形态都有）
             ReconRow(recon, onOpenReconcile)
 
             // 周期进度（**仅完整形态**）
@@ -1057,17 +1039,11 @@ private fun PayGroupCard(
                                 }
                                 Text(
                                     when (src) {
+                                        // 实时预览下引擎值随考勤实时算（不存在「哪天同步的」），口径是「自动计算」
                                         PayMonthSource.SYNCED -> if (derivation == null) {
-                                            stringResource(
-                                                R.string.paymonth_source_synced,
-                                                syncedDayLabel(item.syncedAt),
-                                            )
+                                            stringResource(R.string.paymonth_source_synced)
                                         } else {
-                                            stringResource(
-                                                R.string.paymonth_source_synced_derived,
-                                                syncedDayLabel(item.syncedAt),
-                                                derivation,
-                                            )
+                                            stringResource(R.string.paymonth_source_synced_derived, derivation)
                                         }
                                         PayMonthSource.EDITED -> stringResource(
                                             R.string.paymonth_source_edited,
@@ -1115,8 +1091,8 @@ private fun syncedDayLabel(iso: String?): String {
 
 /** 编辑条目：出厂行只可改金额，新增行可改名称/金额/删除。
  *
- * 注意：**不提供「天数 × 日薪」这类手算入口**——能自动算的（如「调休折现」）由「同步本月考勤」
- * 按引擎口径自动回填（[PayrollCalculator.compCashCents]），用户只在结果不对时直接改金额（docs/20 设计原则）。
+ * 注意：**不提供「天数 × 日薪」这类手算入口**——能自动算的（如「调休折现」）由引擎口径自动出数
+ * （[PayrollCalculator.compCashCents]，实时预览），用户只在结果不对时直接改金额（docs/20 设计原则）。
  */
 /** 社保个人比例预设（基点）：不算 / 仅养老 8% / 北京广州等 10.2% / 多数城市 10.5% */
 private val SOCIAL_RATE_PRESETS = listOf(0, 800, 1020, 1050)

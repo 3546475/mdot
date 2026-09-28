@@ -236,7 +236,7 @@ fun SiteRecordScreen(
                         .padding(horizontal = Spacing.l)
                         .padding(bottom = Spacing.m),
                 ) {
-                    // 单颗「保存」：尺寸对齐记月「同步本月考勤」（48dp 高 / 24dp 内边距 / 最小宽 144dp）；
+                    // 单颗「保存」：尺寸对齐全局主按钮档（48dp 高 / 24dp 内边距 / 最小宽 144dp）；
                     // 行为＝原「保存 并再记一笔」（原地保存并留在本页继续记）；反馈动效与工资页保存同款
                     ShrinkFeedbackButton(
                         text = stringResource(R.string.site_record_save),

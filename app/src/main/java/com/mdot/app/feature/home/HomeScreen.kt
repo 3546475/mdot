@@ -410,7 +410,7 @@ private fun DataSection(state: HomeUiState, onOpenStats: () -> Unit, onOpenRecor
     }
 }
 
-/** 数据区的金额型 hero（实发工资 / 本月收入）：金额未配置或记月未填时给 "-"（同收入卡口径，不显 ¥0.00） */
+/** 数据区的金额型 hero（实发工资 / 本月收入）：金额未配置或实时预览全 0（单据与引擎皆空）时给 "-"（同收入卡口径，不显 ¥0.00） */
 @Composable
 private fun DataMoneyHero(cents: Long?, label: String) {
     val style = MaterialTheme.typography.displaySmall

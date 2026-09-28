@@ -6,9 +6,10 @@ import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.core.holiday.HolidayRepository
 import com.mdot.app.core.repository.RecordRepository
 import com.mdot.app.domain.CycleCalculator
+import com.mdot.app.domain.InsuranceFill
 import com.mdot.app.domain.PayrollCalculator
+import com.mdot.app.domain.livePreviewSheet
 import com.mdot.app.domain.model.DEFAULT_COLLAPSED_GROUPS
-import com.mdot.app.domain.model.LeaveType
 import com.mdot.app.domain.model.PayGroup
 import com.mdot.app.domain.model.PayMonthItem
 import com.mdot.app.domain.model.PayMonthSheet
@@ -16,16 +17,17 @@ import com.mdot.app.domain.model.PayMonthSource
 import com.mdot.app.domain.model.SalaryConfig
 import com.mdot.app.domain.model.WorkSystem
 import com.mdot.app.domain.model.nextUserRowId
+import com.mdot.app.domain.model.reconciliations
 import com.mdot.app.domain.toCalcLite
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -39,28 +41,35 @@ import javax.inject.Inject
 /**
  * 记月页：月度工资单编辑。数据按月存 DataStore JSON（键 paymonth_<yyyy-MM>），
  * 未编辑过的月份回落出厂单；出厂固定行不可删，新增行可改可删。
- * 「同步本月考勤」用 PayrollCalculator 按当月加班/请假记录回填 基本工资/加班工资/事假/病假（工地模式无引擎值，隐藏）。
+ * 展示走**实时预览**（[displaySheet]，与首页数据区同款的 domain/PayMonthSync.kt 推导）：
+ * 引擎算得出的行（基本工资/加班工资/调休折现/事假/病假/社保/公积金）随当前考勤与薪资设定实时出数，
+ * 手改/手填行保留用户值——不再需要「同步本月考勤」按钮（2026-09-28 用户要求，按钮已移除）。
+ * 工地制度无引擎值，保持存盘单据原值。
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class PayMonthViewModel @Inject constructor(
     private val settings: SettingsDataSource,
-    recordRepo: RecordRepository,
+    private val recordRepo: RecordRepository,
     private val holidayRepo: HolidayRepository,
 ) : ViewModel() {
 
     private val _month = MutableStateFlow(YearMonth.now())
     val month: StateFlow<YearMonth> = _month.asStateFlow()
 
+    /** 存盘单据（写目标 + 实时预览的底稿）；未编辑过的月份回落出厂单 */
     val sheet: StateFlow<PayMonthSheet> = _month
-        .flatMapLatest { m -> settings.payMonthFlow(m.toString()) }
-        .map { it ?: PayMonthSheet.default() }
+        .flatMapLatest { m -> storedFlow(m) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PayMonthSheet.default())
 
-    /** 工地记工无 PayrollCalculator 引擎值，同步按钮隐藏 */
-    val isSite: StateFlow<Boolean> = settings.salaryFlow
-        .map { it.workSystem == WorkSystem.SITE }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    /**
+     * 展示用单据 = **实时预览**（硬规则 12，domain/PayMonthSync.kt 的 livePreviewSheet，
+     * 与首页数据区「实发工资」同一套推导、只算不写盘）：引擎行走当前考勤/薪资实时值、
+     * 手改/手填行保留用户值。页面各卡与汇总的金额都读它，随记随更新（2026-09-28）。
+     */
+    val displaySheet: StateFlow<PayMonthSheet> = _month
+        .flatMapLatest { m -> previewFlow(m) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PayMonthSheet.default())
 
     /** 薪资设定：社保/公积金行的弹窗要读它的比例、基数与底薪 */
     val salary: StateFlow<SalaryConfig> = settings.salaryFlow
@@ -90,7 +99,7 @@ class PayMonthViewModel @Inject constructor(
             else PayrollCalculator.housingFundCents(next)
             val base = if (social) PayrollCalculator.socialInsuranceBaseCents(next)
             else PayrollCalculator.housingFundBaseCents(next)
-            // 比例 >0 → 带上引擎值 + 「基数×比例」推导（保存后行标「来自考勤 · 同步」）；
+            // 比例 >0 → 带上引擎值 + 「基数×比例」推导（保存后行标「来自考勤 · 自动计算」）；
             // 编辑金额与引擎值不一致时 saveItem 会自动改标「已改」
             val patched = if (rateBp > 0) {
                 item.copy(
@@ -118,52 +127,65 @@ class PayMonthViewModel @Inject constructor(
         message.value = null
     }
 
-    /** 当月工资计算结果（非工地；供同步回填）。保持冷流：syncFromRecords 按需订阅计算 */
-    private val monthCalc = _month
-        .flatMapLatest { m ->
-            val from = m.atDay(1)
-            val to = m.atEndOfMonth()
-            combine(
-                settings.salaryFlow,
-                settings.workdaysFlow,
-                recordRepo.observeRange(from, to),
-                recordRepo.observeAdjustments(),
-            ) { salary, workdays, records, adjustments ->
-                val tierOf = { date: LocalDate -> holidayRepo.tierFor(date, workdays) }
-                val standardMinutes = if (salary.workSystem == WorkSystem.COMPREHENSIVE) {
-                    val (holidays, makeups) = holidayRepo.holidaySetsInRange(from, to)
-                    CycleCalculator.standardMinutesFor(from, to, workdays, holidays, makeups)
-                } else null
-                if (salary.workSystem == WorkSystem.SITE) null else PayrollCalculator.summarize(
-                    PayrollCalculator.Input(
-                        salary,
-                        records.map { it.toCalcLite() },
-                        adjustments.map { it.toCalcLite() },
-                        tierOf,
-                        standardMinutes = standardMinutes,
-                    )
-                )
-            }
+    /** 某月存盘单据（读取侧出厂行已由 SettingsDataSource 补齐） */
+    private fun storedFlow(m: YearMonth): Flow<PayMonthSheet> =
+        settings.payMonthFlow(m.toString()).map { it ?: PayMonthSheet.default() }
+
+    /** 某月的实时预览单据（只算不写盘；与首页同款）。工地无引擎值 → 原样返回存盘单据 */
+    private fun previewFlow(m: YearMonth): Flow<PayMonthSheet> =
+        combine(storedFlow(m), calcFlow(m), settings.salaryFlow) { stored, out, salary ->
+            if (out == null) stored else livePreviewSheet(
+                stored,
+                out,
+                fillBase = salary.includeBase,
+                syncedAt = LocalDate.now().toString(),
+                compCashCents = PayrollCalculator.compCashCents(salary, out),
+                compMinutes = PayrollCalculator.compFromOtMinutes(out),
+                insurance = InsuranceFill.of(salary),
+            )
         }
 
-    /**
-     * 本月考勤摘要（摘要条用）：从 monthCalc 推导。UI 订阅即热；
-     * ⚠️ 不影响 syncFromRecords 的**冷流订阅**修复（那里仍走 `monthCalc.filterNotNull().first()`）。
-     */
-    val attendance: StateFlow<PayrollCalculator.AttendanceSummary?> = monthCalc
+    /** 某月工资计算结果（非工地；工地为 null）。保持冷流：预览/摘要按需组合订阅 */
+    private fun calcFlow(m: YearMonth): Flow<PayrollCalculator.Output?> {
+        val from = m.atDay(1)
+        val to = m.atEndOfMonth()
+        return combine(
+            settings.salaryFlow,
+            settings.workdaysFlow,
+            recordRepo.observeRange(from, to),
+            recordRepo.observeAdjustments(),
+        ) { salary, workdays, records, adjustments ->
+            val tierOf = { date: LocalDate -> holidayRepo.tierFor(date, workdays) }
+            val standardMinutes = if (salary.workSystem == WorkSystem.COMPREHENSIVE) {
+                val (holidays, makeups) = holidayRepo.holidaySetsInRange(from, to)
+                CycleCalculator.standardMinutesFor(from, to, workdays, holidays, makeups)
+            } else null
+            if (salary.workSystem == WorkSystem.SITE) null else PayrollCalculator.summarize(
+                PayrollCalculator.Input(
+                    salary,
+                    records.map { it.toCalcLite() },
+                    adjustments.map { it.toCalcLite() },
+                    tierOf,
+                    standardMinutes = standardMinutes,
+                )
+            )
+        }
+    }
+
+    /** 本月考勤摘要（摘要条用）：从当月计算流推导 */
+    val attendance: StateFlow<PayrollCalculator.AttendanceSummary?> = _month
+        .flatMapLatest { calcFlow(it) }
         .map { it?.let(PayrollCalculator::attendanceSummary) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    /** 上月单据（环比用）；该月没填过则 null */
-    val prevSheet: StateFlow<PayMonthSheet?> = month
-        .flatMapLatest { settings.payMonthFlow(it.minusMonths(1).toString()) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    /** 上月单据（环比基线；**同为实时预览**——上月没手动填过也有数）；全 0 时 UI 不显环比 */
+    val prevSheet: StateFlow<PayMonthSheet> = _month
+        .flatMapLatest { previewFlow(it.minusMonths(1)) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PayMonthSheet.default())
 
-    /** 覆盖前快照（撤销用）：导入上月 / 同步考勤各留一份，仅各自最近一次有效 */
+    /** 导入上月的覆盖前快照（撤销用），仅最近一次有效 */
     private var importBackup: PayMonthSheet? = null
     private var importBackupMonth: YearMonth? = null
-    private var syncBackup: PayMonthSheet? = null
-    private var syncBackupMonth: YearMonth? = null
 
     /** 覆盖/撤销串行化：防止「撤销早于覆盖落盘」导致撤销结果被覆盖 */
     private val sheetEditMutex = Mutex()
@@ -187,37 +209,39 @@ class PayMonthViewModel @Inject constructor(
     }
 
     /**
-     * 恢复某行的引擎值（对账弹窗用，docs/20 P2-2 修订）：
-     * 金额改回 `engineCents` 并回到 SYNCED——**不做全局「覆盖/仅填空」开关**，
-     * 由用户按行决定，既尊重手改、也不丢引擎值。
+     * 恢复某行的引擎值（对账弹窗用，docs/20 P2-2 修订）：金额改回**实时**引擎值并回到 SYNCED——
+     * 引擎元数据随预览刷新（liveMerged），恢复的也是「引擎现在算出来的值」而非手改当时的快照。
+     * **不做全局「覆盖/仅填空」开关**，由用户按行决定，既尊重手改、也不丢引擎值。
      */
-    fun restoreEngineValue(group: PayGroup, itemId: Long) = mutate(group) { list ->
-        list.map { item ->
-            val engine = item.engineCents
-            if (item.id != itemId || engine == null) item
-            else item.copy(amountCents = engine, source = PayMonthSource.SYNCED)
+    fun restoreEngineValue(group: PayGroup, itemId: Long) {
+        val engine = displaySheet.value.itemAt(group, itemId)?.engineCents ?: return
+        mutate(group) { list ->
+            list.map { item ->
+                if (item.id != itemId) item
+                else item.copy(amountCents = engine, engineCents = engine, source = PayMonthSource.SYNCED)
+            }
         }
     }
 
-    /** 一键恢复全部手改行 */
+    /** 一键恢复全部手改行（口径同 [restoreEngineValue]：只动对账里那些行，恢复到**实时**引擎值） */
     fun restoreAllEngineValues() {
         viewModelScope.launch {
             val cur = sheet.value
-            fun restore(list: List<PayMonthItem>) = list.map { item ->
-                val engine = item.engineCents
-                if (engine != null && item.amountCents != engine) {
-                    item.copy(amountCents = engine, source = PayMonthSource.SYNCED)
-                } else {
-                    item
-                }
+            val targets = displaySheet.value.reconciliations()
+                .mapNotNull { r -> r.item.engineCents?.let { (r.group to r.item.id) to it } }
+                .toMap()
+            fun restore(group: PayGroup, list: List<PayMonthItem>) = list.map { item ->
+                val engine = targets[group to item.id]
+                if (engine == null) item
+                else item.copy(amountCents = engine, engineCents = engine, source = PayMonthSource.SYNCED)
             }
             settings.setPayMonth(
                 _month.value.toString(),
                 cur.copy(
-                    basic = restore(cur.basic),
-                    subsidy = restore(cur.subsidy),
-                    deduction = restore(cur.deduction),
-                    other = restore(cur.other),
+                    basic = restore(PayGroup.BASIC, cur.basic),
+                    subsidy = restore(PayGroup.SUBSIDY, cur.subsidy),
+                    deduction = restore(PayGroup.DEDUCTION, cur.deduction),
+                    other = restore(PayGroup.OTHER, cur.other),
                 ),
             )
         }
@@ -274,7 +298,10 @@ class PayMonthViewModel @Inject constructor(
         list.filter { it.id != itemId }
     }
 
-    /** 导入上月：上月单据整体覆盖本月（上月未编辑过则用出厂单） */
+    /**
+     * 导入上月：上月**实时预览**单据整体覆盖本月——手填/手改行随行带过来；
+     * 引擎行带上的是上月实时值（不手改就跟本月实时值走，不锁死上月数）。
+     */
     fun importPrevMonth() {
         val cur = _month.value
         // 同步取快照（sheet 已是 StateFlow 值），避免「撤销早于导入落盘」被覆盖的竞态
@@ -282,8 +309,7 @@ class PayMonthViewModel @Inject constructor(
         importBackupMonth = cur
         viewModelScope.launch {
             sheetEditMutex.withLock {
-                val prev = settings.payMonthFlow(cur.minusMonths(1).toString()).first() ?: PayMonthSheet.default()
-                settings.setPayMonth(cur.toString(), prev)
+                settings.setPayMonth(cur.toString(), previewFlow(cur.minusMonths(1)).first())
             }
         }
     }
@@ -294,46 +320,6 @@ class PayMonthViewModel @Inject constructor(
         val month = importBackupMonth ?: return
         importBackup = null
         importBackupMonth = null
-        viewModelScope.launch {
-            sheetEditMutex.withLock {
-                if (month == _month.value) settings.setPayMonth(month.toString(), backup)
-            }
-        }
-    }
-
-    /** 同步本月考勤：加班工资/基本工资/事假/病假 ← PayrollCalculator 当月结果（可再手改）；覆盖前快照供撤销 */
-    fun syncFromRecords() {
-        viewModelScope.launch {
-            if (isSite.value) return@launch // 工地无引擎值
-            // 订阅冷流触发计算并等到首个非空结果（修：stateIn .value 在无订阅者时恒为初始 null，点一次无效）
-            val out = monthCalc.filterNotNull().first()
-            val salary = settings.salaryFlow.first()
-            sheetEditMutex.withLock {
-                val cur = _month.value
-                syncBackup = sheet.value
-                syncBackupMonth = cur
-                settings.setPayMonth(
-                    cur.toString(),
-                    applyRecordSync(
-                        sheet.value,
-                        out,
-                        fillBase = salary.includeBase,
-                        syncedAt = LocalDate.now().toString(),
-                        compCashCents = PayrollCalculator.compCashCents(salary, out),
-                        compMinutes = PayrollCalculator.compFromOtMinutes(out),
-                        insurance = InsuranceFill.of(salary),
-                    ),
-                )
-            }
-        }
-    }
-
-    /** 撤销最近一次同步考勤：恢复同步前的本月快照（仍在本月时；翻月后作废） */
-    fun undoSync() {
-        val backup = syncBackup ?: return
-        val month = syncBackupMonth ?: return
-        syncBackup = null
-        syncBackupMonth = null
         viewModelScope.launch {
             sheetEditMutex.withLock {
                 if (month == _month.value) settings.setPayMonth(month.toString(), backup)
@@ -355,106 +341,13 @@ class PayMonthViewModel @Inject constructor(
     }
 }
 
-/** 记月同步（纯函数，供单测）：仅回填存在的行——加班工资/事假/病假；基本工资仅在薪资含底薪时回填；其余行与分组不动。
- *
- * 回填时打**来源戳**（[PayMonthSource.SYNCED] + engineCents 引擎原值 + syncedAt 日期），
- * 让「哪个数是引擎算的、哪个是手写的」可追溯（docs/20 P0-3）；[syncedAt] 由调用方传（VM 用当天日期，便于单测固定值）。
- */
-internal fun applyRecordSync(
-    sheet: PayMonthSheet,
-    out: PayrollCalculator.Output,
-    fillBase: Boolean,
-    syncedAt: String,
-    /** 「调休折现」金额（分），由 [PayrollCalculator.compCashCents] 算好传入 */
-    compCashCents: Long = 0,
-    /** 推导依据：本月转调休分钟，UI 渲染成「本月转调休 1.5 小时」 */
-    compMinutes: Int = 0,
-    /** 社保/公积金自动回填载荷（比例 0 = 不算，行保持原值） */
-    insurance: InsuranceFill = InsuranceFill(),
-): PayMonthSheet {
-    fun set(
-        list: List<PayMonthItem>,
-        id: Long,
-        cents: Long,
-        derivationMinutes: Int? = null,
-        derivationBaseCents: Long? = null,
-        derivationRateBp: Int? = null,
-    ) = list.map {
-        if (it.id == id) {
-            it.copy(
-                amountCents = cents,
-                source = PayMonthSource.SYNCED,
-                engineCents = cents,
-                syncedAt = syncedAt,
-                derivationMinutes = derivationMinutes,
-                derivationBaseCents = derivationBaseCents,
-                derivationRateBp = derivationRateBp,
-            )
-        } else {
-            it
-        }
-    }
+// 记月的纯函数推导（applyRecordSync / InsuranceFill / livePreviewSheet）在 domain/PayMonthSync.kt：
+// 首页数据区「实发工资」与记月页展示共用同一套算法（硬规则 12），避免两处漂移。
 
-    val basic = if (fillBase) set(sheet.basic, PayMonthSheet.BASE_ROW_ID, out.baseIncludedCents) else sheet.basic
-    return sheet.copy(
-        // 加班工资 ← 引擎；「调休折现」← 转调休分钟按同一套口径折算（自动，不用手填）
-        basic = set(
-            set(basic, 2L, out.otPayCents),
-            PayMonthSheet.COMP_ROW_ID,
-            compCashCents,
-            derivationMinutes = compMinutes.takeIf { it > 0 },
-        ),
-        deduction = set(
-            set(sheet.deduction, 6L, out.leaveDeductByType[LeaveType.PERSONAL] ?: 0L),
-            7L, out.leaveDeductByType[LeaveType.SICK] ?: 0L,
-        ),
-        // 社保/公积金 ← 薪资设定里的「基数 × 比例」（设一次、之后每月自动）。
-        // ⚠️ 比例 0 = 用户没启用该项，**不动该行**——否则会把用户手填的金额清零。
-        other = sheet.other
-            .let {
-                if (insurance.socialRateBp <= 0) it
-                else set(
-                    it,
-                    PayMonthSheet.SOCIAL_ROW_ID,
-                    insurance.socialCents,
-                    derivationBaseCents = insurance.socialBaseCents,
-                    derivationRateBp = insurance.socialRateBp,
-                )
-            }
-            .let {
-                if (insurance.fundRateBp <= 0) it
-                else set(
-                    it,
-                    PayMonthSheet.FUND_ROW_ID,
-                    insurance.fundCents,
-                    derivationBaseCents = insurance.fundBaseCents,
-                    derivationRateBp = insurance.fundRateBp,
-                )
-            },
-    )
-}
-
-/**
- * 社保/公积金自动回填载荷（由薪资设定算出，docs/20「自动 > 选项 > 手动」）。
- * 比例 0 = 用户没启用该项，对应行保持手填不动。
- */
-internal data class InsuranceFill(
-    val socialCents: Long = 0,
-    val socialBaseCents: Long = 0,
-    val socialRateBp: Int = 0,
-    val fundCents: Long = 0,
-    val fundBaseCents: Long = 0,
-    val fundRateBp: Int = 0,
-) {
-    companion object {
-        /** 从薪资设定算出两个载荷（比例 0 时金额也是 0） */
-        fun of(salary: SalaryConfig) = InsuranceFill(
-            socialCents = PayrollCalculator.socialInsuranceCents(salary),
-            socialBaseCents = PayrollCalculator.socialInsuranceBaseCents(salary),
-            socialRateBp = salary.socialInsuranceRateBp,
-            fundCents = PayrollCalculator.housingFundCents(salary),
-            fundBaseCents = PayrollCalculator.housingFundBaseCents(salary),
-            fundRateBp = salary.housingFundRateBp,
-        )
-    }
-}
+/** 按组取行（对账恢复用）；行 id 只在组内唯一，故带 [PayGroup] 定位（docs/11 060 教训） */
+private fun PayMonthSheet.itemAt(group: PayGroup, id: Long): PayMonthItem? = when (group) {
+    PayGroup.BASIC -> basic
+    PayGroup.SUBSIDY -> subsidy
+    PayGroup.DEDUCTION -> deduction
+    PayGroup.OTHER -> other
+}.firstOrNull { it.id == id }

@@ -19,9 +19,9 @@ data class PayMonthItem(
     val builtin: Boolean = false,
     /** 金额来源；null = 纯手填（含出厂零值） */
     val source: PayMonthSource? = null,
-    /** 引擎回填时的原始值（分）——同步后手改也保留，供对账展示「引擎 X → 现值 Y」 */
+    /** 引擎算出的值（分）——手改后也保留，供对账展示「引擎 X → 现值 Y」（实时预览里 X 随**当前**引擎刷新） */
     val engineCents: Long? = null,
-    /** 引擎回填日期（yyyy-MM-dd），展示为「来自考勤 · M月d日 同步」 */
+    /** 引擎计算/回填日期（yyyy-MM-dd）；实时预览徽章口径为「自动计算」，仅个税估算行展示日期 */
     val syncedAt: String? = null,
     /**
      * 推导依据的分钟数（如「调休折现」= 本月转调休分钟）——UI 用 TimeUtils.prettyDuration 渲染成
@@ -37,10 +37,10 @@ data class PayMonthItem(
 /** 记月行金额来源 */
 @Serializable
 enum class PayMonthSource {
-    /** 「同步本月考勤」回填，且未被手改 */
+    /** 引擎算出且未被手改（实时预览/历史同步均可打上） */
     SYNCED,
 
-    /** 同步后又被手改（[PayMonthItem.engineCents] 保留引擎值） */
+    /** 引擎行被手改（[PayMonthItem.engineCents] 保留引擎值；实时预览里随当前引擎刷新） */
     EDITED,
 
     /** 由「个税估算」页填入（engineCents 存估算值，手改后仍可对账） */
