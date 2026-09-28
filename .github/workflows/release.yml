@@ -78,7 +78,10 @@ jobs:
         run: |
           {
             echo "## 更新内容"
-            awk -v ver="v${VER}" '$0 ~ "^## " ver {flag=1;next} /^## v/ {flag=0} flag' CHANGELOG.md
+            # 提取用**精确前缀 + 终结符**匹配，不用正则：正则里点号是通配符，
+            # v0.7.6.2 的提取曾把旧段落「## v0.7.6（2026-09-25）」误吸进来
+            # （点号吃掉全角括号、「2」撞上日期首位）——版本段必须整段精确命中。
+            awk -v ver="v${VER}" 'substr($0,1,3+length(ver)) == "## " ver && substr($0,4+length(ver),1) !~ /[0-9.]/ {flag=1;next} /^## v/ {flag=0} flag' CHANGELOG.md
             echo ""
             echo "系统要求：Android 10（API 29）及以上。"
           } > release_notes.md
