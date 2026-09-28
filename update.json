@@ -1,16 +1,16 @@
 {
-  "versionName": "0.7.6.2",
-  "versionCode": 58,
-  "tag": "v0.7.6.2",
-  "releaseNotes": "## 更新内容\n\n**实时计算**\n\n- 首页数据区的「实发工资」与记月页的工资单都改为**实时计算**：记一笔加班，两处数字\n  立刻跟着变，不用再等任何同步动作\n- 记月页「同步本月考勤」按钮**取消**：基本工资 / 加班工资 / 调休折现 / 事假 / 病假 /\n  社保 / 公积金随当前考勤与薪资设定自动出数\n- 自己**改过或手填的行照旧保留**，不会被自动计算覆盖；「已手改（引擎 X）」里的 X 与\n  对账差额也按当前计算实时走，「恢复引擎值」回到的是引擎现在算出的数\n- 上月对比（环比）同样自动出数，上月没手动填过也能比\n\n**导入上月**\n\n- 按钮大小不变、位置居中；导入内容改为**上月实际看到的那张单**——每月固定的手填项与\n  改动都会带过来（自动计算的行继续跟随本月，不锁死在上月数字上）\n\n**界面细节**\n\n- 行下方的来源标注「来自考勤 · X月X日 同步」改为「来自考勤 · 自动计算」\n\n\n系统要求：Android 10（API 29）及以上。",
+  "versionName": "0.7.7",
+  "versionCode": 59,
+  "tag": "v0.7.7",
+  "releaseNotes": "## 更新内容\n\n**工地记工**\n\n- 统计页工地维度改为**「本期待结 / 项目全周期」两枚口径切换**——工地以项目为核心，\n  原「考勤周期 / 自然月 / 年」对它没有意义\n- 首页工地卡、明细页、统计页口径**统一为「本期待结」**，三处数字始终一致；\n  切「项目全周期」一次看该项目全部流水\n- 图表长按某一天：工地制度**直接打开记工页并预选该日期**（原来会弹出标准制度的记加班弹窗）\n- 记工保存后新增**流水预览卡**，刚记的那一笔当场可见\n- 周聚合柱状图样式强化：柱子加宽更醒目、每柱标注日期、浮窗显示整周日期区间；\n  热点图固定显示最近六个月，今天之后不再留白\n\n**考勤周期**\n\n- 起始日选择**移除 30、31**（只保留 1–29）；原先选过 30/31 的按 29 生效\n- 起始日网格末行与上方对齐（29 不再独占一行变宽）\n\n**界面**\n\n- 调休余额的时长选择栏改为**「沉下去」凹陷质感**（与记加班弹窗时长区同款），操作方式不变\n- 日历页（在底栏时）整列可上下滚动，「本月小结」不再被底栏截断\n- 统计页「记月」页签底部不再被底栏遮挡，最底部按钮可以正常点到\n- 毛玻璃效果统一优化；修复开启底栏毛玻璃后**冷启动不生效、切一次页面才正常**的问题\n\n\n系统要求：Android 10（API 29）及以上。",
   "apkUrl": {
-    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.7.6.2/MDOT-RELEASE-0.7.6.2-v8a.apk",
-    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.7.6.2/MDOT-RELEASE-0.7.6.2-v7a.apk",
-    "universal": "https://github.com/3546475/mdot/releases/download/v0.7.6.2/MDOT-RELEASE-0.7.6.2-dual.apk"
+    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.7.7/MDOT-RELEASE-0.7.7-v8a.apk",
+    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.7.7/MDOT-RELEASE-0.7.7-v7a.apk",
+    "universal": "https://github.com/3546475/mdot/releases/download/v0.7.7/MDOT-RELEASE-0.7.7-dual.apk"
   },
   "apkSha256": {
-    "arm64-v8a": "0f0e208b10c9aa9608fbae569f0f0c0116384c91b13bc95ae3102025bd00b737",
-    "armeabi-v7a": "ceae594a6f180a8999a07b2c05de342ff99562a10c79788f867ae940466f75a4",
-    "universal": "0679c1ffb27da297d052840d6ce1818ff64b2d232382e4800f31fd97c052df83"
+    "arm64-v8a": "0100387f5196c82564f142f42ee6a4beedc7b2505550dab8c7dded2b00e88b04",
+    "armeabi-v7a": "54f9b878edc1591568b98a01aa4e158beb930e2534b789adb0e19bde5efbcd35",
+    "universal": "b8ea1b9db355ef2d5c224f62ffb4882def3993dd8f94c37cba252c6b266183f2"
   }
 }
