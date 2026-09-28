@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.BottomBarSpec
+import com.mdot.app.core.designsystem.GlassCardSpec
 import com.mdot.app.core.designsystem.Radius
 import kotlin.math.roundToInt
 
@@ -129,9 +130,9 @@ fun JiabanBottomBar(
     // 毛玻璃：半透明渐变底色透出模糊内容；无模糊能力（API<31）回退高不透明保证可读性
     val frosted = backdropBlur != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
     val barColor = cs.surfaceContainer
-    val tintTop = cs.surfaceContainer.copy(alpha = BottomBarSpec.frostedAlphaTop)
-    val tintBottom = cs.surfaceContainer.copy(alpha = BottomBarSpec.frostedAlphaBottom)
-    val tintFallback = cs.surfaceContainer.copy(alpha = BottomBarSpec.frostedFallbackAlpha)
+    val tintTop = cs.surfaceContainer.copy(alpha = GlassCardSpec.alphaTop)
+    val tintBottom = cs.surfaceContainer.copy(alpha = GlassCardSpec.alphaBottom)
+    val tintFallback = cs.surfaceContainer.copy(alpha = GlassCardSpec.fallbackAlpha)
     // 底色画刷：毛玻璃=垂直渐变（上缘更透、下缘更实）；无模糊能力（API<31）=高不透明回退；非毛玻璃=实色
     val tintBrush = when {
         frosted -> androidx.compose.ui.graphics.Brush.verticalGradient(listOf(tintTop, tintBottom))
@@ -141,14 +142,14 @@ fun JiabanBottomBar(
     // 内高光：上缘内侧白色渐变（模拟玻璃边缘反光）；衬托渐变：模糊层内淡色（空内容时给玻璃可糊之物）
     val highlightBrush = remember {
         androidx.compose.ui.graphics.Brush.verticalGradient(
-            listOf(androidx.compose.ui.graphics.Color.White.copy(alpha = BottomBarSpec.frostedHighlightAlpha), androidx.compose.ui.graphics.Color.Transparent),
+            listOf(androidx.compose.ui.graphics.Color.White.copy(alpha = GlassCardSpec.highlightAlpha), androidx.compose.ui.graphics.Color.Transparent),
         )
     }
     val scrimBrush = remember(cs) {
         androidx.compose.ui.graphics.Brush.verticalGradient(
             listOf(
                 androidx.compose.ui.graphics.Color.Transparent,
-                cs.surfaceContainerHighest.copy(alpha = BottomBarSpec.frostedScrimAlpha),
+                cs.surfaceContainerHighest.copy(alpha = GlassCardSpec.scrimAlpha),
             ),
         )
     }
@@ -199,7 +200,7 @@ fun JiabanBottomBar(
                 .clip(shape)
                 .border(
                     BottomBarSpec.barBorderWidth,
-                    if (frosted) cs.outlineVariant.copy(alpha = BottomBarSpec.frostedBorderAlpha) else cs.outlineVariant,
+                    if (frosted) cs.outlineVariant.copy(alpha = GlassCardSpec.borderAlpha) else cs.outlineVariant,
                     shape,
                 )
                 .onSizeChanged { barWidth = it.width },
@@ -210,7 +211,7 @@ fun JiabanBottomBar(
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .backdropBlur(backdropBlur!!, BottomBarSpec.frostBlurRadius, backdrop = scrimBrush),
+                        .backdropBlur(backdropBlur!!, GlassCardSpec.blurRadius, backdrop = scrimBrush),
                 )
             }
             // 底色：叠在模糊之上、图标之下（毛玻璃渐变 / 非毛玻璃实色 / API<31 高不透明回退）

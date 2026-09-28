@@ -17,12 +17,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +45,7 @@ import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.designsystem.component.AnimatedMoneyText
+import com.mdot.app.core.designsystem.component.DayPickDialog
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.navigation.contentPaddingValues
 import com.mdot.app.core.repository.DataRevision
@@ -60,17 +65,32 @@ import com.mdot.app.domain.util.TimeUtils
 import com.mdot.app.feature.record.RecordSheetController
 import com.mdot.app.feature.stats.SiteDetailKind
 import com.mdot.app.feature.stats.SiteDetailRow
+import com.mdot.app.feature.stats.buildSiteDetailRows
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 
-/** 明细页 UiState：本周期（考勤周期）内的收入构成明细，与首页收入卡同口径 */
+/** 工地明细区间口径（21 文档 B1）：UNSETTLED/PROJECT_SPAN 走 domain 推导（SiteRanges.Kind），CUSTOM=用户选起止 */
+enum class SiteDetailRangeMode { UNSETTLED, PROJECT_SPAN, CUSTOM }
+
+/** VM 数据流合并参数（combine 五流解包） */
+private data class DetailParams(
+    val anchor: Int,
+    val salary: com.mdot.app.domain.model.SalaryConfig,
+    val workdays: Set<java.time.DayOfWeek>,
+    val siteMode: SiteDetailRangeMode,
+    val customFrom: LocalDate?,
+    val customTo: LocalDate?,
+)
+
+/** 明细页 UiState：非工地=本周期（考勤周期）收入构成明细；工地=项目区间流水（21 文档 B1） */
 data class DetailUiState(
     val workSystem: WorkSystem = WorkSystem.STANDARD,
     /** 周期区间标签（如「9月1日 – 9月30日」） */
@@ -78,10 +98,14 @@ data class DetailUiState(
     /** 非工地：加班/请假逐条明细 + 引擎汇总（档位分布/合计） */
     val breakdowns: List<PayrollCalculator.RecordBreakdown> = emptyList(),
     val output: PayrollCalculator.Output? = null,
-    /** 工地：当前项目流水（出工/休息/包工/借支/部分结算，日期倒序）+ 三色汇总 */
+    /** 工地：当前项目区间流水（出工/休息/包工/借支/部分结算，日期倒序）+ 三色汇总 */
     val siteDetails: List<SiteDetailRow> = emptyList(),
     val siteSummary: SitePayCalculator.Output? = null,
     val sitePartialCents: Long = 0,
+    /** 工地区间口径（默认本期待结） */
+    val siteRangeMode: SiteDetailRangeMode = SiteDetailRangeMode.UNSETTLED,
+    val siteCustomFrom: LocalDate? = null,
+    val siteCustomTo: LocalDate? = null,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -101,84 +125,79 @@ class DetailViewModel @Inject constructor(
     private val anchorFlow = combine(settings.cycleAnchorDayFlow, dataRevision.version) { a, _ -> a }
     private val salaryFlow = combine(settings.salaryFlow, settings.workdaysFlow) { s, w -> s to w }
 
-    val uiState = combine(anchorFlow, salaryFlow) { anchor, (salary, workdays) ->
-        Triple(anchor, salary, workdays)
-    }.flatMapLatest { (anchor, salary, workdays) ->
-        val range = CycleCalculator.periodContaining(today, anchor)
-        val rangeLabel = "${TimeUtils.mdCn(range.from)} – ${TimeUtils.mdCn(range.to)}"
+    /** 工地区间口径 + 自定义起止（21 文档 B1） */
+    private val siteMode = MutableStateFlow(SiteDetailRangeMode.UNSETTLED)
+    private val siteCustomFrom = MutableStateFlow<LocalDate?>(null)
+    private val siteCustomTo = MutableStateFlow<LocalDate?>(null)
+
+    fun onSiteRangeMode(mode: SiteDetailRangeMode) {
+        siteMode.value = mode
+        if (mode != SiteDetailRangeMode.CUSTOM) {
+            siteCustomFrom.value = null
+            siteCustomTo.value = null
+        }
+    }
+
+    fun onSiteCustomFrom(d: LocalDate) {
+        siteCustomFrom.value = d
+        if ((siteCustomTo.value ?: d).isBefore(d)) siteCustomTo.value = d
+    }
+
+    fun onSiteCustomTo(d: LocalDate) {
+        if (d.isAfter(today)) return
+        siteCustomTo.value = d
+        if ((siteCustomFrom.value ?: d).isAfter(d)) siteCustomFrom.value = d
+    }
+
+    val uiState = combine(anchorFlow, salaryFlow, siteMode, siteCustomFrom, siteCustomTo) { anchor, sw, mode, cf, ct ->
+        DetailParams(anchor, sw.first, sw.second, mode, cf, ct)
+    }.flatMapLatest { (anchor, salary, workdays, mode, cf, ct) ->
         if (salary.workSystem == WorkSystem.SITE) {
-            // 工地：当前项目本周期流水（出工/包工/借支/部分结算合并倒序，同统计页明细口径）
+            // 工地（21 文档 B1）：项目区间流水（出工/包工/借支/部分结算合并倒序），
+            // 口径 = 本期待结/项目全周期/自定义；结算变化 → observeSettlements 触发区间滚动
             val pid = siteRepo.currentProjectId()
-            combine(
-                siteRepo.observeAttendance(pid, range.from, range.to),
-                siteRepo.observePieceWorks(pid, range.from, range.to),
-                siteRepo.observeAdvances(pid, range.from, range.to),
-                siteRepo.observePartialSettlements(pid, range.from, range.to),
-            ) { atts, pieces, advs, partials ->
-                fun worksMilliOf(minutes: Int, base: Int): Long = minutes * 1000L / base.coerceAtLeast(1)
-                val details = buildList {
-                    atts.forEach { a ->
-                        add(
-                            SiteDetailRow(
-                                date = LocalDate.parse(a.date),
-                                kind = SiteDetailKind.WORK,
-                                id = a.id,
-                                worksMilli = worksMilliOf(a.workMinutes, a.baseMinutes),
-                                otMinutes = a.otMinutes,
-                                amountCents = a.workPayCents + a.otPayCents,
-                            )
-                        )
+            siteRepo.observeSettlements(pid).flatMapLatest {
+                val (from, to) = when (mode) {
+                    SiteDetailRangeMode.UNSETTLED -> siteRepo.unsettledRange(pid)
+                    SiteDetailRangeMode.PROJECT_SPAN -> siteRepo.projectSpan(pid)
+                    SiteDetailRangeMode.CUSTOM -> {
+                        val span = siteRepo.projectSpan(pid)
+                        val f = cf ?: span.first
+                        val t = maxOf(ct ?: today, f)
+                        f to t
                     }
-                    pieces.forEach { p ->
-                        add(
-                            SiteDetailRow(
-                                date = LocalDate.parse(p.date),
-                                kind = SiteDetailKind.PIECE,
-                                id = p.id,
-                                amountCents = p.amountCents,
-                                itemName = p.itemName,
-                            )
+                }
+                val rangeLabel = "${TimeUtils.mdCn(from)} – ${TimeUtils.mdCn(to)}"
+                combine(
+                    siteRepo.observeAttendance(pid, from, to),
+                    siteRepo.observePieceWorks(pid, from, to),
+                    siteRepo.observeAdvances(pid, from, to),
+                    siteRepo.observePartialSettlements(pid, from, to),
+                ) { atts, pieces, advs, partials ->
+                    // 流水行构造三处共用（21 文档 B5 重构）
+                    val details = buildSiteDetailRows(atts, pieces, advs, partials)
+                    val summary = SitePayCalculator.summarize(
+                        SitePayCalculator.Input(
+                            attendance = atts, pieceWorks = pieces, advances = advs,
                         )
-                    }
-                    advs.forEach { a ->
-                        add(
-                            SiteDetailRow(
-                                date = LocalDate.parse(a.date),
-                                kind = SiteDetailKind.ADVANCE,
-                                id = a.id,
-                                amountCents = a.amountCents,
-                                purpose = runCatching { AdvancePurpose.valueOf(a.purpose) }.getOrNull(),
-                            )
-                        )
-                    }
-                    partials.forEach { p ->
-                        add(
-                            SiteDetailRow(
-                                date = p.periodStart,
-                                kind = SiteDetailKind.PARTIAL,
-                                id = p.id,
-                                amountCents = p.netCents,
-                            )
-                        )
-                    }
-                }.sortedByDescending { it.date }
-                val summary = SitePayCalculator.summarize(
-                    SitePayCalculator.Input(
-                        attendance = atts, pieceWorks = pieces, advances = advs,
                     )
-                )
-                val partial = partials.sumOf { it.netCents }
-                val summaryOut = if (partial > 0) summary.copy(pendingCents = summary.pendingCents - partial) else summary
-                DetailUiState(
-                    workSystem = WorkSystem.SITE,
-                    rangeLabel = rangeLabel,
-                    siteDetails = details,
-                    siteSummary = summaryOut(summary, partial),
-                    sitePartialCents = partial,
-                )
+                    val partial = partials.sumOf { it.netCents }
+                    DetailUiState(
+                        workSystem = WorkSystem.SITE,
+                        rangeLabel = rangeLabel,
+                        siteDetails = details,
+                        siteSummary = summaryOut(summary, partial),
+                        sitePartialCents = partial,
+                        siteRangeMode = mode,
+                        siteCustomFrom = cf,
+                        siteCustomTo = ct,
+                    )
+                }
             }
         } else {
-            // 非工地：本周期加班/请假逐条金额明细（同统计页/工资单口径）
+            // 非工地：本周期（考勤周期）加班/请假逐条金额明细（同统计页/工资单口径）
+            val range = CycleCalculator.periodContaining(today, anchor)
+            val rangeLabel = "${TimeUtils.mdCn(range.from)} – ${TimeUtils.mdCn(range.to)}"
             combine(
                 recordRepo.observeRange(range.from, range.to),
                 recordRepo.observeAdjustments(),
@@ -214,6 +233,39 @@ class DetailViewModel @Inject constructor(
         if (partial > 0) summary.copy(pendingCents = summary.pendingCents - partial) else summary
 }
 
+/**
+ * 工地区间口径三选项（21 文档 B1）：**明细页与统计页工地维度行共用本组件**——
+ * 同功能必须同样式同实现，禁止两处各画一套。
+ * 样式 = FilterChip 轻量筛选 chip（用户拍板 dec-8b817f2b6a12e91d：口径切换是次要信息，
+ * ChoicePillRow 药丸太占视觉重心，与统计页维度 chips 统一成 chip 语言）。
+ */
+@Composable
+fun SiteRangeChips(
+    selected: SiteDetailRangeMode,
+    onSelect: (SiteDetailRangeMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+        SiteDetailRangeMode.entries.forEach { mode ->
+            FilterChip(
+                selected = selected == mode,
+                onClick = { onSelect(mode) },
+                label = {
+                    Text(
+                        stringResource(
+                            when (mode) {
+                                SiteDetailRangeMode.UNSETTLED -> R.string.stats_dim_site_pending
+                                SiteDetailRangeMode.PROJECT_SPAN -> R.string.stats_dim_site_span
+                                SiteDetailRangeMode.CUSTOM -> R.string.stats_dim_custom
+                            }
+                        )
+                    )
+                },
+            )
+        }
+    }
+}
+
 /** 明细内容主体（统计页「明细」页签与本页共用）：区间胶囊 + 模式化汇总卡 + 逐条明细列表 */
 @Composable
 fun DetailPane(
@@ -221,6 +273,7 @@ fun DetailPane(
     vm: DetailViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
+    var picking by remember { mutableStateOf<String?>(null) } // "from" | "to"（工地自定义区间）
 
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(Spacing.xs),
@@ -230,6 +283,37 @@ fun DetailPane(
         contentPadding = com.mdot.app.core.navigation.contentPaddingValues(showBottomBar = showBottomBar),
     ) {
         item {
+            // 工地：区间口径行（21 文档 B1/Q3）——本期待结（默认）/ 项目全周期 / 自定义（与统计页工地维度行共用 SiteRangeChips）
+            if (state.workSystem == WorkSystem.SITE) {
+                SiteRangeChips(
+                    selected = state.siteRangeMode,
+                    onSelect = vm::onSiteRangeMode,
+                )
+                if (state.siteRangeMode == SiteDetailRangeMode.CUSTOM) {
+                    Spacer(Modifier.height(Spacing.s))
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                        OutlinedButton(onClick = { picking = "from" }) {
+                            Text(
+                                stringResource(
+                                    R.string.stats_custom_from,
+                                    state.siteCustomFrom?.let(TimeUtils::mdCn)
+                                        ?: stringResource(R.string.stats_custom_from_default),
+                                )
+                            )
+                        }
+                        OutlinedButton(onClick = { picking = "to" }) {
+                            Text(
+                                stringResource(
+                                    R.string.stats_custom_to,
+                                    state.siteCustomTo?.let(TimeUtils::mdCn)
+                                        ?: stringResource(R.string.stats_custom_to_default),
+                                )
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(Spacing.s))
+            }
             if (state.rangeLabel.isNotEmpty()) {
                 // 区间胶囊（与首页数据区日期同款样式）
                 Row(
@@ -275,6 +359,22 @@ fun DetailPane(
                 }
             }
         }
+    }
+
+    // 工地自定义区间起止选择（21 文档 B1）
+    picking?.let { which ->
+        DayPickDialog(
+            title = stringResource(
+                if (which == "from") R.string.ds_pick_start else R.string.ds_pick_end,
+            ),
+            initial = if (which == "from") state.siteCustomFrom ?: LocalDate.now().withDayOfMonth(1)
+            else state.siteCustomTo ?: LocalDate.now(),
+            onPick = { d ->
+                if (which == "from") vm.onSiteCustomFrom(d) else vm.onSiteCustomTo(d)
+                picking = null
+            },
+            onDismiss = { picking = null },
+        )
     }
 }
 
@@ -540,9 +640,9 @@ private fun NormalDetailRow(
     }
 }
 
-/** 明细行（工地）：单行——「9/11 周五 · 类型/构成」+ 金额 */
+/** 明细行（工地）：单行——「9/11 周五 · 类型/构成」+ 金额（明细页列表与记工页保存预览共用） */
 @Composable
-private fun SiteDetailRowItem(row: SiteDetailRow) {
+fun SiteDetailRowItem(row: SiteDetailRow) {
     val kindLine = when (row.kind) {
         SiteDetailKind.WORK -> {
             val num = if (row.worksMilli % 1000L == 0L) (row.worksMilli / 1000L).toString()

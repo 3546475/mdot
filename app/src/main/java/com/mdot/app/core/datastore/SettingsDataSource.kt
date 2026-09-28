@@ -82,10 +82,12 @@ class SettingsDataSource @Inject constructor(
     private val PAY_MONTH_COLLAPSED = stringSetPreferencesKey("paymonth_collapsed")
 
     // ---- 考勤周期 ----
-    val cycleAnchorDayFlow: Flow<Int> = dataStore.data.map { it[CYCLE_ANCHOR_DAY] ?: 1 }
+    // 起始日仅 1–29（30/31 已从 UI 移除）；存量值 30/31 读取时收敛到 29
+    val cycleAnchorDayFlow: Flow<Int> =
+        dataStore.data.map { (it[CYCLE_ANCHOR_DAY] ?: 1).coerceIn(1, 29) }
 
     suspend fun setCycleAnchorDay(day: Int) {
-        require(day in 1..31)
+        require(day in 1..29)
         dataStore.edit { it[CYCLE_ANCHOR_DAY] = day }
     }
 

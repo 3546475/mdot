@@ -6,7 +6,19 @@
 
     <!-- 记录/首页制度化文案（when 补齐） -->
     <string name="site_record_hero">记 工</string>
+    <!-- 日历页工地月小结标签（日历=月视图，「本月」语义正确；21 文档 B1 保留） -->
     <string name="site_cycle_label">本月工数</string>
+    <!-- 首页数据区大数字标签（v0.7.7 起口径=本期待结，21 文档 B1/Q3 拍板） -->
+    <string name="site_home_works_label">本期待结工数</string>
+    <string name="site_home_works_label_hour">本期待结工时</string>
+    <!-- 首页待结卡区间行 -->
+    <string name="site_pending_range">待结区间 %1$s</string>
+    <!-- 统计页区间胶囊（工地口径，21 文档 M7） -->
+    <string name="site_range_period">区间 %1$s</string>
+    <!-- 记工页保存后流水预览（21 文档 B5） -->
+    <string name="site_save_recent_title">刚记下 · 本项目最近流水</string>
+    <string name="site_save_recent_all">查看全部明细</string>
+    <string name="site_save_recent_close">关闭</string>
     <string name="site_tab_ot">出工</string>
     <!-- 项目管理/项目设置（F-S2） -->
     <string name="site_projects_title">项目管理</string>
@@ -156,6 +168,5 @@
     <string name="site_project_standard_hint">只影响新记录，历史金额不重算。</string>
     <string name="site_project_summary_hour_format">%1$sh = 1 工 · ¥%2$s/工 · 加班 ¥%3$s/h</string>
     <string name="site_project_summary_day_format">%1$sh = 1 工 · ¥%2$s/工 · 加班 %3$sh = 1 工</string>
-    <!-- 显示单位偏好（F-S11） -->
-    <string name="site_cycle_label_hour">本月工时</string>
+    <!-- 显示单位偏好（F-S11）；首页大数字标签 v0.7.7 起见 site_home_works_label(_hour) -->
 </resources>

@@ -98,6 +98,9 @@
     <string name="stats_dim_month">自然月</string>
     <string name="stats_dim_year">年</string>
     <string name="stats_dim_custom">自定义</string>
+    <!-- 工地记工维度（21 文档 B2：工地以项目为核心，无固定周期） -->
+    <string name="stats_dim_site_pending">本期待结</string>
+    <string name="stats_dim_site_span">项目全周期</string>
     <string name="stats_pie_shift">班次分布</string>
     <string name="stats_pie_leave">请假类型</string>
     <string name="stats_custom_from">开始：%1$s</string>
@@ -180,6 +183,10 @@
     <string name="site_stat_ot">加班</string>
     <string name="site_stat_work_pay">点工工资</string>
     <string name="stats_month_best">%1$d日最多 · %2$s</string>
+    <!-- 柱状图周聚合「最多」行（21 文档 B3）：%1$s = 周起 M/d -->
+    <string name="stats_bar_best_label">%1$s 起最多 · %2$s</string>
+    <!-- 柱状图周聚合说明（21 文档 B3 用户反馈：周柱与日柱同形需明示口径） -->
+    <string name="stats_bar_weekly_hint">按周汇总 · 每柱 = 周一至周日合计</string>
     <string name="stats_ot_duration_line">加班 %1$s</string>
     <string name="stats_leave_deduct_line">请假扣款 %1$s</string>
     <string name="stats_period_line">周期总 %1$s · 标准 %2$s · 超时 %3$s</string>

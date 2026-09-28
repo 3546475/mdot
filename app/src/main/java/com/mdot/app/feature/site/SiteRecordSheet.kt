@@ -13,6 +13,7 @@ import com.mdot.app.domain.model.SiteDayStatus
 import com.mdot.app.domain.model.SiteProject
 import com.mdot.app.domain.model.SiteOtMode
 import com.mdot.app.domain.util.Money
+import com.mdot.app.feature.stats.buildSiteDetailRows
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -66,6 +67,9 @@ data class SiteRecordUiState(
     val photos: List<String> = emptyList(),
     val saved: Boolean = false,
     val error: String? = null,
+    /** 保存后预览（21 文档 B5）：本项目最近流水（日期倒序，最多 5 条）+ 显示开关 */
+    val recentRows: List<com.mdot.app.feature.stats.SiteDetailRow> = emptyList(),
+    val recentVisible: Boolean = false,
 ) {
     /** 生效日价（分）：记录级改价优先 */
     val effectiveRateCents: Long
@@ -295,6 +299,7 @@ class SiteRecordViewModel @Inject constructor(
                 note = s.note.ifBlank { null },
                 photos = s.photos.toPhotosJson(),
             ).onSuccess {
+                showRecentAfterSave()
                 if (keepOpen) {
                     _state.update {
                         it.copy(
@@ -342,6 +347,7 @@ class SiteRecordViewModel @Inject constructor(
                 _state.update { it.copy(error = e.toSiteErrorText()) }
                 return@launch
             }
+            showRecentAfterSave()
             if (keepOpen) {
                 // 再记一笔：重置表单，保留项目上下文
                 _state.update {
@@ -370,6 +376,7 @@ class SiteRecordViewModel @Inject constructor(
         viewModelScope.launch {
             siteRepo.settlePartial(s.projectId, cents)
                 .onSuccess {
+                    showRecentAfterSave()
                     if (keepOpen) {
                         _state.update { it.copy(settleAmountText = "", saved = false, error = null) }
                     } else {
@@ -393,6 +400,7 @@ class SiteRecordViewModel @Inject constructor(
         viewModelScope.launch {
             siteRepo.saveAdvance(s.projectId, s.date, cents, s.purpose, s.advanceNote.ifBlank { null }, s.photos.toPhotosJson())
                 .onSuccess {
+                    showRecentAfterSave()
                     if (keepOpen) {
                         _state.update {
                             it.copy(advanceYuanText = "", advanceNote = "", photos = emptyList(), saved = false)
@@ -408,6 +416,29 @@ class SiteRecordViewModel @Inject constructor(
     }
 
     fun clearError() = _state.update { it.copy(error = null) }
+
+    /** 保存成功后（21 文档 B5）：加载本项目最近流水并滑出预览（录入闭环确认感） */
+    private fun showRecentAfterSave() {
+        viewModelScope.launch {
+            val pid = _state.value.projectId.takeIf { it != 0L } ?: siteRepo.currentProjectId()
+            val span = siteRepo.projectSpan(pid)
+            val rows = buildSiteDetailRows(
+                attendance = siteRepo.observeAttendance(pid, span.first, span.second).first(),
+                pieceWorks = siteRepo.observePieceWorks(pid, span.first, span.second).first(),
+                advances = siteRepo.observeAdvances(pid, span.first, span.second).first(),
+                partials = siteRepo.observePartialSettlements(pid, span.first, span.second).first(),
+            ).take(RECENT_LIMIT)
+            _state.update { it.copy(recentRows = rows, recentVisible = true) }
+        }
+    }
+
+    /** 收起保存后流水预览 */
+    fun dismissRecent() = _state.update { it.copy(recentVisible = false) }
+
+    private companion object {
+        /** 保存后预览最多行数 */
+        const val RECENT_LIMIT = 5
+    }
 }
 
 /** 照片路径列表 → 存储串（SOH 分隔，避免序列化依赖） */

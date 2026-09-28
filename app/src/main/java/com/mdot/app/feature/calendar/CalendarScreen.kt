@@ -14,6 +14,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -498,10 +500,12 @@ fun CalendarScreen(
                 }
             }
         } else {
-            // ---- 手机：单列（原布局） ----
+            // ---- 手机：单列（原布局）——整列可滚动（2026-09-28 用户报：日历作底栏一级页时
+            // 避让底栏后「本月小结」显示空间不足，应像其它页面一样可滚动） ----
             Column(
                 Modifier
                     .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
                     .wrapContentWidth(Alignment.CenterHorizontally)
                     .contentBottomPadding(showBottomBar = !canBack)
                     .widthIn(max = AdaptiveSpecs.contentMaxWidth)

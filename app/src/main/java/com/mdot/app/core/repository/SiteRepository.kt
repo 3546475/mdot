@@ -16,6 +16,7 @@ import com.mdot.app.core.util.AppResult
 import com.mdot.app.core.util.AppResult.Failure
 import com.mdot.app.core.util.AppResult.Success
 import com.mdot.app.domain.SitePayCalculator
+import com.mdot.app.domain.SiteRanges
 import com.mdot.app.domain.model.AdvancePurpose
 import com.mdot.app.domain.model.SiteAdvance
 import com.mdot.app.domain.model.SiteAttendance
@@ -363,13 +364,33 @@ class SiteRepository @Inject constructor(
     // ---- 汇总与结算 ----
 
     /** 未结算区间 = 最近结算单 period_end 次日 → today（无结算单则不限起点） */
-    /** 未结算区间：上次结算次日 → 今天；无结算时从项目首笔记录日期起（而非硬编码 2000-01-01） */
-    suspend fun unsettledRange(projectId: Long, today: LocalDate = LocalDate.now()): Pair<LocalDate, LocalDate> {
-        val start = settlementDao.lastSettlementEnd(projectId)?.plusDays(1)
-            ?: listOfNotNull(attDao.minDate(projectId), advanceDao.minDate(projectId), pieceDao.minDate(projectId)).minOrNull()
-            ?: today
-        return start to maxOf(start, today)
-    }
+    /** 未结算区间：上次结算次日 → 今天；无结算时从项目首笔记录日期起（而非硬编码 2000-01-01）。
+     *  推导委托 domain 纯函数（21 文档 B1a，与「项目全周期」同一套推导，勿在调用方另算） */
+    suspend fun unsettledRange(projectId: Long, today: LocalDate = LocalDate.now()): Pair<LocalDate, LocalDate> =
+        rangeOf(SiteRanges.Kind.UNSETTLED, projectId, today)
+
+    /** 项目全周期（21 文档 B1）：首条记录日 → 末条记录日（三类记录合并），无记录退化为今天单日 */
+    suspend fun projectSpan(projectId: Long, today: LocalDate = LocalDate.now()): Pair<LocalDate, LocalDate> =
+        rangeOf(SiteRanges.Kind.PROJECT_SPAN, projectId, today)
+
+    /** 按口径解析工地区间（21 文档 B1）：UNSETTLED=本期待结、PROJECT_SPAN=项目全周期。区间推导只住此处 */
+    suspend fun rangeOf(
+        kind: SiteRanges.Kind,
+        projectId: Long,
+        today: LocalDate = LocalDate.now(),
+    ): Pair<LocalDate, LocalDate> = SiteRanges.resolve(
+        kind = kind,
+        lastSettlementEnd = settlementDao.lastSettlementEnd(projectId),
+        firstRecord = firstRecordDate(projectId),
+        lastRecord = lastRecordDate(projectId),
+        today = today,
+    )
+
+    private suspend fun firstRecordDate(projectId: Long): LocalDate? =
+        listOfNotNull(attDao.minDate(projectId), advanceDao.minDate(projectId), pieceDao.minDate(projectId)).minOrNull()
+
+    private suspend fun lastRecordDate(projectId: Long): LocalDate? =
+        listOfNotNull(attDao.maxDate(projectId), advanceDao.maxDate(projectId), pieceDao.maxDate(projectId)).maxOrNull()
 
     /** 未结算包工（一次性读，结算页流水用） */
     suspend fun unsettledPieces(projectId: Long, from: LocalDate, to: LocalDate):

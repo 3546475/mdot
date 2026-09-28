@@ -3,6 +3,7 @@ package com.mdot.app.core.designsystem.component
 import android.os.Build
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -14,14 +15,20 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toIntSize
 
@@ -58,10 +65,13 @@ import androidx.compose.ui.unit.toIntSize
  */
 @Stable
 class BackdropBlurState internal constructor() {
-    /** 源录制的内容层（首帧前为 null，效果方该帧跳过模糊只画半透明底色） */
-    internal var layer: GraphicsLayer? = null
-    /** 源的 LayoutCoordinates（效果方据此把「身后」区域对齐到自身原点） */
-    internal var sourceCoords: LayoutCoordinates? = null
+    /** 源录制的内容层（首帧前为 null，效果方该帧跳过模糊只画半透明底色）。
+     *  ⚠️ 快照状态 + neverEqualPolicy（2026-09-28 修「冷启动圆钮不模糊、切页才正常」）：
+     *  普通 var 时效果方感知不到源的重录（失效链只靠 recordTick），首帧走 fallback 后
+     *  可能不重画直到节点重建；neverEqual 保证源每次 record 赋值必触发效果方重画 */
+    internal var layer: GraphicsLayer? by mutableStateOf(null, androidx.compose.runtime.neverEqualPolicy())
+    /** 源的 LayoutCoordinates（效果方据此把「身后」区域对齐到自身原点）；同上快照状态 */
+    internal var sourceCoords: LayoutCoordinates? by mutableStateOf(null, androidx.compose.runtime.neverEqualPolicy())
     /** 录制序号（**普通变量**，非快照）：源在 draw 里自增用，见 [onRecorded] 的 ⚠️ */
     private var recordSeq = 0
     /**
@@ -82,6 +92,12 @@ class BackdropBlurState internal constructor() {
 
 @Composable
 fun rememberBackdropBlurState(): BackdropBlurState = remember { BackdropBlurState() }
+
+/** 全局玻璃源下发（MainActivity provides；null = 毛玻璃关/不可用）：
+ *  底部悬浮提示（MessageSnackbar）等**源之外无自有源**的零散玻璃从这里取共享源采样 */
+val LocalBackdropGlassState = compositionLocalOf<BackdropBlurState?> { null }
+
+
 
 /** 背景模糊源：每帧把自身内容录进共享 [BackdropBlurState.layer] 并上屏。挂在「会被效果方盖住」的内容上（如导航宿主） */
 fun Modifier.backdropBlurSource(state: BackdropBlurState): Modifier = composed {
@@ -105,8 +121,14 @@ fun Modifier.backdropBlurSource(state: BackdropBlurState): Modifier = composed {
 }
 
 /**
- * 背景模糊效果方（独立子层）：把源录制的内容层平移对齐后直接绘入自身节点层，再整层模糊
- * （`Modifier.blur`）。
+ * 背景模糊效果方（独立子层）——**2026-09-28 按 AndroidLiquidGlass（Kyant0）工程方案重写**，
+ * 三招治本项目在真机上暴露的采样顽疾（黑影整块闪断/错位无影/边缘露锐利）：
+ *  1. **外扩录制层**：把「平移后的源 + 衬托渐变」录进四周外扩 blur 半径的自有 GraphicsLayer，
+ *     blur（RenderEffect）挂在**层**上——羽化/边缘采样发生在外扩区（可见窗外），窗口边缘平滑；
+ *  2. **TileMode.Clamp**：模糊采样越界取边缘像素，源层边缘（屏幕底边）不发黑不透空；
+ *  3. **坐标换算双路兜底**：`localPositionOf` 在外层变换下会算错（LiquidGlass 作者 TODO 同记），
+ *     异常/失配时改用 `positionInWindow` 差值。
+ *  另：外扩区铺背景实底——窗边外的羽化过渡到实底，绝不透出身后锐利内容。
  *
  * 调用方负责修饰符顺序：放在 **clip 之后**（模糊绘制随形状裁切）、**半透明底色与图标之前**
  * （即作为胶囊最底层子层；图标在兄弟层保持锐利）。API<31 / [radius]≤0 时整体不挂载。
@@ -118,32 +140,64 @@ fun Modifier.backdropBlur(
     backdrop: Brush? = null,
 ): Modifier = composed {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || radius <= 0.dp) return@composed this
-    // 自身原点在源局部坐标系中的位置（localPositionOf 经共同祖先双向换算，
-    // 祖先自身的缩放/平移变换两两抵消；布局与位移动画期间随坐标回调即时刷新）
-    var offsetInSource by remember { mutableStateOf(Offset.Zero) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val blurPx = with(density) { radius.toPx() }
+    val pad = blurPx.toInt()
+    val backdropColor = MaterialTheme.colorScheme.background
+    // 效果层 + 模糊效果（Clamp 边缘；BlurEffect 可复用，radius 变化才重建）
+    val layer = rememberGraphicsLayer()
+    val blurEffect = remember(radius) {
+        BlurEffect(with(density) { radius.toPx() }, with(density) { radius.toPx() }, TileMode.Clamp)
+    }
+    // 自身布局坐标（每帧绘制时现算相对偏移；只存引用，draw 内只读）
+    var myCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    // 启动期续画重试（2026-09-28 修「冷启动圆钮画一帧即定格」）：首帧可能采到源尚未同步的
+    // 空纹理，之后若无失效即永久定格。draw 内**读写分离**（读 selfRetry 建立依赖、
+    // 用普通计数器 retrySeq 生成新值只写回）——有限 3 次重试，非 tick++ 自触发死循环（坑④）
+    val selfRetry = remember { mutableIntStateOf(0) }
+    val retrySeq = remember { intArrayOf(0) }
     this
-        .onGloballyPositioned { coords ->
-            val src = state.sourceCoords
-            if (src != null && src.isAttached && coords.isAttached) {
-                val p = src.localPositionOf(coords, Offset.Zero)
-                if (p != offsetInSource) offsetInSource = p
-            }
-        }
-        // ⚠️ blur 必须在链首（最外层）：Modifier 靠前的修饰符包住后续绘制。
-        // 若放 drawWithContent 之后（最内层），drawLayer(src) 由外层直接画到画布、
-        // blur 只包住空内容 → 采样层锐利、模糊不生效（实为「透出锐利页面」）。
-        .blur(radius)
+        .onGloballyPositioned { coords -> myCoords = coords }
         .drawWithContent {
             // 读录制通知建立快照依赖：源每重录一帧，本 draw 失效重采样
             state.recordTick
-            val src = state.layer
-            if (src != null) {
-                translate(left = -offsetInSource.x, top = -offsetInSource.y) {
-                    drawLayer(src)
-                }
+            selfRetry.intValue // 读：建立重试依赖（与下方写分离，非读-改-写）
+            if (retrySeq[0] < 3) {
+                retrySeq[0] = retrySeq[0] + 1
+                selfRetry.intValue = retrySeq[0] // 只写：安排下一帧续画（启动期防首帧空纹理定格）
             }
-            // 衬托渐变在模糊**之内**：与身后内容一起被糊（空内容时给玻璃一层淡渐变可糊）
-            backdrop?.let { drawRect(brush = it, size = size) }
+            val src = state.layer
+            val self = myCoords
+            val srcCoords = state.sourceCoords
+            val offset =
+                if (src != null && self != null && srcCoords != null &&
+                    self.isAttached && srcCoords.isAttached
+                ) {
+                    runCatching { srcCoords.localPositionOf(self, Offset.Zero) }
+                        .getOrElse { self.positionInWindow() - srcCoords.positionInWindow() }
+                } else null
+            if (src != null && offset != null) {
+                val winW = size.width
+                val winH = size.height
+                layer.record(IntSize(winW.toInt() + pad * 2, winH.toInt() + pad * 2)) {
+                    // 外扩区铺背景实底：羽化带过渡到实底，绝不透出身后锐利内容
+                    drawRect(color = backdropColor, size = this.size)
+                    translate(left = pad - offset.x, top = pad - offset.y) {
+                        drawLayer(src)
+                    }
+                    // 衬托渐变在模糊**之内**（只画窗口区，随 blur 一起糊）
+                    backdrop?.let { brush ->
+                        translate(left = pad.toFloat(), top = pad.toFloat()) {
+                            drawRect(brush = brush, size = Size(winW, winH))
+                        }
+                    }
+                }
+                layer.topLeft = IntOffset(-pad, -pad)
+                layer.renderEffect = blurEffect
+                drawLayer(layer)
+            } else {
+                backdrop?.let { drawRect(brush = it, size = size) }
+            }
             drawContent()
         }
 }

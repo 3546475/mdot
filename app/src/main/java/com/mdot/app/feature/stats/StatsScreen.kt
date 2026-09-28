@@ -118,6 +118,8 @@ import kotlin.math.roundToInt
 
 enum class StatsDimension(val labelRes: Int) {
     CYCLE(R.string.stats_dim_cycle), MONTH(R.string.stats_dim_month), YEAR(R.string.stats_dim_year), CUSTOM(R.string.stats_dim_custom),
+    /** 工地记工维度（21 文档 B2）：工地以项目为核心，无固定周期——本期待结 / 项目全周期 */
+    SITE_PENDING(R.string.stats_dim_site_pending), SITE_SPAN(R.string.stats_dim_site_span),
 }
 
 enum class PieMode(val labelRes: Int) { SHIFT(R.string.stats_pie_shift), LEAVE(R.string.stats_pie_leave) }
@@ -173,13 +175,15 @@ data class StatsUiState(
     val output: PayrollCalculator.Output? = null,
     /** 汇总（工地，SitePayCalculator） */
     val siteSummary: SitePayCalculator.Output? = null,
+    /** 柱状图每日值（**所选区间内**，工地=工数/其他=加班分钟；与热点图窗口解耦，21 文档 B3） */
+    val barValues: Map<LocalDate, Float> = emptyMap(),
     /** 统一热点图（所有模式）：非工地=加班小时，工地=工数 */
     val heatValues: Map<LocalDate, Float> = emptyMap(),
     /** 热点图铺格终止日（固定今天，与所选区间无关） */
     val heatEnd: LocalDate = LocalDate.now(),
     /** 热点图铺格起始日（本月月初向前推五个月的月初，共六个月） */
     val heatStart: LocalDate? = null,
-    /** 区间起止日（月柱状图铺满整月用，不截断到今天） */
+    /** 区间起止日（月柱状图铺柱用，不截断到今天） */
     val rangeFrom: LocalDate? = null,
     val rangeTo: LocalDate? = null,
     /** 统一柱状：本周周一~周日 7 柱，空日/未来日占位 */
@@ -250,22 +254,44 @@ class StatsViewModel @Inject constructor(
                 val to = ct ?: today
                 if (from.isAfter(to)) null else CycleCalculator.Period(from, to)
             }
+            // 工地维度（21 文档 B2）：区间在下方按项目口径解析（本期待结/项目全周期随结算滚动）
+            StatsDimension.SITE_PENDING, StatsDimension.SITE_SPAN -> null
         }
         Triple(dim, range, salary to workdays)
     }.flatMapLatest { (dim, range, salaryWorkdays) ->
         val (salary, workdays) = salaryWorkdays
-        if (range == null) return@flatMapLatest flowOf(StatsUiState(dimension = dim))
-        // 热点图固定窗口：本月月初向前推五个月的月初 → 今天（如本月九月 = 四~九月），与所选区间无关
+        val isSite = salary.workSystem == WorkSystem.SITE
+        // 维度归一（跨制度残留，21 文档 B2）：工地的固定周期维度回落「本期待结」，非工地的工地维度回落「考勤周期」
+        val effDim = when {
+            isSite && dim in setOf(StatsDimension.CYCLE, StatsDimension.MONTH, StatsDimension.YEAR) ->
+                StatsDimension.SITE_PENDING
+            !isSite && dim in setOf(StatsDimension.SITE_PENDING, StatsDimension.SITE_SPAN) ->
+                StatsDimension.CYCLE
+            else -> dim
+        }
+        if (!isSite && range == null) return@flatMapLatest flowOf(StatsUiState(dimension = effDim))
+        // 热点图窗口：固定六个月（本月月初向前推五个月的月初 → 今天），与所选区间无关（21 文档 B3 修订）
         val heatStart = today.withDayOfMonth(1).minusMonths(5)
         val heatEnd = today
-        // 工地记工：汇总/明细走所选区间（SitePayCalculator 口径），热点图由下方 merge 提供固定六个月窗口
-        val base = if (salary.workSystem == WorkSystem.SITE) {
+        // 工地记工（21 文档 B1/B2）：汇总/明细走项目口径区间，热点图由下方 merge 提供项目活动期窗口
+        val base = if (isSite) {
             val pid = siteRepo.currentProjectId()
-            combine(
-                siteRepo.observeAttendance(pid, range.from, range.to),
-                siteRepo.observePieceWorks(pid, range.from, range.to),
-                siteRepo.observeAdvances(pid, range.from, range.to),
-                siteRepo.observeAttendanceAllProjects(range.from, range.to),
+            // 结算/撤销结算 → observeSettlements 触发区间滚动
+            siteRepo.observeSettlements(pid).flatMapLatest {
+                val (rFrom, rTo) = when (effDim) {
+                    StatsDimension.SITE_SPAN -> siteRepo.projectSpan(pid)
+                    StatsDimension.CUSTOM -> {
+                        val from = customFrom.value ?: today.withDayOfMonth(1)
+                        val to = customTo.value ?: today
+                        from to maxOf(to, from)
+                    }
+                    else -> siteRepo.unsettledRange(pid) // SITE_PENDING
+                }
+                combine(
+                siteRepo.observeAttendance(pid, rFrom, rTo),
+                siteRepo.observePieceWorks(pid, rFrom, rTo),
+                siteRepo.observeAdvances(pid, rFrom, rTo),
+                siteRepo.observeAttendanceAllProjects(rFrom, rTo),
                 siteRepo.observeAllProjects(),
             ) { atts, pieces, advs, allAtts, projects ->
                 val out0 = SitePayCalculator.summarize(
@@ -294,51 +320,17 @@ class StatsViewModel @Inject constructor(
                     }
                     .filter { it.value > 0f }
                     .sortedByDescending { it.value }
-                val details = buildList {
-                    atts.forEach { a ->
-                        add(
-                            SiteDetailRow(
-                                date = LocalDate.parse(a.date),
-                                kind = if (a.dayStatus == "REST") SiteDetailKind.REST else SiteDetailKind.WORK,
-                                id = a.id,
-                                worksMilli = worksMilliOf(a.workMinutes, a.baseMinutes),
-                                otMinutes = a.otMinutes,
-                                amountCents = a.workPayCents + a.otPayCents,
-                            )
-                        )
-                    }
-                    pieces.forEach { p ->
-                        add(
-                            SiteDetailRow(
-                                date = LocalDate.parse(p.date),
-                                kind = SiteDetailKind.PIECE,
-                                id = p.id,
-                                amountCents = p.amountCents,
-                                itemName = p.itemName,
-                            )
-                        )
-                    }
-                    advs.forEach { a ->
-                        add(
-                            SiteDetailRow(
-                                date = LocalDate.parse(a.date),
-                                kind = SiteDetailKind.ADVANCE,
-                                id = a.id,
-                                amountCents = a.amountCents,
-                                purpose = runCatching { AdvancePurpose.valueOf(a.purpose) }.getOrNull(),
-                            )
-                        )
-                    }
-                }.sortedByDescending { it.date }
+                // 流水行构造三处共用（21 文档 B5 重构）
+                val details = buildSiteDetailRows(atts, pieces, advs)
                 StatsUiState(
-                    dimension = dim,
-                    rangeLabel = range.toString(),
+                    dimension = effDim,
+                    rangeLabel = "${TimeUtils.mdCn(rFrom)} – ${TimeUtils.mdCn(rTo)}",
                     workSystem = WorkSystem.SITE,
                     siteSummary = out,
-                    heatValues = worksByDay,
+                    barValues = worksByDay,
                     heatEnd = heatEnd,
-                    rangeFrom = range.from,
-                    rangeTo = range.to,
+                    rangeFrom = rFrom,
+                    rangeTo = rTo,
                     weekBars = buildWeekBars(worksByDay),
                     pieSiteProjects = pieSiteProjects,
                     siteDetails = details,
@@ -346,10 +338,14 @@ class StatsViewModel @Inject constructor(
                     customTo = customTo.value,
                 )
             }
-        } else combine(
-            recordRepo.observeRange(range.from, range.to),
-            recordRepo.observeAdjustments(),
-        ) { records, adjustments ->
+            }
+        } else {
+            @Suppress("NAME_SHADOWING")
+            val range = range ?: return@flatMapLatest flowOf(StatsUiState(dimension = effDim))
+            combine(
+                recordRepo.observeRange(range.from, range.to),
+                recordRepo.observeAdjustments(),
+            ) { records, adjustments ->
             val tierOf: (LocalDate) -> RateTier = { date -> holidayRepo.tierFor(date, workdays) }
             // 综合工时：区间标准 = 应出勤天数 × 8h（手动覆盖在引擎内优先，10 文档 §4）
             val standardMinutes =
@@ -384,13 +380,14 @@ class StatsViewModel @Inject constructor(
                 .groupBy { it.date }
                 .mapValues { (_, list) -> list.sumOf { it.durationMinutes }.toFloat() }
             StatsUiState(
-                dimension = dim,
+                dimension = effDim,
                 rangeLabel = range.toString(),
                 output = out,
                 showMoney = showMoney,
                 workSystem = salary.workSystem,
                 pieShift = pieShift,
                 pieLeave = pieLeave,
+                barValues = heat,
                 heatValues = heat,
                 heatEnd = heatEnd,
                 rangeFrom = range.from,
@@ -399,24 +396,26 @@ class StatsViewModel @Inject constructor(
                 customFrom = customFrom.value,
                 customTo = customTo.value,
             )
-        }
-        // 热点图数据独立于所选区间：固定六个月窗口（工地=工数，非工地=加班分钟），覆盖完整窗口
-        val heatFlow = if (salary.workSystem == WorkSystem.SITE) {
-            val pid = siteRepo.currentProjectId()
-            siteRepo.observeAttendance(pid, heatStart, heatEnd).map { atts ->
-                atts.filter { it.workMinutes > 0 }
-                    .groupBy { LocalDate.parse(it.date) }
-                    .mapValues { (_, list) ->
-                        list.sumOf { it.workMinutes * 1000L / it.baseMinutes.coerceAtLeast(1) } / 1000f
-                    }
-            }
-        } else {
-            recordRepo.observeRange(heatStart, heatEnd).map { recs ->
-                recs.filter { it.type == RecordType.OT }
-                    .groupBy { it.date }
-                    .mapValues { (_, list) -> list.sumOf { it.durationMinutes }.toFloat() }
             }
         }
+        // 热点图数据独立于所选区间：固定六个月窗口（21 文档 B3 修订：恢复月窗，工地/非工地同款）
+        val heatFlow: kotlinx.coroutines.flow.Flow<Map<LocalDate, Float>> =
+            if (isSite) {
+                val pid = siteRepo.currentProjectId()
+                siteRepo.observeAttendance(pid, heatStart, heatEnd).map { atts ->
+                    atts.filter { it.workMinutes > 0 }
+                        .groupBy { LocalDate.parse(it.date) }
+                        .mapValues { (_, list) ->
+                            list.sumOf { it.workMinutes * 1000L / it.baseMinutes.coerceAtLeast(1) } / 1000f
+                        }
+                }
+            } else {
+                recordRepo.observeRange(heatStart, heatEnd).map { recs ->
+                    recs.filter { it.type == RecordType.OT }
+                        .groupBy { it.date }
+                        .mapValues { (_, list) -> list.sumOf { it.durationMinutes }.toFloat() }
+                }
+            }
         base.combine(heatFlow) { st, heat ->
             st.copy(heatValues = heat, heatEnd = heatEnd, heatStart = heatStart)
         }
@@ -454,6 +453,8 @@ fun StatsScreen(
     vm: StatsViewModel = hiltViewModel(),
     /** 记月「个人所得税」行 → 个税估算页（导航由 AppRoot 注入） */
     onOpenTax: () -> Unit = {},
+    /** 图表长按「记那一天」（21 文档：按制度分流——工地→记工页带日期、其他→记录弹层），AppRoot 注入 */
+    onChartDay: (LocalDate) -> Unit = {},
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val pieMode by vm.pieMode.collectAsStateWithLifecycle()
@@ -511,12 +512,14 @@ fun StatsScreen(
                     pieMode = pieMode,
                     selectedBar = selectedBar,
                     showBottomBar = !canBack,
+                    onChartDay = onChartDay,
                 )
                 1 -> if (monthTab) {
                     // 摘要条/空态点「明细」：切到末位页签（pager 由本页持有）
                     PayMonthContent(
                         onOpenDetail = { scope.launch { pagerState.animateScrollToPage(2) } },
                         onOpenTax = onOpenTax,
+                        showBottomBar = !canBack,
                     )
                 } else {
                     DetailPane(showBottomBar = !canBack)
@@ -535,6 +538,7 @@ private fun StatsContent(
     pieMode: PieMode,
     selectedBar: String?,
     showBottomBar: Boolean,
+    onChartDay: (LocalDate) -> Unit,
 ) {
     var picking by remember { mutableStateOf<String?>(null) } // "from" | "to"
     LazyColumn(
@@ -545,22 +549,46 @@ private fun StatsContent(
             .padding(horizontal = Spacing.page),
         contentPadding = com.mdot.app.core.navigation.contentPaddingValues(showBottomBar = showBottomBar),
     ) {
+        // 维度行（21 文档 B2）：工地=与明细页共用的三药丸 SiteRangePills（同功能同样式）；
+        // 非工地=四筛选 chips（长标签横滚语义，保持现役样式）
+        val isSite = state.workSystem == WorkSystem.SITE
         item {
             Spacer(Modifier.height(Spacing.m))
 
             // ---- 维度选择行 ----
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s),
-            ) {
-                StatsDimension.entries.forEach { dim ->
-                    FilterChip(
-                        selected = state.dimension == dim,
-                        onClick = { vm.onDimension(dim) },
-                        label = { Text(stringResource(dim.labelRes)) },
-                    )
+            if (isSite) {
+                com.mdot.app.feature.detail.SiteRangeChips(
+                    selected = when (state.dimension) {
+                        StatsDimension.SITE_SPAN -> com.mdot.app.feature.detail.SiteDetailRangeMode.PROJECT_SPAN
+                        StatsDimension.CUSTOM -> com.mdot.app.feature.detail.SiteDetailRangeMode.CUSTOM
+                        else -> com.mdot.app.feature.detail.SiteDetailRangeMode.UNSETTLED
+                    },
+                    onSelect = { mode ->
+                        vm.onDimension(
+                            when (mode) {
+                                com.mdot.app.feature.detail.SiteDetailRangeMode.UNSETTLED -> StatsDimension.SITE_PENDING
+                                com.mdot.app.feature.detail.SiteDetailRangeMode.PROJECT_SPAN -> StatsDimension.SITE_SPAN
+                                com.mdot.app.feature.detail.SiteDetailRangeMode.CUSTOM -> StatsDimension.CUSTOM
+                            }
+                        )
+                    },
+                )
+            } else {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+                ) {
+                    listOf(
+                        StatsDimension.CYCLE, StatsDimension.MONTH, StatsDimension.YEAR, StatsDimension.CUSTOM,
+                    ).forEach { dim ->
+                        FilterChip(
+                            selected = state.dimension == dim,
+                            onClick = { vm.onDimension(dim) },
+                            label = { Text(stringResource(dim.labelRes)) },
+                        )
+                    }
                 }
             }
             if (state.dimension == StatsDimension.CUSTOM) {
@@ -585,10 +613,12 @@ private fun StatsContent(
                 }
             }
             Spacer(Modifier.height(Spacing.xs))
-            // 区间胶囊（与首页数据区日期同款样式）
+            // 区间胶囊（与首页数据区日期同款样式；工地文案用「区间」，21 文档 M7）
             val rangeText = state.rangeFrom?.let { f ->
                 state.rangeTo?.let { t ->
-                    stringResource(R.string.home_cycle_period, "${TimeUtils.mdCn(f)} – ${TimeUtils.mdCn(t)}")
+                    val period = "${TimeUtils.mdCn(f)} – ${TimeUtils.mdCn(t)}"
+                    if (isSite) stringResource(R.string.site_range_period, period)
+                    else stringResource(R.string.home_cycle_period, period)
                 }
             } ?: state.rangeLabel
             Row(
@@ -614,7 +644,6 @@ private fun StatsContent(
             Spacer(Modifier.height(Spacing.m))
         }
 
-        val isSite = state.workSystem == WorkSystem.SITE
         val hasData = if (isSite) {
             val s = state.siteSummary
             s != null && (s.daysWork > 0 || s.piecePayCents > 0L || s.advanceTotalCents > 0L)
@@ -634,7 +663,7 @@ private fun StatsContent(
                         else -> stringResource(R.string.stats_empty_hint)
                     },
                     actionText = stringResource(R.string.stats_empty_action),
-                    onAction = { vm.recordSheet.open(LocalDate.now()) },
+                    onAction = { onChartDay(LocalDate.now()) },
                 )
             }
         } else {
@@ -651,17 +680,17 @@ private fun StatsContent(
                     valueText = { modeValueText(state.workSystem, it) },
                     selectedLabel = selectedBar,
                     onSelect = vm::selectBar,
-                    onDayLongPress = { vm.recordSheet.open(it) },
+                    onDayLongPress = { onChartDay(it) },
                     hintValueText = chartHintText(state.workSystem),
                 )
                 Spacer(Modifier.height(Spacing.m))
             }
 
-            // ---- 月柱状图（区间 ≤31 天时展示：整月每日柱 + 刻度 + 最多日文字） ----
+            // ---- 柱状图（铺满所选区间：≤31 天每日柱，超长按周聚合，21 文档 B3） ----
             val rangeDays = state.rangeFrom?.let { f -> state.rangeTo?.let { t -> (t.toEpochDay() - f.toEpochDay()).toInt() + 1 } } ?: 0
-            if (rangeDays in 2..31) {
+            if (rangeDays >= 2) {
                 item {
-                    MonthBarCard(state, { vm.recordSheet.open(it) }, chartHintText(state.workSystem))
+                    MonthBarCard(state, { onChartDay(it) }, chartHintText(state.workSystem))
                     Spacer(Modifier.height(Spacing.m))
                 }
             }
@@ -673,7 +702,7 @@ private fun StatsContent(
                         values = state.heatValues,
                         start = state.heatStart,
                         end = state.heatEnd,
-                        onDayLongPress = { vm.recordSheet.open(it) },
+                        onDayLongPress = { onChartDay(it) },
                         hintValueText = chartHintText(state.workSystem),
                     )
                 }
@@ -726,25 +755,35 @@ private fun StatsTabBar(pagerState: PagerState, showMonth: Boolean) {
 /** 模式取值文本：非工地=时长（小时），工地=工数（"N 工"） */
 
 
-/** 月柱状图：统计页薄包装（共享组件在 core/designsystem/component/MonthBarCard.kt） */
+/** 月柱状图：统计页薄包装（共享组件在 core/designsystem/component/MonthBarCard.kt）。
+ *  铺满所选区间（21 文档 B3）：≤31 天每日柱、超长按周聚合；取数用 barValues（区间内），与热点图窗口解耦 */
 @Composable
 private fun MonthBarCard(
     state: StatsUiState,
     onDayLongPress: (LocalDate) -> Unit,
     hintValueText: @Composable (LocalDate, Float) -> String?,
 ) {
-    // 铺满完整区间（自然月即 1 号到月末，未来日期空柱），不截断到今天
     val from = state.rangeFrom ?: return
     val to = state.rangeTo ?: return
     if (from.isAfter(to)) return
-    val days = ((to.toEpochDay() - from.toEpochDay()).toInt() + 1).coerceIn(2, 31)
-    val values = (0 until days).map { state.heatValues[from.plusDays(it.toLong())] ?: 0f }
+    val bars = com.mdot.app.domain.SiteRanges.bucketize(from, to, state.barValues)
+    if (bars.size < 2) return
+    // 周聚合柱（21 文档 B3 用户反馈）：浮窗日期段改周区间「M/d – M/d」、禁长按（柱=整周，长按无单日语义）
+    val weekly = bars.any { it.label != null }
+    val hintFn = if (weekly) {
+        chartHintText(
+            state.workSystem,
+            dateLabel = { d -> "${TimeUtils.mdCn(d)} – ${TimeUtils.mdCn(d.plusDays(6))}" },
+        )
+    } else hintValueText
     com.mdot.app.core.designsystem.component.MonthBarCard(
-        values = values,
-        from = from,
+        values = bars.map { it.value },
+        from = bars.first().date,
         workSystem = state.workSystem,
-        onDayLongPress = onDayLongPress,
-        hintValueText = hintValueText,
+        onDayLongPress = if (weekly) null else onDayLongPress,
+        hintValueText = hintFn,
+        dates = bars.map { it.date },
+        barLabels = bars.map { it.label },
     )
 }
 

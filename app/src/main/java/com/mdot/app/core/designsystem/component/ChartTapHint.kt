@@ -56,10 +56,14 @@ fun rememberChartHint(autoHideMs: Long = 2200): MutableState<ChartHint?> {
 /**
  * 图表点击浮窗文本：日期 · 时长/工数。
  * **统计页与首页共用同一实现**（两页图表效果必须一致，见 03 文档；改一处两页同时生效）。
+ * [dateLabel] 覆盖日期段文本（周聚合柱传「M/d – M/d」周区间，默认单日 mdCn）。
  */
 @Composable
-fun chartHintText(workSystem: WorkSystem): @Composable (LocalDate, Float) -> String? = { date, v ->
-    "${TimeUtils.mdCn(date)} · ${modeValueText(workSystem, v)}"
+fun chartHintText(
+    workSystem: WorkSystem,
+    dateLabel: (LocalDate) -> String = { TimeUtils.mdCn(it) },
+): @Composable (LocalDate, Float) -> String? = { date, v ->
+    "${dateLabel(date)} · ${modeValueText(workSystem, v)}"
 }
 
 /**

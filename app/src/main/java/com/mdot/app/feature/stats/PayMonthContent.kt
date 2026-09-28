@@ -46,6 +46,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.OutlinedTextField
+import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.core.designsystem.component.InlineConfirmButton
 import com.mdot.app.core.designsystem.component.InlineConfirmStyle
 import com.mdot.app.core.designsystem.component.MessageSnackbarHost
@@ -117,6 +118,8 @@ fun PayMonthContent(
     onOpenDetail: () -> Unit = {},
     /** 「个人所得税」行 → 个税估算页 */
     onOpenTax: () -> Unit = {},
+    /** 底栏形态（统计页一级页签时 true）：内容底部避让底栏——否则最底部内容被底栏挡住无法点击 */
+    showBottomBar: Boolean = false,
     vm: PayMonthViewModel = hiltViewModel(),
 ) {
     val month by vm.month.collectAsStateWithLifecycle()
@@ -151,6 +154,7 @@ fun PayMonthContent(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .wrapContentWidth(Alignment.CenterHorizontally)
+                .contentBottomPadding(showBottomBar = showBottomBar)
                 .widthIn(max = AdaptiveSpecs.contentMaxWidth)
                 .padding(horizontal = Spacing.page),
         ) {

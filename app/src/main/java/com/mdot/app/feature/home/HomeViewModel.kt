@@ -221,51 +221,58 @@ class HomeViewModel @Inject constructor(
             } else {
                 kotlinx.coroutines.flow.flow {
                     val pid = siteRepo.currentProjectId()
-                    // 热点图固定六个月窗口（本月月初向前推五个月的月初 → 今天），与统计页同窗口
-                    val heatFrom = today.withDayOfMonth(1).minusMonths(5)
                     val name = siteRepo.getProject(pid)?.name.orEmpty()
-                    // 待结余额扣减未结清的部分结算（本次结算金额）
-                    val partial = siteRepo.partialSettledTotal(pid)
-                    val month = CycleCalculator.naturalMonth(today.toYearMonth())
-                    combine(
-                        siteRepo.observeAttendance(pid, month.from, month.to),
-                        siteRepo.observePieceWorks(pid, month.from, month.to),
-                        siteRepo.observeAdvances(pid, month.from, month.to),
-                        siteRepo.observeAttendance(pid, heatFrom, today),
-                    ) { atts, pieces, advs, heatAtts ->
-                        val out = SitePayCalculator.summarize(
-                            SitePayCalculator.Input(
-                                attendance = atts,
-                                pieceWorks = pieces,
-                                advances = advs,
-                            )
-                        )
-                        val todayRows = atts.filter { LocalDate.parse(it.date) == LocalDate.now() }
-                        SiteHomeUi(
-                            projectId = pid,
-                            projectName = name,
-                            totalWorksMilli = out.totalWorksMilli,
-                            otMinutes = out.otMinutes,
-                            workPayCents = out.receivableCents,
-                            advanceCents = out.advanceTotalCents,
-                            pendingCents = out.pendingCents - partial,
-                            siteBaseMinutes = siteRepo.getProject(pid)?.baseMinutes ?: 480,
-                            todayWorksMilli = todayRows.sumOf { it.workMinutes * 1000L / it.baseMinutes.coerceAtLeast(1) },
-                            todayOtMinutes = todayRows.sumOf { it.otMinutes },
-                            daily = atts.map { a ->
-                                HomeDayPoint(
-                                    date = LocalDate.parse(a.date),
-                                    worksMilli = a.workMinutes * 1000L / a.baseMinutes.coerceAtLeast(1),
-                                    otMinutes = a.otMinutes,
-                                    payCents = a.workPayCents + a.otPayCents,
+                    val project = siteRepo.getProject(pid)
+                    // 口径 =「本期待结」（21 文档 B1/Q3 拍板）：上次结算次日 → 今天，与结算页摘要同源。
+                    // 热点图窗口 = 固定六个月（21 文档 B3 修订：恢复月窗，工地/非工地同款）。结算/撤销结算 → 区间滚动
+                    siteRepo.observeSettlements(pid).flatMapLatest {
+                        val (rFrom, rTo) = siteRepo.unsettledRange(pid)
+                        val heatFrom = today.withDayOfMonth(1).minusMonths(5)
+                        val heatTo = today
+                        // 待结余额扣减未结清的部分结算（本次结算金额）
+                        val partial = siteRepo.partialSettledTotal(pid)
+                        combine(
+                            siteRepo.observeAttendance(pid, rFrom, rTo),
+                            siteRepo.observePieceWorks(pid, rFrom, rTo),
+                            siteRepo.observeAdvances(pid, rFrom, rTo),
+                            siteRepo.observeAttendance(pid, heatFrom, heatTo),
+                        ) { atts, pieces, advs, heatAtts ->
+                            val out = SitePayCalculator.summarize(
+                                SitePayCalculator.Input(
+                                    attendance = atts,
+                                    pieceWorks = pieces,
+                                    advances = advs,
                                 )
-                            }.sortedBy { it.date },
-                            heatValues = heatAtts.filter { it.workMinutes > 0 }
-                                .groupBy { LocalDate.parse(it.date) }
-                                .mapValues { (_, list) ->
-                                    list.sumOf { it.workMinutes * 1000L / it.baseMinutes.coerceAtLeast(1) } / 1000f
-                                },
-                        )
+                            )
+                            val todayRows = atts.filter { LocalDate.parse(it.date) == LocalDate.now() }
+                            SiteHomeUi(
+                                projectId = pid,
+                                projectName = name,
+                                rangeFrom = rFrom,
+                                rangeTo = rTo,
+                                totalWorksMilli = out.totalWorksMilli,
+                                otMinutes = out.otMinutes,
+                                workPayCents = out.receivableCents,
+                                advanceCents = out.advanceTotalCents,
+                                pendingCents = out.pendingCents - partial,
+                                siteBaseMinutes = project?.baseMinutes ?: 480,
+                                todayWorksMilli = todayRows.sumOf { it.workMinutes * 1000L / it.baseMinutes.coerceAtLeast(1) },
+                                todayOtMinutes = todayRows.sumOf { it.otMinutes },
+                                daily = atts.map { a ->
+                                    HomeDayPoint(
+                                        date = LocalDate.parse(a.date),
+                                        worksMilli = a.workMinutes * 1000L / a.baseMinutes.coerceAtLeast(1),
+                                        otMinutes = a.otMinutes,
+                                        payCents = a.workPayCents + a.otPayCents,
+                                    )
+                                }.sortedBy { it.date },
+                                heatValues = heatAtts.filter { it.workMinutes > 0 }
+                                    .groupBy { LocalDate.parse(it.date) }
+                                    .mapValues { (_, list) ->
+                                        list.sumOf { it.workMinutes * 1000L / it.baseMinutes.coerceAtLeast(1) } / 1000f
+                                    },
+                            )
+                        }
                     }.collect { emit(it) }
                 }
             }
@@ -284,6 +291,9 @@ private data class HomeSettingsExtra(
 data class SiteHomeUi(
     val projectId: Long = 0,
     val projectName: String = "",
+    /** 本期待结区间（21 文档 B1）：上次结算次日 → 今天；待结卡/数据区显示口径用 */
+    val rangeFrom: LocalDate? = null,
+    val rangeTo: LocalDate? = null,
     val totalWorksMilli: Long = 0,
     val otMinutes: Int = 0,
     val workPayCents: Long = 0,
@@ -291,9 +301,9 @@ data class SiteHomeUi(
     val pendingCents: Long = 0,
     /** 当前项目上班基准分钟（HOUR 显示折算用） */
     val siteBaseMinutes: Int = 480,
-    /** 每日工数（每日时长卡/周柱状/月柱状卡用，本月） */
+    /** 每日工数点（每日时长卡/周柱状/月柱状卡用；工地=本期待结区间内，其他=本月） */
     val daily: List<HomeDayPoint> = emptyList(),
-    /** 热点图强度（本月月初向前六个月 → 今天；工地=工数，其他=加班分钟），与统计页同窗口 */
+    /** 热点图强度（固定六个月窗口：本月月初向前六个月 → 今天；工地=工数，其他=加班分钟） */
     val heatValues: Map<java.time.LocalDate, Float> = emptyMap(),
     /** 今日（数据区今日胶囊用） */
     val todayWorksMilli: Long = 0,

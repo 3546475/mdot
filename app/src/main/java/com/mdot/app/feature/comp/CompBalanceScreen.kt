@@ -218,13 +218,19 @@ fun CompBalancePane(
                         label = { Text(stringResource(R.string.comp_chip_deduct)) },
                     )
                 }
-                com.mdot.app.feature.record.DurationGrid(
-                    selectedHours = hours,
-                    onPreset = { hours = it },
-                    onCustomCommit = { text ->
-                        text.toDoubleOrNull()?.takeIf { it > 0 }?.let { hours = it }
-                    },
-                )
+                // 时间选择滚动栏：凹陷托盘（「沉下去」视觉）——与记加班弹窗时长区同款 SunkenWell
+                // （外圈 6dp 凹面留边 + 内衬；容器 164dp = 可视 3 行 + 内衬，同 RecordSheet 范式）
+                com.mdot.app.core.designsystem.component.SunkenWell(
+                    Modifier.fillMaxWidth().height(164.dp),
+                ) {
+                    com.mdot.app.feature.record.DurationGrid(
+                        selectedHours = hours,
+                        onPreset = { hours = it },
+                        onCustomCommit = { text ->
+                            text.toDoubleOrNull()?.takeIf { it > 0 }?.let { hours = it }
+                        },
+                    )
+                }
                 OutlinedTextField(
                 shape = RoundedCornerShape(Radius.textField),
                     value = note,

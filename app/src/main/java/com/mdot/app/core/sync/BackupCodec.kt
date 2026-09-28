@@ -326,7 +326,7 @@ class BackupCodec @Inject constructor(
         // 设置覆盖（事务外，DataStore）
         val st = data.settings
         settings.setSalary(st.salary)
-        settings.setCycleAnchorDay(st.cycleAnchorDay.coerceIn(1, 31))
+        settings.setCycleAnchorDay(st.cycleAnchorDay.coerceIn(1, 29))
         settings.setWorkdays(
             st.workdays.mapNotNull { runCatching { java.time.DayOfWeek.valueOf(it) }.getOrNull() }.toSet()
                 .ifEmpty {

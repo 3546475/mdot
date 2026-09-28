@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.BottomBarSpec
+import com.mdot.app.core.designsystem.GlassCardSpec
 import com.mdot.app.core.designsystem.IconSpec
 
 /*
@@ -159,18 +160,18 @@ fun RecordCircleButton(
     val tint = when {
         frosted -> Brush.verticalGradient(
             listOf(
-                cs.surfaceContainer.copy(alpha = BottomBarSpec.frostedAlphaTop),
-                cs.surfaceContainer.copy(alpha = BottomBarSpec.frostedAlphaBottom),
+                cs.surfaceContainer.copy(alpha = GlassCardSpec.alphaTop),
+                cs.surfaceContainer.copy(alpha = GlassCardSpec.alphaBottom),
             ),
         )
         backdropBlur != null ->
-            SolidColor(cs.surfaceContainer.copy(alpha = BottomBarSpec.frostedFallbackAlpha))
+            SolidColor(cs.surfaceContainer.copy(alpha = GlassCardSpec.fallbackAlpha))
         else -> SolidColor(cs.primary)
     }
     val highlightBrush = remember {
         Brush.verticalGradient(
             listOf(
-                Color.White.copy(alpha = BottomBarSpec.frostedHighlightAlpha),
+                Color.White.copy(alpha = GlassCardSpec.highlightAlpha),
                 Color.Transparent,
             ),
         )
@@ -179,7 +180,7 @@ fun RecordCircleButton(
         Brush.verticalGradient(
             listOf(
                 Color.Transparent,
-                cs.surfaceContainerHighest.copy(alpha = BottomBarSpec.frostedScrimAlpha),
+                cs.surfaceContainerHighest.copy(alpha = GlassCardSpec.scrimAlpha),
             ),
         )
     }
@@ -204,7 +205,7 @@ fun RecordCircleButton(
                 if (frosted) {
                     Modifier.border(
                         BottomBarSpec.barBorderWidth,
-                        cs.outlineVariant.copy(alpha = BottomBarSpec.frostedBorderAlpha),
+                        cs.outlineVariant.copy(alpha = GlassCardSpec.borderAlpha),
                         shape,
                     )
                 } else Modifier
@@ -223,7 +224,7 @@ fun RecordCircleButton(
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .backdropBlur(backdropBlur!!, BottomBarSpec.frostBlurRadius, backdrop = scrimBrush),
+                        .backdropBlur(backdropBlur!!, GlassCardSpec.blurRadius, backdrop = scrimBrush),
                 )
             }
             // 主色底：叠在模糊之上、图标之下

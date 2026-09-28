@@ -88,18 +88,23 @@ fun MdJiabanApp(appVm: AppViewModel = hiltViewModel()) {
     }
 
     val appearance by appVm.appearance.collectAsStateWithLifecycle()
+    val glassEnabled by appVm.bottomBarFrosted.collectAsStateWithLifecycle()
+    // 玻璃共享源（底栏/圆钮/底部悬浮提示共用采样；MainActivity 创建供全局下发）
+    val backdropBlurState = com.mdot.app.core.designsystem.component.rememberBackdropBlurState()
     val firstLaunchDone by appVm.firstLaunchDone.collectAsStateWithLifecycle()
 
     JiabanTheme(appearance = appearance) {
         // 弹层背景效果档位（外观页可选）全局下发：SheetBackdropLayer 据此决定缩放/模糊/压暗组合
         androidx.compose.runtime.CompositionLocalProvider(
-            com.mdot.app.core.designsystem.component.LocalSheetBackdropMode provides appearance.sheetBackdropMode
+            com.mdot.app.core.designsystem.component.LocalSheetBackdropMode provides appearance.sheetBackdropMode,
+            com.mdot.app.core.designsystem.component.LocalBackdropGlassState provides
+                if (glassEnabled) backdropBlurState else null,
         ) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background,
             ) {
-                AppRoot(firstLaunchDone = firstLaunchDone, appVm = appVm)
+                AppRoot(firstLaunchDone = firstLaunchDone, appVm = appVm, backdropBlurState = backdropBlurState)
             }
         }
     }

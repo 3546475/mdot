@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -94,10 +95,13 @@ fun WorkHeatmap(
 
     ChartHintBox(hint = hint.value, columns = cols, modifier = modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth()) {
-            // 月份行：与格子列同宽；文字超出列宽时可见溢出（参考图月份比格子宽）
+            // 月份行：与格子列同宽（列宽上限同格子，防天数少时方块/月份格巨大）；文字超出列宽时可见溢出
             Row(Modifier.fillMaxWidth().padding(bottom = Spacing.xs)) {
                 monthLabels.forEach { label ->
-                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    Box(
+                        Modifier.weight(1f).widthIn(max = ChartSpec.heatCellMax),
+                        contentAlignment = Alignment.Center,
+                    ) {
                         Text(
                             label,
                             style = MaterialTheme.typography.labelMedium,
@@ -115,7 +119,8 @@ fun WorkHeatmap(
             ) {
                 (0 until cols).forEach { c ->
                     Column(
-                        Modifier.weight(1f),
+                        // 列宽上限：天数少（列少）时格子保持小方块，不随列数放大成巨块
+                        Modifier.weight(1f, fill = false).widthIn(max = ChartSpec.heatCellMax),
                         verticalArrangement = Arrangement.spacedBy(gap),
                     ) {
                         (0 until 7).forEach { r ->

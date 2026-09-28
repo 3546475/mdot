@@ -1,8 +1,15 @@
 package com.mdot.app.feature.site
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import android.os.Build
+import androidx.compose.foundation.border
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -43,6 +50,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -54,16 +64,24 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
+import com.mdot.app.core.designsystem.BottomBarSpec
+import com.mdot.app.core.designsystem.GlassCardSpec
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.component.BackdropBlurState
 import com.mdot.app.core.designsystem.component.DayPickDialog
 import com.mdot.app.core.designsystem.component.LocalSheetBackdropState
 import com.mdot.app.core.designsystem.component.SegmentBar
 import com.mdot.app.core.designsystem.component.SheetBackdropLayer
 import com.mdot.app.core.designsystem.component.ShrinkFeedbackButton
+import com.mdot.app.core.designsystem.component.backdropBlur
+import com.mdot.app.core.designsystem.component.backdropBlurSource
 import com.mdot.app.core.designsystem.component.pressScale
+import com.mdot.app.core.designsystem.component.rememberBackdropBlurState
 import com.mdot.app.core.navigation.bottomBarContentPaddingValues
+import com.mdot.app.feature.detail.SiteDetailRowItem
+import com.mdot.app.feature.stats.SiteDetailRow
 import java.time.LocalDate
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -84,10 +102,14 @@ fun SiteRecordScreen(
     onOpenProjectSettings: (Long) -> Unit = {},
     onOpenProjectPick: () -> Unit = {},
     onOpenSettlement: () -> Unit = {},
+    /** 保存后流水预览「查看全部明细」→ 统计页工地明细页签（21 文档 B5） */
+    onOpenDetail: () -> Unit = {},
+    /** 图表长按「记那一天」预选日期（21 文档 bug 修复：工地长按图表直达本页该日期） */
+    initialDate: LocalDate? = null,
     vm: SiteRecordViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) { vm.open(LocalDate.now()) }
+    LaunchedEffect(Unit) { vm.open(initialDate ?: LocalDate.now()) }
     LaunchedEffect(state.saved) { if (state.saved) onBack() }
 
     // 表单分页（扁平 4 页）：0=记账·点工 1=记账·包工 2=记借支·借支 3=记借支·结算。
@@ -103,6 +125,13 @@ fun SiteRecordScreen(
     val saveHaptic = rememberSaveWithHaptic()
     val scope = rememberCoroutineScope()
     LaunchedEffect(state.error) { if (state.error != null) saveFlash = false }
+    // 保存后流水预览（21 文档 B5）：停留几秒自动收起（也可手动关）
+    LaunchedEffect(state.recentVisible) {
+        if (state.recentVisible) {
+            delay(5000)
+            vm.dismissRecent()
+        }
+    }
     // ✓ 收起：本页不关闭，必须自行回退（停留一拍给足确认感）
     LaunchedEffect(saveFlash) {
         if (saveFlash) {
@@ -137,6 +166,8 @@ fun SiteRecordScreen(
         saveCurrent(keepOpen = true)
     }
 
+    // 保存后流水预览的毛玻璃状态（21 文档：参考底栏毛玻璃，源=表单内容、效果方=预览卡玻璃层）
+    val previewBlur = rememberBackdropBlurState()
     // 弹层背景层：本页所有底部弹层（多选日期/工量单位/选工天/选小时/备注/点工标准）
     // 都是独立窗口的 Dialog，状态经 LocalSheetBackdropState 下发与背景层共享、进出场同拍
     val sheetVisible = remember { MutableTransitionState(false) }
@@ -152,6 +183,8 @@ fun SiteRecordScreen(
                 Column(
                     Modifier
                         .fillMaxSize()
+                        // 预览卡毛玻璃的源：录制本列（表单内容），预览卡浮于其上采样模糊
+                        .backdropBlurSource(previewBlur)
                         .statusBarsPadding()
                         .padding(horizontal = Spacing.page),
                 ) {
@@ -236,6 +269,23 @@ fun SiteRecordScreen(
                         .padding(horizontal = Spacing.l)
                         .padding(bottom = Spacing.m),
                 ) {
+                    // 保存后流水预览（21 文档 B5）：从底部滑出，展示本项目最近流水（含刚记的这笔）
+                    AnimatedVisibility(
+                        visible = state.recentVisible,
+                        enter = slideInVertically(animationSpec = spatialSpec) { it / 2 } + fadeIn(effectsSpec),
+                        exit = slideOutVertically(animationSpec = spatialSpec) { it / 2 } + fadeOut(effectsSpec),
+                    ) {
+                        RecentPreviewCard(
+                            rows = state.recentRows,
+                            blur = previewBlur,
+                            onClose = { vm.dismissRecent() },
+                            onOpenDetail = {
+                                vm.dismissRecent()
+                                onOpenDetail()
+                            },
+                        )
+                    }
+                    Spacer(Modifier.height(Spacing.s))
                     // 单颗「保存」：尺寸对齐全局主按钮档（48dp 高 / 24dp 内边距 / 最小宽 144dp）；
                     // 行为＝原「保存 并再记一笔」（原地保存并留在本页继续记）；反馈动效与工资页保存同款
                     ShrinkFeedbackButton(
@@ -270,6 +320,136 @@ fun SiteRecordScreen(
                         showUnitSheet = false
                     },
                     onDismiss = { showUnitSheet = false },
+                )
+            }
+        }
+    }
+}
+
+/** 保存后流水预览（21 文档 B5）：本项目最近流水（含刚记的这笔，行样式与明细页同款）+「查看全部明细」入口。
+ *  背景 = 毛玻璃（参考底栏 JiabanBottomBar 同套实现与令牌：模糊身后表单 + 半透明渐变底 + 衬托渐变；
+ *  API<31 无 RenderEffect 回退实色底）。 */
+@Composable
+private fun RecentPreviewCard(
+    rows: List<SiteDetailRow>,
+    blur: BackdropBlurState?,
+    onClose: () -> Unit,
+    onOpenDetail: () -> Unit,
+) {
+    val shape = RoundedCornerShape(Radius.card)
+    val cs = MaterialTheme.colorScheme
+    val frosted = blur != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    // 底色：毛玻璃=垂直渐变半透明（上缘更透）；无模糊能力=实色回退。
+    // 玻璃参数走 GlassCardSpec（比底栏更透更糊：小卡身后是浅色表单，弱参数读不出模糊）
+    val tintBrush = if (frosted) {
+        Brush.verticalGradient(
+            listOf(
+                cs.surfaceContainerHigh.copy(alpha = GlassCardSpec.alphaTop),
+                cs.surfaceContainerHigh.copy(alpha = GlassCardSpec.alphaBottom),
+            ),
+        )
+    } else {
+        SolidColor(cs.surfaceContainerHigh.copy(alpha = GlassCardSpec.fallbackAlpha))
+    }
+    val scrimBrush = remember(cs) {
+        Brush.verticalGradient(
+            listOf(
+                Color.Transparent,
+                cs.surfaceContainerHighest.copy(alpha = GlassCardSpec.scrimAlpha),
+            ),
+        )
+    }
+    // 内高光：上缘内侧白色渐变（玻璃边缘反光，空内容时也显玻璃感）
+    val highlightBrush = remember {
+        Brush.verticalGradient(
+            listOf(Color.White.copy(alpha = GlassCardSpec.highlightAlpha), Color.Transparent),
+        )
+    }
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .border(
+                BottomBarSpec.barBorderWidth,
+                if (frosted) cs.outlineVariant.copy(alpha = GlassCardSpec.borderAlpha) else cs.outlineVariant,
+                shape,
+            ),
+    ) {
+        // 毛玻璃采样层（最底层子层）：只画「身后表单」窗口并整层模糊 + 衬托渐变
+        if (frosted) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .backdropBlur(blur!!, GlassCardSpec.blurRadius, backdrop = scrimBrush),
+            )
+        }
+        // 底色叠在模糊之上、内容之下
+        Box(Modifier.matchParentSize().background(tintBrush))
+        // 内高光（仅毛玻璃）：上缘内侧白渐变
+        if (frosted) {
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .background(highlightBrush),
+            )
+        }
+        Column(Modifier.padding(horizontal = Spacing.m, vertical = Spacing.s)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.site_save_recent_title),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                val closeInteraction = remember { MutableInteractionSource() }
+                Box(
+                    Modifier
+                        .size(28.dp)
+                        .pressScale(closeInteraction)
+                        .clip(CircleShape)
+                        .clickable(
+                            interactionSource = closeInteraction,
+                            indication = LocalIndication.current,
+                            onClick = onClose,
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_ms_close),
+                        stringResource(R.string.site_save_recent_close),
+                        modifier = Modifier.size(IconSpec.inline),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            rows.forEach { row -> SiteDetailRowItem(row) }
+            val allInteraction = remember { MutableInteractionSource() }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .pressScale(allInteraction)
+                    .clip(RoundedCornerShape(Radius.pill))
+                    .clickable(
+                        interactionSource = allInteraction,
+                        indication = LocalIndication.current,
+                        onClick = onOpenDetail,
+                    )
+                    .padding(vertical = Spacing.xs),
+            ) {
+                Text(
+                    stringResource(R.string.site_save_recent_all),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Icon(
+                    painterResource(R.drawable.ic_ms_keyboard_arrow_right),
+                    null,
+                    modifier = Modifier.size(IconSpec.inline),
+                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
         }

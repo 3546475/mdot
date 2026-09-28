@@ -304,24 +304,34 @@ object BottomBarSpec {
     val barElevation = 2.dp
     /** 底栏浮层效果：0.5dp outlineVariant 细描边 */
     val barBorderWidth = 0.5.dp
-    /** 底栏毛玻璃（背景模糊）：模糊半径（API≥31 生效，与弹层背景模糊同量级） */
-    val frostBlurRadius = 20.dp
-    /** 毛玻璃底色垂直渐变：上缘不透明度（更透，配合内高光） */
-    val frostedAlphaTop = 0.50f
-    /** 毛玻璃底色垂直渐变：下缘不透明度（更实，衔接页面、消除色块感） */
-    val frostedAlphaBottom = 0.68f
-    /** 毛玻璃底色不透明度回退（API<31 无模糊能力：保持可读性的高不透明） */
-    val frostedFallbackAlpha = 0.9f
-    /** 毛玻璃内高光：上缘内侧白色高光不透明度（空内容时也呈现玻璃质感） */
-    val frostedHighlightAlpha = 0.12f
-    /** 毛玻璃衬托渐变（模糊层内）：下缘淡色不透明度（空内容时给模糊「有物可糊」） */
-    val frostedScrimAlpha = 0.10f
     /** 毛玻璃开启时的投影高度（玻璃不投影：空白背景时阴影光晕观感差；非毛玻璃仍 [barElevation] 6dp） */
     val frostedElevation = 0.dp
-    /** 毛玻璃开启时的描边透明度（弱化硬边；非毛玻璃仍全不透明 outlineVariant） */
-    val frostedBorderAlpha = 0.35f
     /** 「固定长度」档：胶囊固定为该个数槽位宽（仍受可用宽上限约束） */
     val fixedCellCount = 4
+}
+
+/**
+ * 毛玻璃质感统一令牌（**全 App 唯一真源**：底栏 JiabanBottomBar / 记加班圆钮 RecordActionButtons /
+ * 悬浮玻璃卡（记工页保存后预览）同款质感）。2026-09-28 用户定：玻璃=模糊半径 32dp、
+ * 底色 0.16–0.36 渐变、内高光 0.18——「更透更糊」的观感（此前底栏用 20dp/0.50–0.68，
+ * 用户反馈模糊不明显）。API<31 无模糊能力时由调用方用 [fallbackAlpha] 回退实色底。
+ */
+object GlassCardSpec {
+    /** 模糊半径。16dp（2026-09-28 按 AndroidLiquidGlass 方案从 32dp 降档：大半径是驱动采样
+     *  波动的放大器，玻璃感由内高光/衬托渐变/底色补偿；其官方底栏仅 8dp blur + 折射） */
+    val blurRadius = 16.dp
+    /** 底色渐变上缘不透明度（更透，透出模糊层；二调：0.30 → 0.16 更透看效果） */
+    val alphaTop = 0.16f
+    /** 底色渐变下缘不透明度（二调：0.52 → 0.36） */
+    val alphaBottom = 0.36f
+    /** 无模糊能力回退底色不透明度（保持文字可读） */
+    val fallbackAlpha = 0.92f
+    /** 内高光不透明度（上缘内侧白渐变，空内容也显玻璃感） */
+    val highlightAlpha = 0.18f
+    /** 衬托渐变（模糊层内）下缘不透明度 */
+    val scrimAlpha = 0.14f
+    /** 玻璃描边不透明度 */
+    val borderAlpha = 0.40f
 }
 
 /**
@@ -333,6 +343,9 @@ object BottomBarSpec {
 object ChartSpec {
     /** 柱/格的圆角（月柱状小柱、热力图小格） */
     val cellRadius = 3.dp
+
+    /** 热点图格子列宽上限（窗口天数少时格子不得随列数放大失控成巨块） */
+    val heatCellMax = 16.dp
 }
 
 /**

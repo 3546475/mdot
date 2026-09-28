@@ -74,7 +74,7 @@ import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.domain.model.Shift
 import java.time.DayOfWeek
 
-/** 考勤周期内容主体（设定多页签「周期」页签复用；F7-3：1–31 号起始日，29–31 在天数不足的月份自动落到月末） */
+/** 考勤周期内容主体（设定多页签「周期」页签复用；F7-3：1–29 号起始日，29 在天数不足的月份自动落到月末） */
 @Composable
 fun CyclePane(vm: CycleViewModel = hiltViewModel()) {
     val anchor by vm.anchorDay.collectAsStateWithLifecycle()
@@ -132,7 +132,8 @@ fun CyclePane(vm: CycleViewModel = hiltViewModel()) {
                     )
                 }
                 Spacer(Modifier.height(Spacing.m))
-                (1..31).chunked(7).forEach { week ->
+                // 起始日 1–29（30/31 用不到已移除；2 月不足 29 时 CycleCalculator 自动落月末）
+                (1..29).chunked(7).forEach { week ->
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(Spacing.s),
@@ -143,6 +144,10 @@ fun CyclePane(vm: CycleViewModel = hiltViewModel()) {
                                 selected = anchor == day,
                                 modifier = Modifier.weight(1f),
                             ) { vm.set(day) }
+                        }
+                        // 末行补齐空位：保持 7 列同宽，否则末行格子会均分整行（比上面宽且不与上方对齐）
+                        repeat(7 - week.size) {
+                            Spacer(Modifier.weight(1f))
                         }
                     }
                     Spacer(Modifier.height(8.dp))

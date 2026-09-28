@@ -63,9 +63,14 @@ fun MonthBarCard(
     onDayLongPress: ((LocalDate) -> Unit)? = null,
     /** 浮窗文本（日期+时长/工数）；返回 null 则不显示浮窗 */
     hintValueText: @Composable (LocalDate, Float) -> String? = { _, _ -> null },
+    /** 各柱日期（21 文档 B3 周聚合用）；null = from + i 天（每日柱）。size 与 values 对齐 */
+    dates: List<LocalDate>? = null,
+    /** 各柱 X 轴标签；null = 自动日标签（1/5/10/15/20/25/30）。周聚合传「M/d」稀疏标签 */
+    barLabels: List<String?>? = null,
 ) {
     val days = values.size
     if (days < 2) return
+    val barDates = (0 until days).map { dates?.getOrNull(it) ?: from.plusDays(it.toLong()) }
     val maxV = values.maxOrNull() ?: 0f
     val bestIdx = values.indices.maxByOrNull { values[it] } ?: 0
     val hint = rememberChartHint()
@@ -118,7 +123,7 @@ fun MonthBarCard(
                             verticalAlignment = Alignment.Bottom,
                         ) {
                             values.forEachIndexed { idx, v ->
-                                val date = from.plusDays(idx.toLong())
+                                val date = barDates[idx]
                                 Box(
                                     Modifier
                                         .weight(1f)
@@ -144,7 +149,14 @@ fun MonthBarCard(
                                                 .fillMaxHeight(
                                                     (v / maxV.coerceAtLeast(1f)).coerceIn(0.03f, 1f)
                                                 )
-                                                .width(if (selected) 7.dp else 5.dp)
+                                                .then(
+                                                    // 周聚合柱：占槽宽比例（加宽收紧、与细日柱明显区分）；日柱固定细宽
+                                                    if (barLabels != null) {
+                                                        Modifier.fillMaxWidth(if (selected) 0.92f else 0.72f)
+                                                    } else {
+                                                        Modifier.width(if (selected) 7.dp else 5.dp)
+                                                    }
+                                                )
                                                 .background(
                                                     // 选中柱满饱和（区分于未选中渐变）
                                                     if (selected) Brush.verticalGradient(
@@ -179,17 +191,22 @@ fun MonthBarCard(
                             }
                         }
                     }
-                    // X 轴固定标签（1 5 10 15 20 25 30，按当月日期定位，Canvas 直绘防换行）
+                    // X 轴标签：周聚合桶自带「M/d」标签（≤13 桶全标、更多隔一标一防重叠）；日柱自动 1 5 10 15 20 25 30
                     val labelStyle = MaterialTheme.typography.labelSmall
                     val measurer = rememberTextMeasurer()
-                    val labelDates = (0 until days)
-                        .map { from.plusDays(it.toLong()) }
-                        .filter { it.dayOfMonth == 1 || it.dayOfMonth % 5 == 0 }
+                    val labelTexts: List<Pair<Int, String>> = if (barLabels != null) {
+                        val all = barLabels.mapIndexedNotNull { i, l -> l?.let { i to it } }
+                        val step = if (all.size <= 13) 1 else 2
+                        all.filterIndexed { i, _ -> i % step == 0 }
+                    } else {
+                        barDates.mapIndexedNotNull { i, d ->
+                            if (d.dayOfMonth == 1 || d.dayOfMonth % 5 == 0) i to d.dayOfMonth.toString() else null
+                        }
+                    }
                     Canvas(Modifier.fillMaxWidth().height(18.dp)) {
-                        labelDates.forEach { date ->
-                            val idx = (date.toEpochDay() - from.toEpochDay()).toInt()
+                        labelTexts.forEach { (idx, text) ->
                             val measured = measurer.measure(
-                                AnnotatedString(date.dayOfMonth.toString()),
+                                AnnotatedString(text),
                                 labelStyle,
                             )
                             drawText(
@@ -227,15 +244,34 @@ fun MonthBarCard(
                     )
                 }
             }
-            // 最多日（纯文字）
+            // 周聚合说明（21 文档 B3 用户反馈：周柱与日柱同形，需明示聚合口径）
+            if (barLabels != null) {
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    stringResource(R.string.stats_bar_weekly_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                )
+            }
+            // 最多日/最多周（纯文字；周聚合时以周起 M/d 标注）
             if (maxV > 0f) {
                 Spacer(Modifier.height(Spacing.m))
                 Text(
-                    stringResource(
-                        R.string.stats_month_best,
-                        from.plusDays(bestIdx.toLong()).dayOfMonth,
-                        modeValueText(workSystem, values[bestIdx]),
-                    ),
+                    if (barLabels != null) {
+                        stringResource(
+                            R.string.stats_bar_best_label,
+                            "${barDates[bestIdx].monthValue}/${barDates[bestIdx].dayOfMonth}",
+                            modeValueText(workSystem, values[bestIdx]),
+                        )
+                    } else {
+                        stringResource(
+                            R.string.stats_month_best,
+                            barDates[bestIdx].dayOfMonth,
+                            modeValueText(workSystem, values[bestIdx]),
+                        )
+                    },
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Medium,

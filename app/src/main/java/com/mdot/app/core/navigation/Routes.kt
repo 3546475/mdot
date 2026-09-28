@@ -32,9 +32,15 @@ object Routes {
     const val SITE_PROJECTS_PATTERN = "site/projects?pick={pick}"
     const val SITE_SETTLEMENT = "site/settlement"
     const val SITE_RECORD = "site/record"
+    /** 记工页带初始日期（图表长按「记那一天」直达，21 文档：与 stats?tab= 同一「同路由 + 参数」范式） */
+    const val SITE_RECORD_PATTERN = "site/record?date={date}"
     const val SITE_PROJECT_EDIT_PATTERN = "site/project/{projectId}"
 
     fun siteProjectEdit(projectId: Long) = "site/project/$projectId"
+
+    /** 记工页路由：date 非空时预选该日期（图表长按「记那一天」） */
+    fun siteRecord(date: java.time.LocalDate? = null): String =
+        if (date == null) SITE_RECORD else "site/record?date=$date"
 
     /** 项目管理页；pick=true 为「选择模式」（从记工页进入：点行即切换当前项目并返回） */
     fun siteProjects(pick: Boolean = false): String =

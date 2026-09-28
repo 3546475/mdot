@@ -83,6 +83,10 @@ interface SiteAttendanceDao {
     @Query("SELECT MIN(date) FROM site_attendance WHERE project_id = :projectId")
     suspend fun minDate(projectId: Long): LocalDate?
 
+    /** 项目末笔出勤日期（项目全周期/热点图窗口用） */
+    @Query("SELECT MAX(date) FROM site_attendance WHERE project_id = :projectId")
+    suspend fun maxDate(projectId: Long): LocalDate?
+
     @Query("SELECT * FROM site_attendance WHERE project_id = :projectId ORDER BY date")
     suspend fun getAllForProject(projectId: Long): List<SiteAttendanceEntity>
 
@@ -127,6 +131,10 @@ interface SiteAdvanceDao {
     /** 项目首笔借支日期（未结算区间默认起点） */
     @Query("SELECT MIN(date) FROM site_advance WHERE project_id = :projectId")
     suspend fun minDate(projectId: Long): LocalDate?
+
+    /** 项目末笔借支日期（项目全周期/热点图窗口用） */
+    @Query("SELECT MAX(date) FROM site_advance WHERE project_id = :projectId")
+    suspend fun maxDate(projectId: Long): LocalDate?
 
     @Query("SELECT * FROM site_advance WHERE project_id = :projectId ORDER BY date, id")
     suspend fun getAllForProject(projectId: Long): List<SiteAdvanceEntity>
@@ -179,6 +187,10 @@ interface SitePieceWorkDao {
     /** 项目首笔包工日期（未结算区间默认起点） */
     @Query("SELECT MIN(date) FROM site_piece_work WHERE project_id = :projectId")
     suspend fun minDate(projectId: Long): LocalDate?
+
+    /** 项目末笔包工日期（项目全周期/热点图窗口用） */
+    @Query("SELECT MAX(date) FROM site_piece_work WHERE project_id = :projectId")
+    suspend fun maxDate(projectId: Long): LocalDate?
 
     /** 彻底删除项目的全部包工（含已结算；仅随项目 purge 使用） */
     @Query("DELETE FROM site_piece_work WHERE project_id = :projectId")

@@ -271,7 +271,7 @@ private fun SwipeTabHost(
 
 
 @Composable
-fun AppRoot(firstLaunchDone: Boolean, appVm: AppViewModel) {
+fun AppRoot(firstLaunchDone: Boolean, appVm: AppViewModel, backdropBlurState: BackdropBlurState) {
     // 响应式布局（docs 03 §3.2）：窗口档位全局下发（页面读 LocalWindowSpec 决定单列/双栏）；
     // 二级页统一经 AdaptiveContainer 限宽居中（下方逐页包裹）；固定一级顶栏/底栏/
     // 记录弹层/FAB 等悬浮层各自跟随内容宽度对齐
@@ -284,7 +284,7 @@ fun AppRoot(firstLaunchDone: Boolean, appVm: AppViewModel) {
         LocalWindowSpec provides windowSpec,
         LocalPageBackInterception provides pageBackInterception,
     ) {
-        AppRootContent(firstLaunchDone, appVm, fabSideInset, pageBackInterception)
+        AppRootContent(firstLaunchDone, appVm, fabSideInset, pageBackInterception, backdropBlurState)
     }
 }
 
@@ -294,6 +294,8 @@ private fun AppRootContent(
     appVm: AppViewModel,
     fabSideInset: androidx.compose.ui.unit.Dp,
     pageBackInterception: androidx.compose.runtime.MutableState<Boolean>,
+    /** 玻璃共享源（MainActivity 创建并经 LocalBackdropGlassState 全局下发；底栏/圆钮/提示窗共用） */
+    backdropBlurState: BackdropBlurState,
 ) {
     val navController = rememberNavController()
     // 记录弹层 VM 为 Activity 级（弹层在 NavHost 外组合）——此处取同一实例，
@@ -303,8 +305,8 @@ private fun AppRootContent(
     // 记录弹层可见性状态提升到此处：背景「模糊 + 缩小」层（SheetBackdropLayer）与弹层自身
     // 共享同一过渡状态，进出场严格同步（弹层内部负责置 targetState）
     val recordSheetVisible = remember { MutableTransitionState(false) }
-    // 底栏毛玻璃：导航宿主为「源」（录制内容层），底栏为「效果方」（模糊身后内容）
-    val backdropBlurState = rememberBackdropBlurState()
+    // 底栏毛玻璃：导航宿主为「源」（录制内容层），底栏为「效果方」（模糊身后内容）；
+    // 源状态由 MainActivity 创建（[LocalBackdropGlassState] 全局下发，提示窗等共享采样）
     // 预测性返回（PredictiveBackHandler）：手势进度 0→1 映射为「当前页小幅右移」（不缩放），
     // 主体留在屏上、侧边只露极窄一条；确认松手继续走右滑出屏的 pop 转场，中途取消弹簧回弹。
     // 进度只在 graphicsLayer（绘制期）读取——组合期读会逐帧重组整棵树（同底栏 progress 的坑）
@@ -435,6 +437,14 @@ private fun AppRootContent(
                                         appVm.recordSheetController.open(java.time.LocalDate.now())
                                     }
                                 },
+                                // 图表长按「记那一天」按制度分流（21 文档：工地勿弹其它模式的记录弹层）
+                                onChartDay = { date ->
+                                    if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
+                                        navTo(navController, Routes.siteRecord(date), slots)
+                                    } else {
+                                        appVm.recordSheetController.open(date)
+                                    }
+                                },
                             )
                         }
                     }
@@ -464,6 +474,13 @@ private fun AppRootContent(
                                 onBack = { navController.popBackStack() },
                                 initialTab = entry.arguments?.getInt("tab") ?: 0,
                                 onOpenTax = { navTo(navController, Routes.TAX_ESTIMATE, slots) },
+                                onChartDay = { date ->
+                                    if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
+                                        navTo(navController, Routes.siteRecord(date), slots)
+                                    } else {
+                                        appVm.recordSheetController.open(date)
+                                    }
+                                },
                             )
                         }
                     }
@@ -477,6 +494,13 @@ private fun AppRootContent(
                                 onBack = { navController.popBackStack() },
                                 initialTab = entry.arguments?.getInt("tab") ?: 0,
                                 onOpenTax = { navTo(navController, Routes.TAX_ESTIMATE, slots) },
+                                onChartDay = { date ->
+                                    if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
+                                        navTo(navController, Routes.siteRecord(date), slots)
+                                    } else {
+                                        appVm.recordSheetController.open(date)
+                                    }
+                                },
                             )
                         }
                     }
@@ -601,7 +625,9 @@ private fun AppRootContent(
                             SiteSettlementScreen(onBack = { navController.popBackStack() })
                         }
                     }
-                    composable(Routes.SITE_RECORD) {
+                    composable(Routes.SITE_RECORD_PATTERN,
+                        arguments = listOf(navArgument("date") { type = NavType.StringType; defaultValue = "" }),
+                    ) { entry ->
                         AdaptiveContainer {
                             SiteRecordScreen(
                                 onBack = { navController.popBackStack() },
@@ -612,6 +638,11 @@ private fun AppRootContent(
                                     navTo(navController, Routes.siteProjects(pick = true), slots)
                                 },
                                 onOpenSettlement = { navTo(navController, Routes.SITE_SETTLEMENT, slots) },
+                                onOpenDetail = { navTo(navController, Routes.statsDetail(1), slots) },
+                                // 图表长按「记那一天」带初始日期（21 文档）
+                                initialDate = entry.arguments?.getString("date")
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() },
                             )
                         }
                     }

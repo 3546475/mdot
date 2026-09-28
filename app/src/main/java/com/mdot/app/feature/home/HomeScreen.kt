@@ -91,6 +91,8 @@ fun HomeScreen(
     onOpenPayMonth: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenRecord: () -> Unit,
+    /** 图表长按某日 → 记录那天（21 文档：AppRoot 按制度分流——工地→记工页带日期、其他→记录弹层） */
+    onChartDay: (LocalDate) -> Unit = { homeVm.recordSheet.open(it) },
     homeVm: HomeViewModel = hiltViewModel(),
 ) {
     val state by homeVm.uiState.collectAsStateWithLifecycle()
@@ -99,8 +101,6 @@ fun HomeScreen(
     // 卡片渲染序列（v0.6.0 首页卡片可编辑；id -> 内容由 HomeCardContent 按 id 分发）
     val cardIds = state.cards
     val site by homeVm.siteState.collectAsStateWithLifecycle()
-    // 图表统一接线（与统计页完全一致）：长按某日 → 打开该日记加班弹层
-    val onChartDay: (LocalDate) -> Unit = { homeVm.recordSheet.open(it) }
 
     if (twoPane) {
         // ---- 宽屏双栏：总宽 720dp 居中，左右各半 ----
@@ -261,7 +261,7 @@ private fun HomeCardContent(
         }
     })
     "heatmap" -> ({
-        // 显隐与数据解耦：所有制度同序列（配置驱动）；固定六个月窗口（本月向前推五个月），与统计页同款
+        // 显隐与数据解耦：所有制度同序列（配置驱动）；窗口=工地项目活动期（21 文档 B3）/其他固定六个月，与统计页同款
         HomeHeatmapCard(site.heatValues, state.salary.workSystem, onChartDay)
     })
     "weekbar" -> ({
@@ -280,24 +280,45 @@ private fun HomeCardContent(
         )
     })
     "monthbar" -> ({
-        // 月柱状卡（与统计页同款共享组件）：本月自然月每日柱，强度随制度（工地=工数，其他=加班分钟）
+        // 柱状卡（与统计页同款共享组件）：非工地=本月自然月每日柱；工地=本期待结区间柱状（>31 天按周聚合，21 文档 B3）
         val isSite = state.salary.workSystem == WorkSystem.SITE
         val today = java.time.LocalDate.now()
-        val from = today.withDayOfMonth(1)
-        val days = today.lengthOfMonth()
-        val byDate = site.daily.associateBy { it.date }
-        val values = (0 until days).map { off ->
-            val p = byDate[from.plusDays(off.toLong())]
-            if (p == null) 0f else if (isSite) p.worksMilli / 1000f else p.otMinutes.toFloat()
+        if (isSite && site.rangeFrom != null && site.rangeTo != null) {
+            val dayValues = site.daily.associate { it.date to (it.worksMilli / 1000f) }
+            val bars = com.mdot.app.domain.SiteRanges.bucketize(site.rangeFrom, site.rangeTo, dayValues)
+            // 周聚合柱（21 文档 B3 用户反馈）：浮窗日期段改周区间、禁长按（柱=整周，长按无单日语义）
+            val weekly = bars.any { it.label != null }
+            com.mdot.app.core.designsystem.component.MonthBarCard(
+                values = bars.map { it.value },
+                from = site.rangeFrom,
+                workSystem = state.salary.workSystem,
+                onDayLongPress = if (weekly) null else onChartDay,
+                hintValueText = if (weekly) {
+                    com.mdot.app.core.designsystem.component.chartHintText(
+                        state.salary.workSystem,
+                        dateLabel = { d -> "${TimeUtils.mdCn(d)} – ${TimeUtils.mdCn(d.plusDays(6))}" },
+                    )
+                } else com.mdot.app.core.designsystem.component.chartHintText(state.salary.workSystem),
+                dates = bars.map { it.date },
+                barLabels = bars.map { it.label },
+            )
+        } else {
+            val from = today.withDayOfMonth(1)
+            val days = today.lengthOfMonth()
+            val byDate = site.daily.associateBy { it.date }
+            val values = (0 until days).map { off ->
+                val p = byDate[from.plusDays(off.toLong())]
+                if (p == null) 0f else if (isSite) p.worksMilli / 1000f else p.otMinutes.toFloat()
+            }
+            // 与统计页完全一致（共享组件自带卡片底，故不再套 SectionCard）：点击出浮窗、长按进该日记加班弹层
+            com.mdot.app.core.designsystem.component.MonthBarCard(
+                values = values,
+                from = from,
+                workSystem = state.salary.workSystem,
+                onDayLongPress = onChartDay,
+                hintValueText = com.mdot.app.core.designsystem.component.chartHintText(state.salary.workSystem),
+            )
         }
-        // 与统计页完全一致（共享组件自带卡片底，故不再套 SectionCard）：点击出浮窗、长按进该日记加班弹层
-        com.mdot.app.core.designsystem.component.MonthBarCard(
-            values = values,
-            from = from,
-            workSystem = state.salary.workSystem,
-            onDayLongPress = onChartDay,
-            hintValueText = com.mdot.app.core.designsystem.component.chartHintText(state.salary.workSystem),
-        )
     })
     else -> null
 }
@@ -652,13 +673,13 @@ private fun IncomeCard(
 }
 
 
-/** 首页 SITE 数据区（12 文档 F-S6）：本月工数大数字 + 加班副行 + 项目名 */
+/** 首页 SITE 数据区（12 文档 F-S6；v0.7.7 起大数字口径=本期待结，21 文档 B1）：本期待结工数大数字 + 加班副行 + 项目名 */
 @Composable
 private fun SiteDataContent(state: HomeUiState, site: SiteHomeUi, onOpenRecord: () -> Unit) {
     Column {
         Text(
-            if (state.salary.siteDisplayUnit == "HOUR") stringResource(R.string.site_cycle_label_hour)
-            else stringResource(R.string.site_cycle_label),
+            if (state.salary.siteDisplayUnit == "HOUR") stringResource(R.string.site_home_works_label_hour)
+            else stringResource(R.string.site_home_works_label),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -727,12 +748,24 @@ private fun SiteDataContent(state: HomeUiState, site: SiteHomeUi, onOpenRecord: 
     }
 }
 
-/** 首页 SITE 待结卡：应得 / 已借支 / 待结 + 「明细 ›」入口（primaryContainer hero；整卡与小字均进明细页） */
+/** 首页 SITE 待结卡：应得 / 已借支 / 待结 + 待结区间行 + 「明细 ›」入口（primaryContainer hero；整卡与小字均进明细页）。
+ *  数字口径 =「本期待结」（上次结算次日 → 今天，21 文档 B1），与结算页摘要同源逐分一致。 */
 @Composable
 private fun SitePendingCard(site: SiteHomeUi, onOpenDetail: () -> Unit) {
     SectionCard(onClick = onOpenDetail, containerColor = MaterialTheme.colorScheme.primaryContainer) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
+                // 待结区间（M/d – M/d）：口径可见，与结算页「本期待结摘要」对账用（21 文档 B1）
+                if (site.rangeFrom != null && site.rangeTo != null) {
+                    Text(
+                        stringResource(
+                            R.string.site_pending_range,
+                            "${TimeUtils.mdCn(site.rangeFrom)} – ${TimeUtils.mdCn(site.rangeTo)}",
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                    )
+                }
                 Text(
                     stringResource(R.string.site_settlement_receivable),
                     style = MaterialTheme.typography.labelSmall,
