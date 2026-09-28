@@ -1,16 +1,16 @@
 {
-  "versionName": "0.7.6.1",
-  "versionCode": 57,
-  "tag": "v0.7.6.1",
-  "releaseNotes": "## 更新内容\n\n**首页**\n\n- 首页卡片的内容现在可以自己改了：点数据区右上角的**铅笔**图标，就能把大数字换成\n  「加班时长 / 实发工资 / 本月收入」中的任意一个\n- 「日历/统计入口」卡片改名**快捷入口**，入口项也能自己选了：\n  日历、统计、记月、明细、我的，想要几个放几个（至少留一个）\n\n**记月页（统计页第 1 页签）**\n\n- 「补贴」分组默认多一行**「全勤奖」**：新建单子自带，老单子打开时也会自动补上这一行\n- 修复：扣款分组自己加的行，点开会**误弹出社保/公积金的设置**（原因是行编号在不同分组间撞车了）\n\n**界面细节**\n\n- 底部提示窗修了两处：长消息不再把按钮挤成竖排；有按钮和没按钮时窗口高度统一了\n\n\n系统要求：Android 10（API 29）及以上。",
+  "versionName": "0.7.6.2",
+  "versionCode": 58,
+  "tag": "v0.7.6.2",
+  "releaseNotes": "## 更新内容\n\n**实时计算**\n\n- 首页数据区的「实发工资」与记月页的工资单都改为**实时计算**：记一笔加班，两处数字\n  立刻跟着变，不用再等任何同步动作\n- 记月页「同步本月考勤」按钮**取消**：基本工资 / 加班工资 / 调休折现 / 事假 / 病假 /\n  社保 / 公积金随当前考勤与薪资设定自动出数\n- 自己**改过或手填的行照旧保留**，不会被自动计算覆盖；「已手改（引擎 X）」里的 X 与\n  对账差额也按当前计算实时走，「恢复引擎值」回到的是引擎现在算出的数\n- 上月对比（环比）同样自动出数，上月没手动填过也能比\n\n**导入上月**\n\n- 按钮大小不变、位置居中；导入内容改为**上月实际看到的那张单**——每月固定的手填项与\n  改动都会带过来（自动计算的行继续跟随本月，不锁死在上月数字上）\n\n**界面细节**\n\n- 行下方的来源标注「来自考勤 · X月X日 同步」改为「来自考勤 · 自动计算」\n\n\n系统要求：Android 10（API 29）及以上。",
   "apkUrl": {
-    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.7.6.1/MDOT-RELEASE-0.7.6.1-v8a.apk",
-    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.7.6.1/MDOT-RELEASE-0.7.6.1-v7a.apk",
-    "universal": "https://github.com/3546475/mdot/releases/download/v0.7.6.1/MDOT-RELEASE-0.7.6.1-dual.apk"
+    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.7.6.2/MDOT-RELEASE-0.7.6.2-v8a.apk",
+    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.7.6.2/MDOT-RELEASE-0.7.6.2-v7a.apk",
+    "universal": "https://github.com/3546475/mdot/releases/download/v0.7.6.2/MDOT-RELEASE-0.7.6.2-dual.apk"
   },
   "apkSha256": {
-    "arm64-v8a": "523768e183b4b68d1f2ac9488c4f7af539eba09facab88d9ca5b8088a86a8e27",
-    "armeabi-v7a": "a3c9d1ff93e7b310000ec038b0f2ed03507904ee24e363886c61181beb6872aa",
-    "universal": "99ca03ca39cf2f0484928d99fbe882073f4ae9ea40c3b70ec6ef12dcb3598e20"
+    "arm64-v8a": "0f0e208b10c9aa9608fbae569f0f0c0116384c91b13bc95ae3102025bd00b737",
+    "armeabi-v7a": "ceae594a6f180a8999a07b2c05de342ff99562a10c79788f867ae940466f75a4",
+    "universal": "0679c1ffb27da297d052840d6ce1818ff64b2d232382e4800f31fd97c052df83"
   }
 }
