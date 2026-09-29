@@ -1,5 +1,6 @@
 package com.mdot.app.feature.detail
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -76,6 +76,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
+import com.mdot.app.core.designsystem.component.JiabanButton
+import com.mdot.app.core.designsystem.component.JiabanButtonRole
+import com.mdot.app.core.designsystem.jiabanFilterChipColors
+import com.mdot.app.core.designsystem.emphasisCardSurface
+import com.mdot.app.core.designsystem.emphasisCardInk
 
 /** 工地明细区间口径（21 文档 B1）：UNSETTLED/PROJECT_SPAN 走 domain 推导（SiteRanges.Kind），CUSTOM=用户选起止 */
 enum class SiteDetailRangeMode { UNSETTLED, PROJECT_SPAN, CUSTOM }
@@ -248,6 +253,7 @@ fun SiteRangeChips(
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
         SiteDetailRangeMode.entries.forEach { mode ->
             FilterChip(
+                colors = jiabanFilterChipColors(),
                 selected = selected == mode,
                 onClick = { onSelect(mode) },
                 label = {
@@ -292,24 +298,24 @@ fun DetailPane(
                 if (state.siteRangeMode == SiteDetailRangeMode.CUSTOM) {
                     Spacer(Modifier.height(Spacing.s))
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
-                        OutlinedButton(onClick = { picking = "from" }) {
-                            Text(
-                                stringResource(
+                        JiabanButton(
+                            text = stringResource(
                                     R.string.stats_custom_from,
                                     state.siteCustomFrom?.let(TimeUtils::mdCn)
                                         ?: stringResource(R.string.stats_custom_from_default),
-                                )
-                            )
-                        }
-                        OutlinedButton(onClick = { picking = "to" }) {
-                            Text(
-                                stringResource(
+                                ),
+                            onClick = { picking = "from" },
+                            role = JiabanButtonRole.SECONDARY,
+                        )
+                        JiabanButton(
+                            text = stringResource(
                                     R.string.stats_custom_to,
                                     state.siteCustomTo?.let(TimeUtils::mdCn)
                                         ?: stringResource(R.string.stats_custom_to_default),
-                                )
-                            )
-                        }
+                                ),
+                            onClick = { picking = "to" },
+                            role = JiabanButtonRole.SECONDARY,
+                        )
                     }
                 }
                 Spacer(Modifier.height(Spacing.s))
@@ -318,7 +324,7 @@ fun DetailPane(
                 // 区间胶囊（与首页数据区日期同款样式）
                 Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(Radius.pill))
+                        .clip(engineShape(Radius.pill))
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                         .padding(horizontal = Spacing.m, vertical = Spacing.xs),
                     verticalAlignment = Alignment.CenterVertically,
@@ -382,7 +388,7 @@ fun DetailPane(
 
 @Composable
 private fun DetailSummary(state: DetailUiState) {
-    SectionCard(onClick = {}, containerColor = MaterialTheme.colorScheme.primaryContainer) {
+    SectionCard(onClick = {}, containerColor = emphasisCardSurface()) {
         Column(Modifier.fillMaxWidth()) {
             when {
                 state.workSystem == WorkSystem.SITE -> {
@@ -390,12 +396,12 @@ private fun DetailSummary(state: DetailUiState) {
                     Text(
                         stringResource(R.string.site_settlement_receivable),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                        color = emphasisCardInk().copy(alpha = 0.8f),
                     )
                     AnimatedMoneyText(
                         out.receivableCents,
                         style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = emphasisCardInk(),
                         fontWeight = FontWeight.Bold,
                         label = "detailReceivable",
                     )
@@ -433,12 +439,12 @@ private fun DetailSummary(state: DetailUiState) {
                     Text(
                         incomeLabel,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                        color = emphasisCardInk().copy(alpha = 0.8f),
                     )
                     AnimatedMoneyText(
                         out.incomeCents,
                         style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = emphasisCardInk(),
                         fontWeight = FontWeight.Bold,
                         label = "detailIncome",
                     )
@@ -448,14 +454,14 @@ private fun DetailSummary(state: DetailUiState) {
                         Text(
                             stringResource(R.string.detail_worked_hours, TimeUtils.hoursDecimal(out.otMinutes)),
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                            color = emphasisCardInk().copy(alpha = 0.8f),
                         )
                     } else {
                         Text(
                             stringResource(R.string.detail_ot_leave_line, TimeUtils.hoursDecimal(out.otMinutes)) +
                                 if (out.leaveDeductCents > 0) " · " + stringResource(R.string.detail_leave_deduct, Money.yuanWithSign(out.leaveDeductCents)) else "",
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                            color = emphasisCardInk().copy(alpha = 0.8f),
                         )
                     }
                     // 标准工时：三档时薪分布 chips（平时/周末/法定）
@@ -485,7 +491,7 @@ internal fun MiniStat(
         Text(
             label,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+            color = emphasisCardInk().copy(alpha = 0.7f),
         )
         if (animatedCents != null) {
             AnimatedMoneyText(
@@ -513,7 +519,7 @@ internal fun TierChip(tier: RateTier, out: PayrollCalculator.Output, modifier: M
     val tint = tierTint(tier)
     Box(
         modifier
-            .clip(RoundedCornerShape(Radius.pill))
+            .clip(engineShape(Radius.pill))
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
             .padding(horizontal = Spacing.m, vertical = Spacing.xs),
     ) {
@@ -521,20 +527,20 @@ internal fun TierChip(tier: RateTier, out: PayrollCalculator.Output, modifier: M
             Box(
                 Modifier
                     .size(7.dp)
-                    .background(tint, RoundedCornerShape(Radius.pill)),
+                    .background(tint, engineShape(Radius.pill)),
             )
             Spacer(Modifier.width(4.dp))
             Text(
                 tier.displayName,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = emphasisCardInk(),
                 maxLines = 1,
             )
             Spacer(Modifier.width(4.dp))
             AnimatedMoneyText(
                 cents,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = emphasisCardInk(),
                 maxLines = 1,
                 label = "tierChip",
             )
@@ -598,7 +604,7 @@ private fun NormalDetailRow(
                     r.leaveType?.let { type ->
                         Box(
                             Modifier
-                                .clip(RoundedCornerShape(Radius.pill))
+                                .clip(engineShape(Radius.pill))
                                 .background(MaterialTheme.colorScheme.error.copy(alpha = 0.12f))
                                 .padding(horizontal = Spacing.s, vertical = 1.dp),
                         ) {
@@ -704,7 +710,7 @@ private fun kindIcon(kind: SiteDetailKind): Int = when (kind) {
 private fun TierBadge(tier: RateTier) {
     Box(
         Modifier
-            .clip(RoundedCornerShape(Radius.pill))
+            .clip(engineShape(Radius.pill))
             .background(tierTint(tier).copy(alpha = 0.12f))
             .padding(horizontal = Spacing.s, vertical = 1.dp),
     ) {

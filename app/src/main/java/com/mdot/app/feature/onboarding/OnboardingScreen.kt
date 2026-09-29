@@ -1,5 +1,7 @@
 package com.mdot.app.feature.onboarding
 
+import com.mdot.app.core.designsystem.engineShape
+import com.mdot.app.core.designsystem.EngineIcons
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -25,7 +27,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -63,6 +64,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.mdot.app.core.designsystem.component.JiabanLinearProgress
+import com.mdot.app.core.designsystem.component.FloatingLabelTextField
 
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
@@ -136,7 +139,7 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(64.dp))
-        LinearProgressIndicator(
+        JiabanLinearProgress(
             progress = { (step + 1) / 2f },
             modifier = Modifier.fillMaxWidth(),
         )
@@ -241,14 +244,12 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Spacer(Modifier.height(16.dp))
-                        OutlinedTextField(
-                        shape = RoundedCornerShape(Radius.textField),
+                        FloatingLabelTextField(
                             value = baseText,
                             onValueChange = { baseText = it.filter { c -> c.isDigit() || c == '.' } },
-                            label = { Text(stringResource(R.string.onboarding_base_salary_label)) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            singleLine = true,
+                            label = stringResource(R.string.onboarding_base_salary_label),
                             modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         )
                         Spacer(Modifier.height(16.dp))
                         Text(stringResource(R.string.onboarding_multiplier_title), style = MaterialTheme.typography.titleSmall)
@@ -268,14 +269,12 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Spacer(Modifier.height(16.dp))
-                        OutlinedTextField(
-                        shape = RoundedCornerShape(Radius.textField),
+                        FloatingLabelTextField(
                             value = baseText,
                             onValueChange = { baseText = it.filter { c -> c.isDigit() || c == '.' } },
-                            label = { Text(stringResource(R.string.onboarding_base_salary_label)) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            singleLine = true,
+                            label = stringResource(R.string.onboarding_base_salary_label),
                             modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         )
                         Spacer(Modifier.height(16.dp))
                         Text(stringResource(R.string.onboarding_multiplier_title), style = MaterialTheme.typography.titleSmall)
@@ -295,14 +294,12 @@ fun OnboardingScreen(onDone: () -> Unit, vm: OnboardingViewModel = hiltViewModel
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Spacer(Modifier.height(16.dp))
-                        OutlinedTextField(
-                        shape = RoundedCornerShape(Radius.textField),
+                        FloatingLabelTextField(
                             value = baseText,
                             onValueChange = { baseText = it.filter { c -> c.isDigit() || c == '.' } },
-                            label = { Text(stringResource(R.string.onboarding_base_salary_label)) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            singleLine = true,
+                            label = stringResource(R.string.onboarding_base_salary_label),
                             modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         )
                         Spacer(Modifier.height(16.dp))
                         Text(stringResource(R.string.onboarding_multiplier_title), style = MaterialTheme.typography.titleSmall)
@@ -356,14 +353,12 @@ private fun androidx.compose.foundation.layout.RowScope.MultField(
     value: String,
     onChange: (String) -> Unit,
 ) {
-    OutlinedTextField(
-    shape = RoundedCornerShape(Radius.textField),
+    FloatingLabelTextField(
         value = value,
         onValueChange = onChange,
-        label = { Text(label) },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-        singleLine = true,
+        label = label,
         modifier = Modifier.weight(1f),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
     )
 }
 
@@ -392,7 +387,7 @@ private fun OnboardingSystemCard(
         label = "onbCardBorderWidth",
     )
     Surface(
-        shape = RoundedCornerShape(Radius.card),
+        shape = engineShape(Radius.card),
         color = containerColor,
         border = BorderStroke(borderWidth, borderColor),
         modifier = Modifier
@@ -419,7 +414,7 @@ private fun OnboardingSystemCard(
                     ) + fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec()),
                 ) {
                     Icon(
-                        painterResource(R.drawable.ic_ms_check),
+                        EngineIcons.check(),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                     )

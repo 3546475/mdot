@@ -17,7 +17,7 @@ if (keystoreProps.isNotEmpty()) {
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
+    // AGP 9.0+ 内置 Kotlin（kotl.in/gradle/agp-built-in-kotlin）：不再应用 kotlin-android
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
@@ -26,14 +26,14 @@ plugins {
 
 android {
     namespace = "com.mdot.app"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.mdot.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 59
-        versionName = "0.7.7"
+        versionCode = 60
+        versionName = "0.7.8"
     }
 
     signingConfigs {
@@ -83,9 +83,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -94,6 +91,22 @@ android {
     androidResources {
         localeFilters += listOf("zh", "en")
     }
+}
+
+// KGP 2.4：kotlinOptions{ jvmTarget: String } 已移除，迁移 compilerOptions DSL
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
+
+// miuix 库类是 Java 21 字节码（jvmToolchain 21 构建）：单测 JVM 必须 ≥21 才能 defineClass，
+// 否则 UnsupportedClassVersionError（编译/装机/D8 不受影响，仅 JVM 单测运行时）。
+// JDK 21 路径见 gradle.properties 的 org.gradle.java.installations.paths。
+tasks.withType<Test>().configureEach {
+    javaLauncher.set(javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    })
 }
 
 ksp {
@@ -107,6 +120,17 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
     implementation(platform(libs.compose.bom))
+
+    // miuix 全家桶（top.yukonga.miuix.kmp，Maven Central；构建于 Kotlin 2.4 / CMP 1.12，
+    // 依赖链要求 compileSdk 37——已具备。按依赖序：shader ← squircle/blur，core ← icons，
+    // ui 聚合，preference 依赖 ui，nav 依赖 squircle）
+    implementation("top.yukonga.miuix.kmp:miuix-shader:0.9.4")
+    implementation("top.yukonga.miuix.kmp:miuix-squircle:0.9.4")
+    implementation("top.yukonga.miuix.kmp:miuix-blur:0.9.4")
+    implementation("top.yukonga.miuix.kmp:miuix-icons:0.9.4")
+    implementation("top.yukonga.miuix.kmp:miuix-ui:0.9.4")
+    implementation("top.yukonga.miuix.kmp:miuix-preference:0.9.4")
+    implementation("top.yukonga.miuix.kmp:miuix-nav:0.9.4")
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)

@@ -1,5 +1,6 @@
 package com.mdot.app.feature.stats
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.foundation.Canvas
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
@@ -26,7 +27,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -115,6 +115,9 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
 import kotlin.math.roundToInt
+import com.mdot.app.core.designsystem.emphasisCardSurface
+import com.mdot.app.core.designsystem.emphasisCardInk
+import com.mdot.app.core.designsystem.jiabanFilterChipColors
 
 enum class StatsDimension(val labelRes: Int) {
     CYCLE(R.string.stats_dim_cycle), MONTH(R.string.stats_dim_month), YEAR(R.string.stats_dim_year), CUSTOM(R.string.stats_dim_custom),
@@ -584,6 +587,7 @@ private fun StatsContent(
                         StatsDimension.CYCLE, StatsDimension.MONTH, StatsDimension.YEAR, StatsDimension.CUSTOM,
                     ).forEach { dim ->
                         FilterChip(
+                            colors = jiabanFilterChipColors(),
                             selected = state.dimension == dim,
                             onClick = { vm.onDimension(dim) },
                             label = { Text(stringResource(dim.labelRes)) },
@@ -623,7 +627,7 @@ private fun StatsContent(
             } ?: state.rangeLabel
             Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(Radius.pill))
+                    .clip(engineShape(Radius.pill))
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .padding(horizontal = Spacing.m, vertical = Spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
@@ -791,7 +795,7 @@ private fun MonthBarCard(
  * 工地=工数为主 + 应得/已借支/待结三色钱账；非工地=收入为主 + 档位分布（标准）/周期口径（综合）。 */
 @Composable
 private fun SummaryCard(state: StatsUiState) {
-    SectionCard(containerColor = MaterialTheme.colorScheme.primaryContainer) {
+    SectionCard(containerColor = emphasisCardSurface()) {
         // SectionCard 内已含 Spacing.l padding（与明细页 hero 同一层），此处不再叠加
         Column(Modifier.fillMaxWidth()) {
             if (state.workSystem == WorkSystem.SITE) {
@@ -799,7 +803,7 @@ private fun SummaryCard(state: StatsUiState) {
                 Text(
                     stringResource(R.string.site_stat_works),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                    color = emphasisCardInk().copy(alpha = 0.8f),
                 )
                 AnimatedNumberText(
                     value = out.totalWorksMilli,
@@ -810,7 +814,7 @@ private fun SummaryCard(state: StatsUiState) {
                         stringResource(R.string.stats_works_value, wn)
                     },
                     style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = emphasisCardInk(),
                     fontWeight = FontWeight.Bold,
                     label = "summaryWorks",
                 )
@@ -821,14 +825,14 @@ private fun SummaryCard(state: StatsUiState) {
                         stringResource(R.string.site_stat_piece_pay) + " " + Money.yuanWithSign(out.piecePayCents),
                     ).joinToString(" · "),
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                    color = emphasisCardInk().copy(alpha = 0.8f),
                 )
                 Spacer(Modifier.height(Spacing.xs))
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
                     com.mdot.app.feature.detail.MiniStat(
                         stringResource(R.string.site_stat_work_pay),
                         Money.yuanWithSign(out.receivableCents),
-                        MaterialTheme.colorScheme.onPrimaryContainer,
+                        emphasisCardInk(),
                         modifier = Modifier.weight(1f),
                         animatedCents = out.receivableCents,
                     )
@@ -855,13 +859,13 @@ private fun SummaryCard(state: StatsUiState) {
                         else -> stringResource(R.string.stats_ot_pay)
                     },
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                    color = emphasisCardInk().copy(alpha = 0.8f),
                 )
                 if (state.showMoney) {
                     AnimatedMoneyText(
                         out.incomeCents,
                         style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = emphasisCardInk(),
                         fontWeight = FontWeight.Bold,
                         label = "summaryIncome",
                     )
@@ -870,7 +874,7 @@ private fun SummaryCard(state: StatsUiState) {
                         "-",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = emphasisCardInk(),
                     )
                 }
                 Spacer(Modifier.height(Spacing.xs))
@@ -882,7 +886,7 @@ private fun SummaryCard(state: StatsUiState) {
                         else "",
                     ).filter { it.isNotBlank() }.joinToString(" · "),
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                    color = emphasisCardInk().copy(alpha = 0.8f),
                 )
                 // 标准工时：三档时薪分布胶囊（与明细页同款）
                 if (state.workSystem == WorkSystem.STANDARD) {
@@ -904,7 +908,7 @@ private fun SummaryCard(state: StatsUiState) {
                             TimeUtils.prettyDuration(out.overtimeMinutes),
                         ),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                        color = emphasisCardInk().copy(alpha = 0.8f),
                     )
                 }
                 Spacer(Modifier.height(Spacing.s))
@@ -913,7 +917,7 @@ private fun SummaryCard(state: StatsUiState) {
                     com.mdot.app.feature.detail.MiniStat(
                         stringResource(R.string.stats_leave),
                         TimeUtils.prettyDuration(out.leaveMinutes),
-                        MaterialTheme.colorScheme.onPrimaryContainer,
+                        emphasisCardInk(),
                         modifier = Modifier.weight(1f),
                     )
                     com.mdot.app.feature.detail.MiniStat(
@@ -939,6 +943,7 @@ private fun PieCard(state: StatsUiState, pieMode: PieMode, onPieMode: (PieMode) 
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                     PieMode.entries.forEach { mode ->
                         FilterChip(
+                            colors = jiabanFilterChipColors(),
                             selected = pieMode == mode,
                             onClick = { onPieMode(mode) },
                             label = { Text(stringResource(mode.labelRes)) },

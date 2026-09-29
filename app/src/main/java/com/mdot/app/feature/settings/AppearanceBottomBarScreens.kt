@@ -1,5 +1,6 @@
 package com.mdot.app.feature.settings
 
+import com.mdot.app.core.designsystem.EngineIcons
 import android.os.Build
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
@@ -49,10 +50,14 @@ import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.SwitchRow
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.domain.model.SheetBackdropMode
+import com.mdot.app.domain.model.ThemeEngine
 import com.mdot.app.domain.model.ThemeMode
 
 /** 深浅色三档的固定顺序（索引即 ChoicePillRow 的选项位）：跟随系统 / 浅色 / 深色（参考图顺序） */
 private val ThemeModeOrder = listOf(ThemeMode.SYSTEM, ThemeMode.LIGHT, ThemeMode.DARK)
+
+/** 主题引擎两档的固定顺序（索引即 ChoicePillRow 的选项位）：MD3（现行）/ MIUIX（miuix 风格） */
+private val ThemeEngineOrder = listOf(ThemeEngine.MD3, ThemeEngine.MIUIX)
 
 /** 弹层背景三档的固定顺序（索引即 ChoicePillRow 的选项位） */
 private val SheetBackdropOrder =
@@ -62,7 +67,7 @@ private val SheetBackdropOrder =
  * 外观内容（v0.7.x 视觉重构）：独立外观页已删除，本 Pane 是「外观/首页/底栏」合并页 tab0 的唯一内容。
  *
  * 结构 = **一卡一事**（对齐 04 文档 §4.1 与全 app 的 `SectionCard { 标题 + 内容 }` 范式）：
- * 深浅色 / 配色方案（含动态取色）/ 弹层背景 / 日历，四张卡。
+ * 主题引擎 / 深浅色 / 配色方案（含动态取色）/ 弹层背景 / 日历，五张卡。
  *
  * 间距阶梯（改前是 8/12/14/16/22/24dp 六种、且排序与语义无关）：
  * 卡内「标题 → 内容」8dp、「内容 → 说明」4dp，**卡与卡之间 12dp**——
@@ -90,7 +95,32 @@ fun AppearancePane(vm: AppearanceViewModel = hiltViewModel()) {
     ) {
         Spacer(Modifier.height(Spacing.s))
 
-        // ---- 卡 1：深浅色 ----
+        // ---- 卡 1：主题引擎（MD3 / MIUIX）——只换中性色/排印/形状语言，配色照常生效 ----
+        SectionCard {
+            Column {
+                Text(
+                    stringResource(R.string.appearance_engine_heading),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Spacer(Modifier.height(Spacing.s))
+                ChoicePillRow(
+                    options = ThemeEngineOrder.map { ChoicePillOption(it.iconRes(), it.labelRes()) },
+                    selected = ThemeEngineOrder.indexOf(appearance.themeEngine).coerceAtLeast(0),
+                    onSelect = { vm.setEngine(ThemeEngineOrder[it]) },
+                )
+                // 「内容 → 说明」4dp（间距阶梯）；说明只解释控件标签看不出来的事：
+                // 换引擎不影响下方配色/动态取色，否则用户会以为配色坏了
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    stringResource(R.string.appearance_engine_desc),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Spacer(Modifier.height(Spacing.m))
+
+        // ---- 卡 2：深浅色 ----
         SectionCard {
             Column {
                 Text(
@@ -107,7 +137,7 @@ fun AppearancePane(vm: AppearanceViewModel = hiltViewModel()) {
         }
         Spacer(Modifier.height(Spacing.m))
 
-        // ---- 卡 2：配色方案（+ 动态取色：两者是因果同一件事，放在同一张卡里更易理解）----
+        // ---- 卡 3：配色方案（+ 动态取色：两者是因果同一件事，放在同一张卡里更易理解）----
         SectionCard {
             Column {
                 Text(
@@ -149,7 +179,7 @@ fun AppearancePane(vm: AppearanceViewModel = hiltViewModel()) {
         }
         Spacer(Modifier.height(Spacing.m))
 
-        // ---- 卡 3：弹层背景 ----
+        // ---- 卡 4：弹层背景 ----
         SectionCard {
             Column {
                 Text(
@@ -175,7 +205,7 @@ fun AppearancePane(vm: AppearanceViewModel = hiltViewModel()) {
         }
         Spacer(Modifier.height(Spacing.m))
 
-        // ---- 卡 4：日历 ----
+        // ---- 卡 5：日历 ----
         SectionCard {
             Column {
                 Text(
@@ -198,6 +228,17 @@ private fun ThemeMode.labelRes(): Int = when (this) {
     ThemeMode.LIGHT -> R.string.appearance_theme_light
     ThemeMode.DARK -> R.string.appearance_theme_dark
     ThemeMode.SYSTEM -> R.string.appearance_theme_system
+}
+
+private fun ThemeEngine.labelRes(): Int = when (this) {
+    ThemeEngine.MD3 -> R.string.appearance_engine_md3
+    ThemeEngine.MIUIX -> R.string.appearance_engine_miuix
+}
+
+/** 主题引擎药丸图标：调色盘（MD3 = Material 配色体系）/ squircle 圆角方（MIUIX = HyperOS 图标语言） */
+private fun ThemeEngine.iconRes(): Int = when (this) {
+    ThemeEngine.MD3 -> R.drawable.ic_ms_palette
+    ThemeEngine.MIUIX -> R.drawable.ic_ms_squircle
 }
 
 private fun SheetBackdropMode.labelRes(): Int = when (this) {
@@ -290,7 +331,7 @@ private fun PaletteSwatch(
             ) {
                 if (active) {
                     Icon(
-                        painterResource(R.drawable.ic_ms_check),
+                        EngineIcons.check(),
                         contentDescription = null,
                         tint = onColorFor(discColor),
                         modifier = Modifier.size(SwatchSpec.checkIcon),

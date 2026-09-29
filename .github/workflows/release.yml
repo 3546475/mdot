@@ -1,4 +1,9 @@
 name: Release
+# 构建环境要求（工具链升级后：Kotlin 2.4.20 / AGP 9.4.1 / Gradle 9.6 / KSP 2.3.12 / compileSdk 37）
+# - JDK **21**（actions/setup-java 的 java-version）：单测 JVM 需 ≥21 加载 miuix 的 Java 21 字节码类；
+#   本地由 gradle.properties 的 org.gradle.java.installations.paths 提供，该路径是 Windows 本机路径、CI 上无效。
+# - Android SDK：compileSdk 37（runner 自带 + AGP 按需下载平台；licenses 已接受）。
+# - 依赖源：CI 环境变量存在时直连 google()/mavenCentral()（settings.gradle.kts 判定）。
 
 # 推送 v* 标签时：用 CI 密钥签名构建三包 APK → 发布到 Releases → 更新 main 上的 update.json
 # update.json 由 GitHub Pages 从 main 分支根目录直接托管（仓库 Settings → Pages → Deploy from branch）
@@ -37,7 +42,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'   # ⚠️ 必须 ≥21：miuix 库类是 Java 21 字节码，单测 JVM 用它（AGENTS「JDK 要求」/ docs/11 070）
 
       - name: Decode signing keystore
         env:

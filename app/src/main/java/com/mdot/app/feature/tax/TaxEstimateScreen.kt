@@ -1,5 +1,9 @@
 package com.mdot.app.feature.tax
 
+import com.mdot.app.core.designsystem.component.JiabanAlertDialog
+import com.mdot.app.core.designsystem.dialogContainerColor
+import com.mdot.app.core.designsystem.engineShape
+import com.mdot.app.core.designsystem.EngineIcons
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,12 +17,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.AssistChip
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -78,6 +81,8 @@ import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import com.mdot.app.domain.TaxCalculator
 import com.mdot.app.domain.util.Money
 import java.time.YearMonth
+import com.mdot.app.core.designsystem.component.JiabanIconButton
+import com.mdot.app.core.designsystem.jiabanFilterChipColors
 
 /**
  * 个税估算页（docs/20 P3-5）：入口是记月的「个人所得税（新）」行。
@@ -131,7 +136,7 @@ fun TaxEstimateScreen(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = { vm.onMonth(state.month.minusMonths(1)) }) {
+                JiabanIconButton(onClick = { vm.onMonth(state.month.minusMonths(1)) }) {
                     Icon(
                         painterResource(R.drawable.ic_ms_keyboard_arrow_left),
                         stringResource(R.string.paymonth_prev_cd),
@@ -140,7 +145,7 @@ fun TaxEstimateScreen(
                 Row(
                     Modifier
                         .widthIn(min = 120.dp)
-                        .clip(RoundedCornerShape(Radius.pill))
+                        .clip(engineShape(Radius.pill))
                         .clickable { showMonthPicker = true }
                         .padding(horizontal = Spacing.s, vertical = Spacing.xs),
                     verticalAlignment = Alignment.CenterVertically,
@@ -161,7 +166,9 @@ fun TaxEstimateScreen(
                 }
                 if (!isCurrentMonth) {
                     Spacer(Modifier.width(Spacing.xs))
-                    AssistChip(
+                    FilterChip(
+                        colors = jiabanFilterChipColors(),
+                        selected = false,
                         onClick = { vm.onMonth(YearMonth.now()) },
                         label = {
                             Text(
@@ -171,9 +178,9 @@ fun TaxEstimateScreen(
                         },
                     )
                 }
-                IconButton(onClick = { vm.onMonth(state.month.plusMonths(1)) }) {
+                JiabanIconButton(onClick = { vm.onMonth(state.month.plusMonths(1)) }) {
                     Icon(
-                        painterResource(R.drawable.ic_ms_keyboard_arrow_right),
+                        EngineIcons.chevron(),
                         stringResource(R.string.paymonth_next_cd),
                     )
                 }
@@ -252,7 +259,7 @@ fun TaxEstimateScreen(
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(Radius.small))
+                            .clip(engineShape(Radius.small))
                             .clickable { sourcesExpanded = !sourcesExpanded }
                             .padding(vertical = Spacing.xs),
                         verticalAlignment = Alignment.CenterVertically,
@@ -460,6 +467,7 @@ private fun DeductionChipGroup(
         ) {
             items.forEach { item ->
                 FilterChip(
+                    colors = jiabanFilterChipColors(),
                     selected = item.key in selected,
                     onClick = { onToggle(item.key) },
                     label = {
@@ -497,7 +505,7 @@ private fun DeductionDialog(
 ) {
     val local = remember { mutableStateListOf<String>().apply { addAll(selectedKeys) } }
     val monthly = TaxDeductionItems.ALL.filter { it.key in local }.sumOf { it.monthlyCents }
-    AlertDialog(
+    JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
         // 标题区 = 标题 + **实时合计**：合计是「选择的结果」，放最上面才看得见自己在改什么
         //（原先把合计当正文底部的脚注 + 一个正文里的小字，选的时候看不到结果）
@@ -557,7 +565,11 @@ private fun DeductionDialog(
             )
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.paymonth_cancel)) }
+            JiabanButton(
+                text = stringResource(R.string.paymonth_cancel),
+                onClick = onDismiss,
+                role = JiabanButtonRole.GHOST,
+            )
         },
     )
 }

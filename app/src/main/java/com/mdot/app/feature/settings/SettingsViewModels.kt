@@ -16,6 +16,7 @@ import com.mdot.app.domain.model.WorkSystem
 import com.mdot.app.domain.model.BottomBarConfig
 import com.mdot.app.domain.model.HomeCardsConfig
 import com.mdot.app.domain.model.Shift
+import com.mdot.app.domain.model.ThemeEngine
 import com.mdot.app.domain.model.ThemeMode
 import com.mdot.app.feature.record.toText
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -155,20 +156,25 @@ private fun AppResult<*>.messageOrSuccess(ok: String): String = when (this) {
     is AppResult.Failure -> error.toText()
 }
 
-/** 外观摘要（我的页外观行右值），如"浅色 · 抹茶绿"/"跟随系统 · 动态取色" */
+/** 外观摘要（我的页外观行右值），如"浅色 · 抹茶绿"/"跟随系统 · 动态取色"；MIUIX 引擎加前缀 */
 fun appearanceSummary(context: android.content.Context, config: AppearanceConfig): String {
     val theme = when (config.themeMode) {
         ThemeMode.LIGHT -> "浅色"
         ThemeMode.DARK -> "深色"
         ThemeMode.SYSTEM -> "跟随系统"
     }
-    if (config.dynamicColor &&
+    val core = if (config.dynamicColor &&
         android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
-    ) return "$theme · 动态取色"
-    val paletteRes = com.mdot.app.core.designsystem.paletteOptions()
-        .firstOrNull { it.first == config.paletteId }?.second
-    val palette = paletteRes?.let { context.getString(it) } ?: "自定义"
-    return "$theme · $palette"
+    ) {
+        "$theme · 动态取色"
+    } else {
+        val paletteRes = com.mdot.app.core.designsystem.paletteOptions()
+            .firstOrNull { it.first == config.paletteId }?.second
+        val palette = paletteRes?.let { context.getString(it) } ?: "自定义"
+        "$theme · $palette"
+    }
+    // MD3 是出厂默认，不加前缀（保持既有回显）；MIUIX 引擎标出来，否则摘要看不出换过引擎
+    return if (config.themeEngine == ThemeEngine.MIUIX) "MIUIX · $core" else core
 }
 
 @HiltViewModel
@@ -191,6 +197,11 @@ class AppearanceViewModel @Inject constructor(
 
     fun setMode(mode: ThemeMode) = viewModelScope.launch {
         settings.setAppearance(appearance.value.copy(themeMode = mode))
+    }
+
+    /** 主题引擎：MD3（Material3 Expressive，现行）/ MIUIX（miuix 风格引擎，v0.7.8） */
+    fun setEngine(engine: ThemeEngine) = viewModelScope.launch {
+        settings.setAppearance(appearance.value.copy(themeEngine = engine))
     }
 
     fun setPalette(id: String) = viewModelScope.launch {

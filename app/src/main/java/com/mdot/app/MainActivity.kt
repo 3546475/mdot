@@ -1,5 +1,7 @@
 package com.mdot.app
 
+import com.mdot.app.core.designsystem.component.JiabanAlertDialog
+import com.mdot.app.core.designsystem.dialogContainerColor
 import com.mdot.app.R
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -24,6 +26,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.core.designsystem.JiabanTheme
 import com.mdot.app.core.navigation.AppRoot
 import dagger.hilt.android.AndroidEntryPoint
+import com.mdot.app.core.designsystem.component.JiabanButton
+import com.mdot.app.core.designsystem.component.JiabanButtonRole
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -50,7 +54,7 @@ fun MdJiabanApp(appVm: AppViewModel = hiltViewModel()) {
     }
     crashLog?.let { log ->
         val exportLabel = stringResource(R.string.crash_export_log)
-        AlertDialog(
+        JiabanAlertDialog(containerColor = dialogContainerColor(), 
             onDismissRequest = {
                 com.mdot.app.core.util.CrashGuard.clear(context)
                 crashLog = null
@@ -58,7 +62,9 @@ fun MdJiabanApp(appVm: AppViewModel = hiltViewModel()) {
             title = { Text(stringResource(R.string.crash_dialog_title)) },
             text = { Text(stringResource(R.string.crash_dialog_text)) },
             confirmButton = {
-                TextButton(onClick = {
+                JiabanButton(
+                    text = stringResource(R.string.crash_export_log),
+                    onClick = {
                     val file = java.io.File(
                         java.io.File(context.filesDir, "crash"),
                         "last_crash.txt",
@@ -76,13 +82,19 @@ fun MdJiabanApp(appVm: AppViewModel = hiltViewModel()) {
                     )
                     com.mdot.app.core.util.CrashGuard.clear(context)
                     crashLog = null
-                }) { Text(stringResource(R.string.crash_export_log)) }
+                },
+                    role = JiabanButtonRole.GHOST,
+                )
             },
             dismissButton = {
-                TextButton(onClick = {
+                JiabanButton(
+                    text = stringResource(R.string.crash_clear),
+                    onClick = {
                     com.mdot.app.core.util.CrashGuard.clear(context)
                     crashLog = null
-                }) { Text(stringResource(R.string.crash_clear)) }
+                },
+                    role = JiabanButtonRole.GHOST,
+                )
             },
         )
     }
@@ -91,6 +103,7 @@ fun MdJiabanApp(appVm: AppViewModel = hiltViewModel()) {
     val glassEnabled by appVm.bottomBarFrosted.collectAsStateWithLifecycle()
     // 玻璃共享源（底栏/圆钮/底部悬浮提示共用采样；MainActivity 创建供全局下发）
     val backdropBlurState = com.mdot.app.core.designsystem.component.rememberBackdropBlurState()
+    val backdropFullState = com.mdot.app.core.designsystem.component.rememberBackdropBlurState()
     val firstLaunchDone by appVm.firstLaunchDone.collectAsStateWithLifecycle()
 
     JiabanTheme(appearance = appearance) {
@@ -99,12 +112,14 @@ fun MdJiabanApp(appVm: AppViewModel = hiltViewModel()) {
             com.mdot.app.core.designsystem.component.LocalSheetBackdropMode provides appearance.sheetBackdropMode,
             com.mdot.app.core.designsystem.component.LocalBackdropGlassState provides
                 if (glassEnabled) backdropBlurState else null,
+            // 无门控源（弹层/弹窗背景效果采样用，不受毛玻璃开关影响）
+            com.mdot.app.core.designsystem.component.LocalBackdropSourceState provides backdropFullState,
         ) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background,
             ) {
-                AppRoot(firstLaunchDone = firstLaunchDone, appVm = appVm, backdropBlurState = backdropBlurState)
+                AppRoot(firstLaunchDone = firstLaunchDone, appVm = appVm, backdropBlurState = backdropBlurState, backdropFullState = backdropFullState)
             }
         }
     }

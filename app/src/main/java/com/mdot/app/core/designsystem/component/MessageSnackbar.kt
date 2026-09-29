@@ -1,5 +1,6 @@
 package com.mdot.app.core.designsystem.component
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
@@ -12,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarData
@@ -109,7 +109,7 @@ fun MessageSnackbarHost(
 private fun MessageSnackbarCapsule(data: SnackbarData, isError: Boolean) {
     val accent = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     Surface(
-        shape = RoundedCornerShape(Radius.pill),
+        shape = engineShape(Radius.pill),
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
         border = BorderStroke(1.dp, accent.copy(alpha = 0.35f)),
         shadowElevation = 6.dp,

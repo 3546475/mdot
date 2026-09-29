@@ -1,5 +1,8 @@
 package com.mdot.app.feature.sync
 
+import com.mdot.app.core.designsystem.component.JiabanAlertDialog
+import com.mdot.app.core.designsystem.component.JiabanSwitch
+import com.mdot.app.core.designsystem.dialogContainerColor
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -52,6 +55,7 @@ import com.mdot.app.core.sync.S3Source
 import com.mdot.app.core.sync.WebDavCreds
 import com.mdot.app.core.sync.WebDavSource
 import kotlinx.coroutines.launch
+import com.mdot.app.core.designsystem.component.JiabanCircularProgress
 
 /** 存储源页签内容（同步备份合并页第 2 页签）：类型子页签（滑块式、内容横滑切换，同记工页点工/包工）+ 多存储源列表（新增/切换/删除/断开） */
 @Composable
@@ -279,7 +283,7 @@ private fun SourceCard(
                 }
             }
             if (testing) {
-                CircularProgressIndicator(
+                JiabanCircularProgress(
                     modifier = Modifier.size(18.dp),
                     strokeWidth = 2.dp,
                 )
@@ -321,7 +325,7 @@ private fun AddSourceDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
         title = {
             Text(
@@ -463,6 +467,6 @@ private fun TrustSelfSignedRow(checked: Boolean, onChange: (Boolean) -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(checked = checked, onCheckedChange = onChange)
+        JiabanSwitch(checked = checked, onCheckedChange = onChange)
     }
 }

@@ -2,6 +2,10 @@
 <resources>
     <!-- 外观 -->
     <string name="appearance_title">外观</string>
+    <string name="appearance_engine_heading">主题引擎</string>
+    <string name="appearance_engine_md3">MD3</string>
+    <string name="appearance_engine_miuix">MIUIX</string>
+    <string name="appearance_engine_desc">切换整套视觉语言；配色方案与动态取色照常生效</string>
     <string name="appearance_theme_heading">深浅色</string>
     <string name="appearance_theme_light">浅色</string>
     <string name="appearance_theme_dark">深色</string>

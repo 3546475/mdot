@@ -1,5 +1,7 @@
 package com.mdot.app.feature.site
 
+import com.mdot.app.core.designsystem.engineShape
+import com.mdot.app.core.designsystem.EngineIcons
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Animatable
@@ -33,7 +35,6 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -336,7 +337,7 @@ private fun RecentPreviewCard(
     onClose: () -> Unit,
     onOpenDetail: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(Radius.card)
+    val shape = engineShape(Radius.card)
     val cs = MaterialTheme.colorScheme
     val frosted = blur != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     // 底色：毛玻璃=垂直渐变半透明（上缘更透）；无模糊能力=实色回退。
@@ -432,7 +433,7 @@ private fun RecentPreviewCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .pressScale(allInteraction)
-                    .clip(RoundedCornerShape(Radius.pill))
+                    .clip(engineShape(Radius.pill))
                     .clickable(
                         interactionSource = allInteraction,
                         indication = LocalIndication.current,
@@ -446,7 +447,7 @@ private fun RecentPreviewCard(
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Icon(
-                    painterResource(R.drawable.ic_ms_keyboard_arrow_right),
+                    EngineIcons.chevron(),
                     null,
                     modifier = Modifier.size(IconSpec.inline),
                     tint = MaterialTheme.colorScheme.primary,
@@ -501,7 +502,7 @@ private fun RecordHeader(formPager: PagerState, onBack: () -> Unit, onSwitchTop:
         // 分段胶囊：滑块连续跟随表单分页（顶栏整行手势已负责横滑切上级，此处不再重复挂手势）
         Box(
             Modifier
-                .clip(RoundedCornerShape(Radius.pill))
+                .clip(engineShape(Radius.pill))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .padding(Spacing.xs),
         ) {

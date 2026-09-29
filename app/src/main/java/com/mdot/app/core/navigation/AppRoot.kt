@@ -1,6 +1,6 @@
 package com.mdot.app.core.navigation
 
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.res.stringResource
@@ -118,6 +118,7 @@ import com.mdot.app.feature.site.SiteProjectsScreen
 import com.mdot.app.feature.site.SiteProjectEditScreen
 import com.mdot.app.feature.site.SiteSettlementScreen
 import com.mdot.app.feature.site.SiteRecordScreen
+import com.mdot.app.core.designsystem.component.JiabanFab
 
 /** 内容底部避让底栏（03 文档 §4.1：滚动内容从底栏下方穿过）；
  *  无底栏形态（showBottomBar=false）只避让系统导航栏，避免底部大片空隙 */
@@ -271,7 +272,7 @@ private fun SwipeTabHost(
 
 
 @Composable
-fun AppRoot(firstLaunchDone: Boolean, appVm: AppViewModel, backdropBlurState: BackdropBlurState) {
+fun AppRoot(firstLaunchDone: Boolean, appVm: AppViewModel, backdropBlurState: BackdropBlurState, backdropFullState: BackdropBlurState) {
     // 响应式布局（docs 03 §3.2）：窗口档位全局下发（页面读 LocalWindowSpec 决定单列/双栏）；
     // 二级页统一经 AdaptiveContainer 限宽居中（下方逐页包裹）；固定一级顶栏/底栏/
     // 记录弹层/FAB 等悬浮层各自跟随内容宽度对齐
@@ -284,7 +285,7 @@ fun AppRoot(firstLaunchDone: Boolean, appVm: AppViewModel, backdropBlurState: Ba
         LocalWindowSpec provides windowSpec,
         LocalPageBackInterception provides pageBackInterception,
     ) {
-        AppRootContent(firstLaunchDone, appVm, fabSideInset, pageBackInterception, backdropBlurState)
+        AppRootContent(firstLaunchDone, appVm, fabSideInset, pageBackInterception, backdropBlurState, backdropFullState)
     }
 }
 
@@ -296,6 +297,7 @@ private fun AppRootContent(
     pageBackInterception: androidx.compose.runtime.MutableState<Boolean>,
     /** 玻璃共享源（MainActivity 创建并经 LocalBackdropGlassState 全局下发；底栏/圆钮/提示窗共用） */
     backdropBlurState: BackdropBlurState,
+    backdropFullState: BackdropBlurState,
 ) {
     val navController = rememberNavController()
     // 记录弹层 VM 为 Activity 级（弹层在 NavHost 外组合）——此处取同一实例，
@@ -342,6 +344,14 @@ private fun AppRootContent(
     Box(Modifier.fillMaxSize()) {
         // 背景层：弹层出现时整屏内容模糊 + 缩小成圆角卡片（弹层自身在最上层、不受影响）
         SheetBackdropLayer(visible = recordSheetVisible.targetState) {
+            // 全画面源（对话框背景效果采样用）：包住内容+顶栏+底栏+FAB——⚠️ 玻璃消费方
+            // （底栏/圆钮）画的是**另一个** NavHost 源的层，两源不同 RenderNode 无自引用环
+            // （docs/11 062 禁的是「效果方画自己所在的源」）。按需录制（BackdropSourceDemand）。
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .backdropBlurSource(backdropFullState)
+            ) {
             // 转场动画（03 文档 §7）：底栏 Tab=淡入淡出 200ms；层级跳转=水平滑入 300ms（返回反向）
             val isTabEntry: (androidx.navigation.NavBackStackEntry) -> Boolean =
                 { entry -> entry.destination.route?.substringBefore('?') in slots }
@@ -424,11 +434,11 @@ private fun AppRootContent(
                         SwipeTabHost(orderedSlots, currentBase, selfRoute = Routes.HOME, onNavigate = { navTo(navController, it, slots) }) {
                             HomeScreen(
                                 onOpenCalendar = { navTo(navController, Routes.CALENDAR_PATTERN, slots) },
-                                onOpenStats = { navTo(navController, Routes.statsDetail(0), slots) },
-                                onOpenDetail = { navTo(navController, Routes.statsDetail(if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) 1 else 2), slots) },
+                                onOpenStats = { navTo(navController, Routes.statsEntry(0, slots), slots) },
+                                onOpenDetail = { navTo(navController, Routes.statsEntry(if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) 1 else 2, slots), slots) },
                                 // 快捷入口的「记月」→ 记月页签（统计/记月/明细 = 0/1/2）；
                                 // 工地制度下该入口不渲染（无记月概念），故这里不必按制度分支
-                                onOpenPayMonth = { navTo(navController, Routes.statsDetail(1), slots) },
+                                onOpenPayMonth = { navTo(navController, Routes.statsEntry(1, slots), slots) },
                                 onOpenProfile = { navTo(navController, Routes.PROFILE, slots) },
                                 onOpenRecord = {
                                     if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
@@ -510,7 +520,7 @@ private fun AppRootContent(
                                 ExportScreen(
                                     canBack = !inBar("export"),
                                     onBack = { navController.popBackStack() },
-                                    onViewRecords = { navTo(navController, Routes.statsDetail(if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) 1 else 2), slots) },
+                                    onViewRecords = { navTo(navController, Routes.statsEntry(if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) 1 else 2, slots), slots) },
                                 )
                             }
                         }
@@ -638,7 +648,7 @@ private fun AppRootContent(
                                     navTo(navController, Routes.siteProjects(pick = true), slots)
                                 },
                                 onOpenSettlement = { navTo(navController, Routes.SITE_SETTLEMENT, slots) },
-                                onOpenDetail = { navTo(navController, Routes.statsDetail(1), slots) },
+                                onOpenDetail = { navTo(navController, Routes.statsEntry(1, slots), slots) },
                                 // 图表长按「记那一天」带初始日期（21 文档）
                                 initialDate = entry.arguments?.getString("date")
                                     ?.takeIf { it.isNotBlank() }
@@ -716,7 +726,11 @@ private fun AppRootContent(
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface),
+                        // 2026-09-30 用户口径：顶栏改**透明底**（MIUIX 与 MD3 一致，内容可从下方穿过可见）。
+                        // 原「不透底」（2026-09-20 用户定）作废。
+                        // ⚠️ 代价：滚动时内容会从顶栏文字/图标下方穿过；若观感不佳，可加顶栏下缘渐隐遮罩。
+                        // 毛玻璃在本结构下不可用（顶栏在共享源子树内，见 docs/11 062 自引用禁令）。
+                        .background(androidx.compose.ui.graphics.Color.Transparent),
                 ) {
                     TopLevelBar(
                         workSystem = workSystem,
@@ -797,7 +811,7 @@ private fun AppRootContent(
                     .align(Alignment.BottomEnd)
                     .padding(end = Spacing.page + fabSideInset, bottom = fabBottomPadding),
             ) {
-                FloatingActionButton(
+                JiabanFab(
                     onClick = {
                         // 工地模式：直接打开记工页（不走加班/请假弹窗）
                         if (workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
@@ -806,13 +820,14 @@ private fun AppRootContent(
                             appVm.recordSheetController.open(calSelDate)
                         }
                     },
-                    shape = RoundedCornerShape(Radius.textField),
+                    shape = engineShape(Radius.textField),
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ) {
                     Icon(painterResource(R.drawable.ic_ms_add), contentDescription = stringResource(R.string.nav_fab_cd))
                 }
             }
+        }
         }
 
         // ---- 全局底部提示（一个宿主两条消息；优先级：记录删除撤销 > 冷启动新版本）----

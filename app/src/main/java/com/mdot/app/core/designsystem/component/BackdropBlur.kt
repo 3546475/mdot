@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toIntSize
+import androidx.compose.runtime.DisposableEffect
 
 /**
  * 背景模糊（毛玻璃）共享状态：桥接「源」（被模糊的内容）与「效果方」（如悬浮底栏）。
@@ -72,6 +73,8 @@ class BackdropBlurState internal constructor() {
     internal var layer: GraphicsLayer? by mutableStateOf(null, androidx.compose.runtime.neverEqualPolicy())
     /** 源的 LayoutCoordinates（效果方据此把「身后」区域对齐到自身原点）；同上快照状态 */
     internal var sourceCoords: LayoutCoordinates? by mutableStateOf(null, androidx.compose.runtime.neverEqualPolicy())
+    /** 源所在窗口的宿主 View（跨窗口消费者用它取窗口屏幕原点：screen = positionInWindow + 窗口原点） */
+    internal var sourceView: android.view.View? = null
     /** 录制序号（**普通变量**，非快照）：源在 draw 里自增用，见 [onRecorded] 的 ⚠️ */
     private var recordSeq = 0
     /**
@@ -82,6 +85,15 @@ class BackdropBlurState internal constructor() {
      * （实测：静止不动也是 60 次/秒重录，帧 p90 24ms、19% 帧超 16ms）。
      */
     internal var recordTick by mutableIntStateOf(0)
+
+    /**
+     * 本源的**录制需求计数**：消费该源的效果方（玻璃 [backdropBlur] / 对话框背景）挂载时 +1、卸载 -1；
+     * 为 0 时源只透传不录（省一次全屏/全页重录）。
+     *
+     * ⚠️ **必须按源各自计数**：玻璃消费的是导航宿主小源、对话框背景消费的是全画面源；
+     * 用全局单计数器会让「开玻璃」连带让全画面源每帧重录（正是需求计数要省掉的开销）。
+     */
+    internal var demand by mutableIntStateOf(0)
 
     /** 源录完一帧：普通计数器自增（不产生快照观察）后，把值**只写**进快照通知 */
     internal fun onRecorded() {
@@ -99,15 +111,30 @@ val LocalBackdropGlassState = compositionLocalOf<BackdropBlurState?> { null }
 
 
 
-/** 背景模糊源：每帧把自身内容录进共享 [BackdropBlurState.layer] 并上屏。挂在「会被效果方盖住」的内容上（如导航宿主） */
+/**
+ * 背景模糊源：把自身内容录进共享 [BackdropBlurState.layer] 并上屏。挂在「会被效果方盖住」的内容上（如导航宿主）。
+ *
+ * ⚠️ 是否录制**在 draw 内读需求计数**、不做成取模参数——做成参数会让对话框开关时该 modifier 链
+ * 变更 → 内容根**重新布局一帧** → 源正好录到那一帧 = 用户看到的「点击时画面往下抖一下」
+ * （2026-09-30 日志取证：offset 恒 0，故抖动只可能来自被录内容）。draw 内读状态只触发重绘。
+ */
 fun Modifier.backdropBlurSource(state: BackdropBlurState): Modifier = composed {
     val graphicsLayer = rememberGraphicsLayer()
+    val hostView = androidx.compose.ui.platform.LocalView.current
     // 录制层实底色 = 宿主 Surface 同色（MainActivity `Surface(color = colorScheme.background)`）。
     // 缺了它 → 层里只有透明像素 + 内容元素，模糊后压不住身后锐利页面（见类注释 ⚠️⚠️）。
     val backdropColor = MaterialTheme.colorScheme.background
     this
-        .onGloballyPositioned { state.sourceCoords = it }
+        .onGloballyPositioned {
+            state.sourceCoords = it
+            state.sourceView = hostView
+        }
         .drawWithContent {
+            // 读需求计数（draw 内订阅：变化只重绘、不改 modifier 结构）
+            if (state.demand <= 0) {
+                this@drawWithContent.drawContent()
+                return@drawWithContent
+            }
             // DrawScope 作用域内的 record 重载：重定向绘制上下文到录制 canvas（见类注释 ⚠️）
             graphicsLayer.record(size.toIntSize()) {
                 // ⚠️ 先铺不透明实底，再画内容：否则层是透明的，模糊层盖不住身后锐利页面
@@ -146,6 +173,12 @@ fun Modifier.backdropBlur(
     val backdropColor = MaterialTheme.colorScheme.background
     // 效果层 + 模糊效果（Clamp 边缘；BlurEffect 可复用，radius 变化才重建）
     val layer = rememberGraphicsLayer()
+    // 玻璃消费方即录制需求方：挂载期间提高**本源**的需求计数。
+    // ⚠️ 缺了它：无对话框时源不录制 → 玻璃采到空层 → 底栏/圆钮"变透明"（2026-09-30 用户报告）
+    DisposableEffect(state) {
+        state.demand++
+        onDispose { state.demand-- }
+    }
     val blurEffect = remember(radius) {
         BlurEffect(with(density) { radius.toPx() }, with(density) { radius.toPx() }, TileMode.Clamp)
     }

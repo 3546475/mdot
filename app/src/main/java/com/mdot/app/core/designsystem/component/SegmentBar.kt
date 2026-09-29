@@ -1,5 +1,6 @@
 package com.mdot.app.core.designsystem.component
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -13,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -60,7 +60,17 @@ fun SegmentBar(
     trackSunken: Boolean = true,
 ) {
     val gap = 4.dp
-    val pillShape = RoundedCornerShape(Radius.pill)
+    val pillShape = engineShape(Radius.pill)
+    // 滑块配色随引擎：MD3 = 强调色浮起（用户 2026-09-21 定稿）；MIUIX = 白卡浮起 + 深色字
+    // （HyperOS 分段观感：灰凹槽里浮白滑块，对齐 miuix Switch/TabRow 的白件语言）
+    val sliderColor = when (Radius.engine) {
+        com.mdot.app.domain.model.ThemeEngine.MIUIX -> MaterialTheme.colorScheme.surfaceContainer
+        com.mdot.app.domain.model.ThemeEngine.MD3 -> MaterialTheme.colorScheme.primaryContainer
+    }
+    val selectedTextColor = when (Radius.engine) {
+        com.mdot.app.domain.model.ThemeEngine.MIUIX -> MaterialTheme.colorScheme.onSurface
+        com.mdot.app.domain.model.ThemeEngine.MD3 -> MaterialTheme.colorScheme.onPrimaryContainer
+    }
     Box(
         modifier
             .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier)
@@ -80,14 +90,14 @@ fun SegmentBar(
             } else {
                 segWidth
             }
-            val pillShape = RoundedCornerShape(Radius.pill)
+            val pillShape = engineShape(Radius.pill)
             Box(
                 Modifier
                     .width(seg)
                     .height(34.dp)
                     .offset(x = (seg + gap) * position)
                     .clip(pillShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .background(sliderColor),
             )
             Row(
                 Modifier.height(34.dp),
@@ -110,7 +120,7 @@ fun SegmentBar(
                             label,
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (sel) MaterialTheme.colorScheme.onPrimaryContainer
+                            color = if (sel) selectedTextColor
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                         )

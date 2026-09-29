@@ -21,6 +21,19 @@ object Routes {
 
     fun statsDetail(tab: Int): String = "statsDetail?tab=$tab"
 
+    /**
+     * 统计宿主（统计/记月/明细三个页签）入口的**路由选择**：底栏槽位里有统计 ⇒ 走一级 `stats?tab=N`
+     * （就是底栏那一级页实例：有底栏、Tab 式切换、无返回）；否则走二级 `statsDetail?tab=N`（带返回）。
+     *
+     * 两段历史要求合起来正好是这条规则（改前先看清，别只满足一边）：
+     * ① 统计**不在**底栏时若落进一级实例 ⇒ 没底栏也没返回（用户报过「误入底栏实例、没有返回」
+     *    ⇒ 当时才造的 `statsDetail`）；
+     * ② 统计**在**底栏时若仍一律走二级 ⇒ 首页统计卡片点进去变二级页，用户报
+     *    「统计在底栏时应当去底栏的一级统计页面而不是二级页面」（2026-09-30）。
+     */
+    fun statsEntry(tab: Int, slots: Set<String>): String =
+        if (STATS in slots) stats(tab) else statsDetail(tab)
+
     fun stats(tab: Int): String = if (tab <= 0) STATS else "stats?tab=$tab"
     const val EXPORT = "export"
     const val SYNC = "sync"

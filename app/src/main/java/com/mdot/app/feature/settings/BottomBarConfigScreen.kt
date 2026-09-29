@@ -1,5 +1,8 @@
 package com.mdot.app.feature.settings
 
+import com.mdot.app.core.designsystem.miuix.ConfigRowIcon
+import com.mdot.app.core.designsystem.component.JiabanSwitch
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -22,12 +25,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -276,7 +277,7 @@ private fun SlotConfigCard(
     val haptic = LocalHapticFeedback.current
 
     Surface(
-        shape = RoundedCornerShape(Radius.card),
+        shape = engineShape(Radius.card),
         color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -305,7 +306,7 @@ private fun SlotConfigCard(
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .height(56.dp)
+                            .height(com.mdot.app.core.designsystem.component.TopBarHeight)
                             .graphicsLayer {
                                 translationY = if (isDragged) dragY else 0f
                                 scaleX = dragScale
@@ -405,8 +406,9 @@ private fun SlotConfigRowContent(
         animationSpec = colorSpec,
         label = "slotRowContent",
     )
-    // 图标方块底色随开关浅深（secondaryContainer ⇄ surfaceContainerHighest）
-    // ——**与首页卡片配置行完全一致**（同一屏的两个页签，视觉必须同款；用户 2026-09-22 指出缺底）
+    // 瓦片底色随开关浅深（secondaryContainer ⇄ surfaceContainerHighest）——**仅 MD3 用**（见 [ConfigRowIcon]）。
+    // 2026-09-30 用户定：MIUIX 改裸图标（与「我的」页统一）；此前 2026-09-22 曾要求补底，
+    // 两次决定均出自用户，后者（裸图标）为最新。
     val iconBoxColor by animateColorAsState(
         targetValue = if (isOn) MaterialTheme.colorScheme.secondaryContainer
         else MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -420,20 +422,8 @@ private fun SlotConfigRowContent(
             .padding(horizontal = Spacing.l),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // 图标方块：盒+图标成对（IconBoxSpec.tile = 36dp + 20dp）+ 圆角 Radius.small
-        Box(
-            modifier = Modifier
-                .size(IconBoxSpec.tile.box)
-                .background(iconBoxColor, RoundedCornerShape(Radius.small)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                painterResource(spec.iconRes),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(IconBoxSpec.tile.icon),
-            )
-        }
+        // 行图标：MIUIX 裸图标（与「我的」页统一，用户 2026-09-30）/ MD3 瓦片（底色随开关浅深）
+        ConfigRowIcon(icon = painterResource(spec.iconRes), tileColor = iconBoxColor)
         Spacer(Modifier.width(Spacing.m))
         Text(
             stringResource(spec.labelRes),
@@ -441,7 +431,7 @@ private fun SlotConfigRowContent(
             color = contentColor,
             modifier = Modifier.weight(1f),
         )
-        Switch(
+        JiabanSwitch(
             checked = isOn,
             onCheckedChange = { onToggle() },
             enabled = true,

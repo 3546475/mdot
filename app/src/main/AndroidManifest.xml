@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- miuix-blur 声明 minSdk 33（AGSL RuntimeShader 需要）；本 App minSdk 29 兼容面不砍——
+         overrideLibrary 强接，其 blur 能力一律 SDK_INT >= 33 守卫后才用，
+         低版本继续走自有 BackdropBlur/SheetBackdrop 管线（31 以下自动回退压暗）。 -->
+    <uses-sdk tools:overrideLibrary="top.yukonga.miuix.kmp.blur" />
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />

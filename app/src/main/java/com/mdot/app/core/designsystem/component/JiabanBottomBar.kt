@@ -1,5 +1,6 @@
 package com.mdot.app.core.designsystem.component
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
@@ -22,7 +23,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.annotation.DrawableRes
 import androidx.compose.material3.Icon
 import androidx.compose.ui.res.painterResource
@@ -51,6 +51,8 @@ import com.mdot.app.core.designsystem.BottomBarSpec
 import com.mdot.app.core.designsystem.GlassCardSpec
 import com.mdot.app.core.designsystem.Radius
 import kotlin.math.roundToInt
+import top.yukonga.miuix.kmp.basic.NavigationBarDefaults
+import com.mdot.app.domain.model.ThemeEngine
 
 /** 底栏功能池槽位定义（03 文档 §4.2）；MD3E：图标为 Material Symbols Rounded 单色形状，选中态由 tint（onSecondaryContainer/primary）+ 弹性放大区分。label 为资源 id，显示点用 stringResource 解析 */
 data class SlotSpec(
@@ -125,7 +127,7 @@ fun JiabanBottomBar(
         androidx.compose.runtime.derivedStateOf { progress.value <= 0f }
     }
     if (!visible && fullyHidden) return
-    val shape = RoundedCornerShape(Radius.bar)
+    val shape = engineShape(Radius.bar)
     val cs = MaterialTheme.colorScheme
     // 毛玻璃：半透明渐变底色透出模糊内容；无模糊能力（API<31）回退高不透明保证可读性
     val frosted = backdropBlur != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
@@ -232,7 +234,10 @@ fun JiabanBottomBar(
             }
 
             // 滑动胶囊：M3 Expressive 活动指示，弹簧滑动到目标槽位
-            if (showIndicator && barWidth > 0 && selectedIndex >= 0 && slots.isNotEmpty()) {
+            // MIUIX：库 NavigationBar 没有滑动指示条（选中靠色彩/字重表达）→ 跳过 M3 胶囊指示
+            if (showIndicator && Radius.engine != ThemeEngine.MIUIX &&
+                barWidth > 0 && selectedIndex >= 0 && slots.isNotEmpty()
+            ) {
                 // 胶囊数学用实际槽位数（固定长度档下槽位在固定宽内等分，与 Row 的 weight 一致）
                 val centerW = if (centerAction != null) barWidth.toFloat() / actualCells else 0f
                 val cellPx = (barWidth.toFloat() - centerW) / slots.size
@@ -253,7 +258,7 @@ fun JiabanBottomBar(
                         .align(Alignment.CenterStart)
                         .offset { IntOffset(left.roundToInt(), 0) }
                         .size(width = with(density) { pillW.toDp() }, height = with(density) { pillH.toDp() })
-                        .background(pillColor, RoundedCornerShape(Radius.pill)),
+                        .background(pillColor, engineShape(Radius.pill)),
                 )
             }
 
@@ -329,16 +334,25 @@ private fun SlotBody(
     selected: Boolean,
     iconOnly: Boolean,
 ) {
+    // MIUIX：对齐库 NavigationBarItem 的色彩语义——选中 = 强调色，未选 = onSurface × 库的
+    // UnselectedAlpha(0.4)（库靠透明度而非另一种灰度表达"未选中"）；MD3 保持原观感
+    val miuix = Radius.engine == ThemeEngine.MIUIX
     val tint by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
-        else MaterialTheme.colorScheme.onSurfaceVariant,
+        targetValue = if (miuix) {
+            if (selected) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurface.copy(alpha = NavigationBarDefaults.UnselectedAlpha)
+        } else if (selected) {
+            MaterialTheme.colorScheme.onSecondaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
         animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
         label = "slotTint",
     )
     // MD3E：图标放大走 motionScheme 空间 spec
     val scaleSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
     val iconScale by animateFloatAsState(
-        targetValue = if (selected) 1.1f else 1f,
+        targetValue = if (!miuix && selected) 1.1f else 1f,
         animationSpec = scaleSpec,
         label = "slotIconScale",
     )
@@ -352,7 +366,7 @@ private fun SlotBody(
             contentDescription = stringResource(slot.labelRes),
             tint = tint,
             modifier = Modifier
-                .size(IconSpec.bar)
+                .size(if (miuix) NavigationBarDefaults.IconSize else IconSpec.bar)
                 .graphicsLayer {
                     scaleX = iconScale
                     scaleY = iconScale
@@ -362,9 +376,15 @@ private fun SlotBody(
             Spacer(Modifier.height(2.dp))
             Text(
                 text = stringResource(slot.labelRes),
-                style = if (selected) MaterialTheme.typography.labelMedium
+                style = if (!miuix && selected) MaterialTheme.typography.labelMedium
                 else MaterialTheme.typography.labelSmall,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                fontWeight = if (miuix) {
+                    if (selected) FontWeight.Bold else FontWeight.Normal
+                } else if (selected) {
+                    FontWeight.SemiBold
+                } else {
+                    FontWeight.Normal
+                },
                 color = tint,
             )
         }

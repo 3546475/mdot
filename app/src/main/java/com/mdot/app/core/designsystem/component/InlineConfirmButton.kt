@@ -1,5 +1,6 @@
 package com.mdot.app.core.designsystem.component
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -21,7 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -143,7 +143,7 @@ fun InlineConfirmButton(
     val burn = remember(resetKey) { Animatable(1f) }
     val density = LocalDensity.current
     val cs = MaterialTheme.colorScheme
-    val pill = RoundedCornerShape(Radius.pill)
+    val pill = engineShape(Radius.pill)
     val colorSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Color>()
     // fastSpatialSpec 是 @Composable 泛型函数，须显式 <Float> 且在 Composable 上下文先取值
     val widthSpec = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
@@ -360,7 +360,7 @@ private fun AskingRow(
         val cancelInteraction = remember { MutableInteractionSource() }
         Box(
             Modifier
-                .clip(RoundedCornerShape(Radius.pill))
+                .clip(engineShape(Radius.pill))
                 .pressScale(cancelInteraction)
                 .clickable(
                     interactionSource = cancelInteraction,
@@ -378,7 +378,7 @@ private fun AskingRow(
         val confirmInteraction = remember { MutableInteractionSource() }
         Box(
             Modifier
-                .clip(RoundedCornerShape(Radius.pill))
+                .clip(engineShape(Radius.pill))
                 .pressScale(confirmInteraction)
                 .background(cs.error)
                 .clickable(

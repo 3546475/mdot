@@ -1,5 +1,6 @@
 package com.mdot.app.feature.site
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -77,6 +77,10 @@ import com.mdot.app.core.util.onSuccess
 import com.mdot.app.core.util.onFailure
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.mdot.app.core.designsystem.component.JiabanButton
+import com.mdot.app.core.designsystem.component.JiabanButtonRole
+import com.mdot.app.core.designsystem.component.LocalDialogButtonNative
+import com.mdot.app.core.designsystem.component.FloatingLabelTextField
 
 /** 新建（未设置）项目的默认点工标准展示值：8 小时 = 1 个工 = 260 元 */
 private const val DEFAULT_BASE_HOURS_TEXT = "8"
@@ -223,13 +227,12 @@ fun SiteProjectEditScreen(
 
                 // ---- 项目名 ----
                 SectionCard {
-                    OutlinedTextField(
-                        shape = RoundedCornerShapeField,
+                    FloatingLabelTextField(
                         value = state.name,
                         onValueChange = vm::onName,
-                        label = { Text(stringResource(R.string.site_project_name_label)) },
-                        singleLine = true,
+                        label = stringResource(R.string.site_project_name_label),
                         modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShapeField,
                     )
                 }
                 Spacer(Modifier.height(Spacing.m))
@@ -240,7 +243,7 @@ fun SiteProjectEditScreen(
                         Box(
                             Modifier
                                 .size(IconBoxSpec.tile.box)
-                                .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(Radius.small)),
+                                .background(MaterialTheme.colorScheme.secondaryContainer, engineShape(Radius.small)),
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
@@ -269,10 +272,12 @@ fun SiteProjectEditScreen(
                 }
                 Spacer(Modifier.height(Spacing.l))
 
-                Button(
+                JiabanButton(
+                    text = stringResource(R.string.site_save),
                     onClick = { vm.save(onDone = onBack) },
+                    role = JiabanButtonRole.PRIMARY,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text(stringResource(R.string.site_save)) }
+                )
 
                 Spacer(Modifier.height(Spacing.m))
                 // 删除/归档项目：原地确认（确认后返回列表，归档项可在「已归档区」一键恢复，故无需 toast 撤销）
@@ -371,7 +376,7 @@ internal fun ProjectStandardDialog(
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Row(
                 Modifier
-                    .clip(RoundedCornerShape(Radius.pill))
+                    .clip(engineShape(Radius.pill))
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .padding(Spacing.xs),
             ) {
@@ -405,17 +410,25 @@ internal fun ProjectStandardDialog(
         )
         Spacer(Modifier.height(Spacing.m))
 
+        // 自绘对话框卡片：按钮在 MD3 下按「以前的」原生样式渲染；MIUIX 仍走库按钮
+        androidx.compose.runtime.CompositionLocalProvider(LocalDialogButtonNative provides true) {
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Spacing.m),
         ) {
-            TextButton(onClick = dismiss, modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.site_dialog_cancel))
-            }
-            Button(
-                onClick = { onApply(baseHours, rateYuan, mode, otBaseHours, otHourlyYuan) },
+            JiabanButton(
+                text = stringResource(R.string.site_dialog_cancel),
+                onClick = dismiss,
+                role = JiabanButtonRole.GHOST,
                 modifier = Modifier.weight(1f),
-            ) { Text(stringResource(R.string.site_dialog_ok)) }
+            )
+            JiabanButton(
+                text = stringResource(R.string.site_dialog_ok),
+                onClick = { onApply(baseHours, rateYuan, mode, otBaseHours, otHourlyYuan) },
+                role = JiabanButtonRole.PRIMARY,
+                modifier = Modifier.weight(1f),
+            )
+        }
         }
     }
 }
@@ -431,7 +444,7 @@ private fun EquationCard(
             Box(
                 Modifier
                     .size(IconBoxSpec.tile.box)
-                    .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(Radius.small)),
+                    .background(MaterialTheme.colorScheme.secondaryContainer, engineShape(Radius.small)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -478,4 +491,4 @@ private fun EqField(value: String, onValueChange: (String) -> Unit, width: Dp) {
     )
 }
 
-private val RoundedCornerShapeField = RoundedCornerShape(Radius.textField)
+private val RoundedCornerShapeField = engineShape(Radius.textField)

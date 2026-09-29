@@ -1,5 +1,8 @@
 package com.mdot.app.feature.settings
 
+import com.mdot.app.core.designsystem.component.JiabanAlertDialog
+import com.mdot.app.core.designsystem.dialogContainerColor
+import com.mdot.app.core.designsystem.engineShape
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -81,6 +83,13 @@ import com.mdot.app.core.designsystem.component.MessageSnackbarHost
 import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 
 import kotlin.math.max
+import com.mdot.app.core.designsystem.component.JiabanButton
+import com.mdot.app.core.designsystem.component.JiabanButtonRole
+import com.mdot.app.core.designsystem.component.JiabanRadioButton
+import com.mdot.app.core.designsystem.component.JiabanCircularProgress
+import com.mdot.app.core.designsystem.component.FloatingLabelTextField
+import com.mdot.app.core.designsystem.emphasisCardSurface
+import com.mdot.app.core.designsystem.emphasisCardInk
 
 /** 更新与数据源（F7-9 / F8-1）：hero 版本卡（检查更新 + from 源选择胶囊，弹窗内选择/添加更新源）+ 节假日库卡，与首页/统计 hero 同视觉体系 */
 @Composable
@@ -126,11 +135,11 @@ fun DataSourceScreen(
                     Button(
                         onClick = vm::refreshHoliday,
                         enabled = !busy,
-                        shape = RoundedCornerShape(Radius.pill),
+                        shape = engineShape(Radius.pill),
                         contentPadding = PaddingValues(horizontal = Spacing.l, vertical = Spacing.s),
                     ) {
                         if (busy) {
-                            CircularProgressIndicator(
+                            JiabanCircularProgress(
                                 modifier = Modifier.size(18.dp),
                                 strokeWidth = 2.dp,
                                 color = LocalContentColor.current,
@@ -210,7 +219,7 @@ internal fun UpdateHeroCard(
 
     when (UPDATE_HERO_STYLE) {
         UpdateHeroStyle.Classic -> SectionCard(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            containerColor = emphasisCardSurface(),
         ) {
             UpdateHeroContent(
                 versionText = versionText,
@@ -255,7 +264,7 @@ internal fun UpdateHeroCard(
                         Spacer(Modifier.width(Spacing.s))
                         StarBand(
                             shift = starShift,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            tint = emphasisCardInk(),
                             accent = MaterialTheme.colorScheme.tertiary,
                             modifier = Modifier.weight(1f),
                         )
@@ -304,7 +313,7 @@ private fun UpdateHeroContent(
     onPickSource: () -> Unit,
     titleTrailing: (@Composable androidx.compose.foundation.layout.RowScope.() -> Unit)? = null,
 ) {
-    val onContainer = MaterialTheme.colorScheme.onPrimaryContainer
+    val onContainer = emphasisCardInk()
     Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -339,10 +348,10 @@ private fun UpdateHeroContent(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(Radius.pill))
+                        .clip(engineShape(Radius.pill))
                         .padding(horizontal = Spacing.s, vertical = Spacing.xs),
                 ) {
-                    CircularProgressIndicator(
+                    JiabanCircularProgress(
                         progress = { updateState.progress / 100f },
                         modifier = Modifier.size(18.dp),
                         strokeWidth = 2.dp,
@@ -376,7 +385,7 @@ private fun UpdateHeroContent(
                 Spacer(Modifier.width(Spacing.xs))
                 Button(
                     onClick = onPickSource,
-                    shape = RoundedCornerShape(Radius.pill),
+                    shape = engineShape(Radius.pill),
                     contentPadding = PaddingValues(horizontal = Spacing.m, vertical = Spacing.xs),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = onContainer.copy(alpha = 0.12f),
@@ -410,7 +419,7 @@ private fun UpdateActionButton(
     onInstall: () -> Unit,
     onBackgroundDownload: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(Radius.pill)
+    val shape = engineShape(Radius.pill)
     // 进行中状态视觉不变（primary 底 + onPrimary 内容），enabled=false 只拦截点击
     val activeColors = ButtonDefaults.buttonColors(
         containerColor = MaterialTheme.colorScheme.primary,
@@ -548,7 +557,7 @@ private fun ButtonSpinner(
     ) {
         val p = progress
         if (p != null) {
-            CircularProgressIndicator(
+            JiabanCircularProgress(
                 progress = { p },
                 modifier = Modifier.size(14.dp),
                 strokeWidth = 1.5.dp,
@@ -556,7 +565,7 @@ private fun ButtonSpinner(
                 trackColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f),
             )
         } else {
-            CircularProgressIndicator(
+            JiabanCircularProgress(
                 modifier = Modifier.size(14.dp),
                 strokeWidth = 1.5.dp,
                 color = MaterialTheme.colorScheme.onPrimary,
@@ -587,7 +596,7 @@ private fun UrlPicker(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(Radius.small))
+                    .clip(engineShape(Radius.small))
                     .background(
                         if (isSel) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
                         else Color.Transparent
@@ -596,7 +605,7 @@ private fun UrlPicker(
                     .padding(horizontal = Spacing.s, vertical = Spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                RadioButton(selected = isSel, onClick = { onSelect(url) })
+                JiabanRadioButton(selected = isSel, onClick = { onSelect(url) })
                 Text(
                     url,
                     style = MaterialTheme.typography.bodySmall,
@@ -619,7 +628,7 @@ private fun UrlPicker(
         Spacer(Modifier.height(Spacing.s))
         OutlinedButton(
             onClick = { showAdd = true },
-            shape = RoundedCornerShape(Radius.pill),
+            shape = engineShape(Radius.pill),
             contentPadding = PaddingValues(horizontal = Spacing.l, vertical = Spacing.s),
         ) {
             Icon(painterResource(R.drawable.ic_ms_add), null, Modifier.size(IconSpec.inline))
@@ -629,29 +638,33 @@ private fun UrlPicker(
     }
     if (showAdd) {
         var text by remember { mutableStateOf("") }
-        AlertDialog(
+        JiabanAlertDialog(containerColor = dialogContainerColor(), 
             onDismissRequest = { showAdd = false },
             title = { Text(stringResource(R.string.datasource_add_url)) },
             text = {
-                OutlinedTextField(
+                FloatingLabelTextField(
                     value = text,
                     onValueChange = { text = it },
-                    label = { Text(stringResource(R.string.datasource_add_url_hint)) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(Radius.textField),
+                    label = stringResource(R.string.datasource_add_url_hint),
                 )
             },
             confirmButton = {
-                TextButton(
-                    enabled = text.isNotBlank(),
+                JiabanButton(
+                    text = stringResource(R.string.datasource_ok),
                     onClick = {
                         onAdd(text)
                         showAdd = false
                     },
-                ) { Text(stringResource(R.string.datasource_ok)) }
+                    role = JiabanButtonRole.GHOST,
+                    enabled = text.isNotBlank(),
+                )
             },
             dismissButton = {
-                TextButton(onClick = { showAdd = false }) { Text(stringResource(R.string.datasource_cancel)) }
+                JiabanButton(
+                    text = stringResource(R.string.datasource_cancel),
+                    onClick = { showAdd = false },
+                    role = JiabanButtonRole.GHOST,
+                )
             },
         )
     }
@@ -668,7 +681,7 @@ private fun UpdateSourcePickerDialog(
     onDismiss: () -> Unit,
 ) {
     var showAdd by remember { mutableStateOf(false) }
-    AlertDialog(
+    JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.datasource_source_picker_title)) },
         text = {
@@ -681,12 +694,12 @@ private fun UpdateSourcePickerDialog(
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(Radius.small))
+                            .clip(engineShape(Radius.small))
                             .clickable(onClick = { onSelect(url) })
                             .padding(horizontal = Spacing.xs, vertical = Spacing.s),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        RadioButton(selected = url == selected, onClick = null)
+                        JiabanRadioButton(selected = url == selected, onClick = null)
                         Column(Modifier.weight(1f).padding(start = Spacing.s)) {
                             Text(
                                 sourceDisplayName(url),
@@ -717,7 +730,7 @@ private fun UpdateSourcePickerDialog(
                 Spacer(Modifier.height(Spacing.xs))
                 OutlinedButton(
                     onClick = { showAdd = true },
-                    shape = RoundedCornerShape(Radius.pill),
+                    shape = engineShape(Radius.pill),
                     contentPadding = PaddingValues(horizontal = Spacing.l, vertical = Spacing.s),
                 ) {
                     Icon(painterResource(R.drawable.ic_ms_add), null, Modifier.size(IconSpec.inline))
@@ -727,23 +740,25 @@ private fun UpdateSourcePickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.datasource_cancel)) }
+            JiabanButton(
+                text = stringResource(R.string.datasource_cancel),
+                onClick = onDismiss,
+                role = JiabanButtonRole.GHOST,
+            )
         },
     )
     if (showAdd) {
         var text by remember { mutableStateOf("") }
         val t = text.trim()
         val dup = t.isNotEmpty() && t in urls
-        AlertDialog(
+        JiabanAlertDialog(containerColor = dialogContainerColor(), 
             onDismissRequest = { showAdd = false },
             title = { Text(stringResource(R.string.datasource_add_url)) },
             text = {
-                OutlinedTextField(
+                FloatingLabelTextField(
                     value = text,
                     onValueChange = { text = it },
-                    label = { Text(stringResource(R.string.datasource_add_url_hint)) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(Radius.textField),
+                    label = stringResource(R.string.datasource_add_url_hint),
                     isError = dup,
                     supportingText = if (dup) {
                         { Text(stringResource(R.string.datasource_add_url_dup)) }
@@ -751,16 +766,22 @@ private fun UpdateSourcePickerDialog(
                 )
             },
             confirmButton = {
-                TextButton(
-                    enabled = (t.startsWith("http://") || t.startsWith("https://")) && !dup,
+                JiabanButton(
+                    text = stringResource(R.string.datasource_ok),
                     onClick = {
                         onAdd(t)
                         showAdd = false
                     },
-                ) { Text(stringResource(R.string.datasource_ok)) }
+                    role = JiabanButtonRole.GHOST,
+                    enabled = (t.startsWith("http://") || t.startsWith("https://")),
+                )
             },
             dismissButton = {
-                TextButton(onClick = { showAdd = false }) { Text(stringResource(R.string.datasource_cancel)) }
+                JiabanButton(
+                    text = stringResource(R.string.datasource_cancel),
+                    onClick = { showAdd = false },
+                    role = JiabanButtonRole.GHOST,
+                )
             },
         )
     }

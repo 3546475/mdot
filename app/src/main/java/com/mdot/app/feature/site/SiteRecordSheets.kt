@@ -1,5 +1,6 @@
 package com.mdot.app.feature.site
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -7,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +27,10 @@ import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.feature.record.DurationGrid
 import java.time.LocalDate
+import com.mdot.app.core.designsystem.component.JiabanButton
+import com.mdot.app.core.designsystem.component.JiabanButtonRole
+import com.mdot.app.core.designsystem.component.LocalDialogButtonNative
+import com.mdot.app.core.designsystem.component.FloatingLabelTextField
 
 /**
  * 记工页弹层集合：多选日期、选工天/选小时（复用记加班时长网格）、备注、工量单位选择。
@@ -101,24 +105,34 @@ internal fun HourInputDialog(
 internal fun NoteDialog(initial: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var text by remember { mutableStateOf(initial) }
     SiteBottomSheet(title = stringResource(R.string.site_note), onDismiss = onDismiss) { dismiss ->
-        OutlinedTextField(
+        FloatingLabelTextField(
             value = text,
             onValueChange = { text = it.take(100) },
-            placeholder = { Text(stringResource(R.string.site_note_hint)) },
+            label = "",
+            placeholder = stringResource(R.string.site_note_hint),
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(Radius.textField),
         )
         Spacer(Modifier.height(Spacing.m))
+        // 自绘弹层：按钮在 MD3 下按「以前的」原生样式渲染（M3 Button/OutlinedButton）；
+        // MIUIX 下该标记被 JiabanButton 忽略、仍走库按钮（与 JiabanAlertDialog 同一机制）
+        androidx.compose.runtime.CompositionLocalProvider(LocalDialogButtonNative provides true) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(Spacing.m),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            TextButton(onClick = dismiss, modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.site_dialog_cancel))
-            }
-            Button(onClick = { onConfirm(text) }, modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.site_dialog_ok))
-            }
+            JiabanButton(
+                text = stringResource(R.string.site_dialog_cancel),
+                onClick = dismiss,
+                role = JiabanButtonRole.GHOST,
+                modifier = Modifier.weight(1f),
+            )
+            JiabanButton(
+                text = stringResource(R.string.site_dialog_ok),
+                onClick = { onConfirm(text) },
+                role = JiabanButtonRole.PRIMARY,
+                modifier = Modifier.weight(1f),
+            )
+        }
         }
     }
 }
@@ -142,16 +156,24 @@ internal fun UnitPickerSheet(current: String, onSelect: (String) -> Unit, onDism
             }
         }
         Spacer(Modifier.height(Spacing.m))
+        androidx.compose.runtime.CompositionLocalProvider(LocalDialogButtonNative provides true) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(Spacing.m),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            TextButton(onClick = dismiss, modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.site_dialog_cancel))
-            }
-            Button(onClick = { onSelect(pending) }, modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.site_dialog_ok))
-            }
+            JiabanButton(
+                text = stringResource(R.string.site_dialog_cancel),
+                onClick = dismiss,
+                role = JiabanButtonRole.GHOST,
+                modifier = Modifier.weight(1f),
+            )
+            JiabanButton(
+                text = stringResource(R.string.site_dialog_ok),
+                onClick = { onSelect(pending) },
+                role = JiabanButtonRole.PRIMARY,
+                modifier = Modifier.weight(1f),
+            )
+        }
         }
     }
 }

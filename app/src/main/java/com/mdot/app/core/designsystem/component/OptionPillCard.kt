@@ -1,5 +1,6 @@
 package com.mdot.app.core.designsystem.component
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterExitState
@@ -153,7 +154,7 @@ fun OptionPillCard(
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(OptionPillSpec.slabRadius))
+                        .clip(engineShape(OptionPillSpec.slabRadius))
                         .background(slabColor())
                         .padding(OptionPillSpec.listPadding),
                 ) {
@@ -246,7 +247,7 @@ private fun OptionPill(
             .height(OptionPillSpec.pillHeight)
             // 缩放层必须包住后面的实底与内容：graphicsLayer 只作用于它**之后**的那一层
             .pressScale(interaction)
-            .clip(RoundedCornerShape(OptionPillSpec.slabRadius))
+            .clip(engineShape(OptionPillSpec.slabRadius))
             .background(slab)
             // 药丸上已无文字（见本函数 KDoc），无障碍名称改从这里给：
             // 屏幕阅读器仍能报出「More，按钮」，不会变成一颗只有图标的无名控件。
@@ -465,7 +466,7 @@ private fun OptionRow(
                 alpha = progress.coerceIn(0f, 1f)
                 translationY = (1f - progress) * enterPx
             }
-            .clip(RoundedCornerShape(OptionPillSpec.rowRadius))
+            .clip(engineShape(OptionPillSpec.rowRadius))
             .background(fill)
             .toggleable(
                 value = item.checked,
@@ -497,6 +498,6 @@ private fun OptionRow(
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f),
         )
-        Switch(checked = item.checked, onCheckedChange = null)
+        JiabanSwitch(checked = item.checked, onCheckedChange = null)
     }
 }

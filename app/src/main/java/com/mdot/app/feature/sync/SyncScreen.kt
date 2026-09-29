@@ -1,5 +1,8 @@
 package com.mdot.app.feature.sync
 
+import com.mdot.app.core.designsystem.component.JiabanAlertDialog
+import com.mdot.app.core.designsystem.component.JiabanSwitch
+import com.mdot.app.core.designsystem.dialogContainerColor
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -20,12 +23,9 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,6 +60,7 @@ import com.mdot.app.domain.util.TimeUtils
 import java.time.Instant
 import java.time.ZoneId
 import kotlinx.coroutines.launch
+import com.mdot.app.core.designsystem.component.JiabanCircularProgress
 
 private fun selectedSourceName2(state: SyncUiState): String? {
     val selected = state.sources.selectedId ?: return null
@@ -145,7 +146,7 @@ fun SyncScreen(
         }
         // ---- 云端恢复确认卡 ----
             state.confirmRestore?.let { summary ->
-                    AlertDialog(
+                    JiabanAlertDialog(containerColor = dialogContainerColor(), 
                         onDismissRequest = vm::cancelRestore,
                         title = { Text(stringResource(R.string.sync_restore_confirm_title)) },
                         text = {
@@ -179,7 +180,7 @@ fun SyncScreen(
 
                 // ---- 本地文件恢复确认卡 ----
                 state.pendingLocal?.let { pending ->
-                    AlertDialog(
+                    JiabanAlertDialog(containerColor = dialogContainerColor(), 
                         onDismissRequest = vm::cancelLocalRestore,
                         title = { Text(stringResource(R.string.sync_local_restore_confirm_title)) },
                         text = {
@@ -194,9 +195,12 @@ fun SyncScreen(
                         },
                         confirmButton = {
                             // 危险确认（error 色）暂留原样：危险色按钮变体随第三批对话框统一收敛
-                            TextButton(
-                                onClick = vm::confirmLocalRestore,
-                            ) { Text(stringResource(R.string.sync_local_restore_confirm_action), color = MaterialTheme.colorScheme.error) }
+                            JiabanButton(
+                                    text = stringResource(R.string.sync_local_restore_confirm_action),
+                                    onClick = vm::confirmLocalRestore,
+                                    role = JiabanButtonRole.GHOST,
+                                    contentColorOverride = MaterialTheme.colorScheme.error,
+                                )
                         },
                         dismissButton = {
                             JiabanButton(
@@ -211,7 +215,7 @@ fun SyncScreen(
 
                 // ---- 本地恢复完成：提示重启 ----
                 if (state.restartRequired) {
-                    AlertDialog(
+                    JiabanAlertDialog(containerColor = dialogContainerColor(), 
                         onDismissRequest = vm::dismissRestart,
                         title = { Text(stringResource(R.string.sync_restart_title)) },
                         text = {
@@ -288,7 +292,7 @@ private fun SyncTabPage(
                 Modifier.fillMaxWidth().height(240.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator(Modifier.padding(Spacing.xl))
+                JiabanCircularProgress(Modifier.padding(Spacing.xl))
             }
         } else if (page == 0) {
             // ---- 备份页签：备份与恢复（云端，未配置时收敛为空态直达）+ 本地文件 ----
@@ -380,7 +384,7 @@ private fun SyncTabPage(
                                 Text(stringResource(R.string.sync_auto_backup_desc), style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            Switch(checked = state.autoBackup, onCheckedChange = vm::onAutoBackup)
+                            JiabanSwitch(checked = state.autoBackup, onCheckedChange = vm::onAutoBackup)
                         }
                     }
                 }
@@ -401,7 +405,9 @@ private fun SyncTabPage(
                         JiabanButton(
                             text = stringResource(R.string.sync_local_export),
                             onClick = { createDoc.launch(SyncViewModel.defaultLocalFileName()) },
-                            role = JiabanButtonRole.PRIMARY,
+                            // 2026-09-30 收色铁律（一屏最多一个强调色实底）：「立即备份到云端」为旗舰主色，
+                            // 本页「导出」降为描边次级；该卡另一颗「从文件恢复」本就是 SECONDARY。
+                            role = JiabanButtonRole.SECONDARY,
                             size = JiabanButtonSize.L,
                             loading = state.localBusy,
                             enabled = !state.localBusy && !state.status.busy,

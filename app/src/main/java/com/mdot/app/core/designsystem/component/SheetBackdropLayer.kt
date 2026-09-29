@@ -16,7 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
 import com.mdot.app.core.designsystem.SheetBackdrop
+import top.yukonga.miuix.kmp.blur.blur
+import top.yukonga.miuix.kmp.blur.drawBackdrop
 import com.mdot.app.domain.model.SheetBackdropMode
 
 /**
@@ -66,8 +69,8 @@ fun SheetBackdropLayer(
     // 单一进度驱动全部效果：0=静止（无遮罩）1=弹层完全展开
     val progress by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        // Spatial spec：与弹层自身滑入/滑出同一档（背景后退与面板上滑同拍）
-        animationSpec = MaterialTheme.motionScheme.slowSpatialSpec<Float>(),
+        // Spatial spec：与弹层自身滑入/滑出同档（背景后退与面板上滑同拍；档位随引擎）
+        animationSpec = com.mdot.app.core.designsystem.sheetSpatialSpec<Float>(),
         label = "sheetBackdrop",
     )
     // 模糊只在 API 31+ 生效（更低版本置 0 让 Modifier.blur 整体不挂载）
@@ -78,6 +81,16 @@ fun SheetBackdropLayer(
     // 仅「模糊缩小」档缩放并裁圆角：其余档整屏铺满，裁圆角会在四角露底
     val targetScale = if (mode == SheetBackdropMode.BLUR_SCALE) SheetBackdrop.scale else 1f
     val clipProgress = if (targetScale < 1f) progress else 0f
+    // 引擎分发：MIUIX（SDK33+）用 miuix-blur 库 overlay 模糊共享源；MD3 保持内容内糊（原实现）
+    val sourceState = LocalBackdropSourceState.current
+    // ⚠️ 弹层背景**不走 miuix-blur overlay**（2026-09-30 定，用户实测）：
+    // 本层与共享源**同处一个窗口**（源挂在 AppRoot 内容根、就在本层子树内），overlay 采样同窗层
+    // 会与源的同帧录制冲突 → **100% 闪退**（正是 docs/11 062 记过的「采样源的效果方不得位于源的
+    // 子树内 → RenderNode 自引用」）；而此前的 overlay 还因漏登记录制需求压根没录到源，
+    // 表现为「只压暗不模糊」。故弹层背景**两引擎统一走内容自糊**（下方 Modifier.blur）——
+    // 与 MD3 同一条稳定路径，观感一致。
+    val miuixBlurActive = false
+    val blurPx = with(LocalDensity.current) { targetBlur.toPx() }
 
     Box(
         modifier
@@ -99,12 +112,37 @@ fun SheetBackdropLayer(
                         clip = true
                     }
                 }
-                .blur(targetBlur * progress)
+                .then(
+                    if (miuixBlurActive) Modifier // MIUIX：模糊改由库 overlay 画（见下），内容不再内糊
+                    else Modifier.blur(targetBlur * progress)
+                )
         ) {
             // 不透明实底：页面自身多为透明（浅色底由 MainActivity 的 Surface 提供，在本层**之外**）——
             // 不补实底的话，模糊会把透明像素与被压暗的背板混成脏影（实测背景整片发黑，见 docs/11 036）
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
             content()
+        }
+        // MIUIX：miuix-blur 库管线（shader 模糊共享源，叠在内容之上、压暗之下；layerBlock 同步缩小变换）
+        if (miuixBlurActive && sourceState != null) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .drawBackdrop(
+                        backdrop = com.mdot.app.core.designsystem.miuix.MiuixSourceBackdrop(sourceState),
+                        shape = { RoundedCornerShape(SheetBackdrop.cornerRadius) },
+                        layerBlock = {
+                            val s = 1f + (targetScale - 1f) * progress
+                            scaleX = s
+                            scaleY = s
+                            if (clipProgress > 0f) {
+                                shape = RoundedCornerShape(SheetBackdrop.cornerRadius.toPx() * clipProgress)
+                                clip = true
+                            }
+                        },
+                        effects = { blur(blurPx * progress) },
+                        enabled = progress > 0f,
+                    )
+            )
         }
         // 内容上方压暗（点击仍可穿透到内容，但弹层遮罩挡板在更上层）
         Box(

@@ -1,5 +1,8 @@
 package com.mdot.app.feature.site
 
+import com.mdot.app.core.designsystem.component.JiabanAlertDialog
+import com.mdot.app.core.designsystem.dialogContainerColor
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -83,6 +85,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.mdot.app.core.designsystem.component.JiabanButton
+import com.mdot.app.core.designsystem.component.JiabanButtonRole
+import com.mdot.app.core.designsystem.component.FloatingLabelTextField
 
 /** 项目管理共享底座：项目列表 + 当前项目 */
 open class SiteBaseViewModel @Inject constructor(
@@ -220,7 +225,7 @@ fun SiteProjectsPane(
                 // 新建：tonal 胶囊
                 val createInteraction = remember { MutableInteractionSource() }
                 Surface(
-                    shape = RoundedCornerShape(Radius.pill),
+                    shape = engineShape(Radius.pill),
                     color = MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier.pressScale(createInteraction, pressedScale = 0.92f),
                 ) {
@@ -363,7 +368,7 @@ fun SiteProjectsPane(
                                         Modifier
                                             .weight(1f)
                                             .pressScale(rowInteraction, pressedScale = 0.98f)
-                                            .clip(RoundedCornerShape(Radius.small))
+                                            .clip(engineShape(Radius.small))
                                             .clickable(
                                                 interactionSource = rowInteraction,
                                                 indication = LocalIndication.current,
@@ -392,7 +397,7 @@ fun SiteProjectsPane(
                                                     modifier = Modifier
                                                         .background(
                                                             MaterialTheme.colorScheme.tertiaryContainer,
-                                                            RoundedCornerShape(Radius.pill),
+                                                            engineShape(Radius.pill),
                                                         )
                                                         .padding(horizontal = Spacing.s, vertical = Spacing.xs),
                                                 ) {
@@ -465,7 +470,7 @@ fun SiteProjectsPane(
                             Modifier
                                 .fillMaxWidth()
                                 .pressScale(archivedExpandInteraction, pressedScale = 0.98f)
-                                .clip(RoundedCornerShape(Radius.small))
+                                .clip(engineShape(Radius.small))
                                 .clickable(
                                     interactionSource = archivedExpandInteraction,
                                     indication = null,
@@ -540,18 +545,27 @@ fun SiteProjectsPane(
 
     // ---- 彻底删除（归档项目连带全部数据）确认 ----
     purging?.let { p ->
-        AlertDialog(
+        JiabanAlertDialog(containerColor = dialogContainerColor(), 
             onDismissRequest = { purging = null },
             title = { Text(stringResource(R.string.site_project_purge_title)) },
             text = { Text(stringResource(R.string.site_project_purge_body, p.name)) },
             confirmButton = {
-                TextButton(onClick = {
+                JiabanButton(
+                        text = stringResource(R.string.site_project_purge_confirm),
+                        onClick = {
                     purging = null
                     vm.purgeProject(p.id)
-                }) { Text(stringResource(R.string.site_project_purge_confirm), color = MaterialTheme.colorScheme.error) }
+                },
+                        role = JiabanButtonRole.GHOST,
+                        contentColorOverride = MaterialTheme.colorScheme.error,
+                    )
             },
             dismissButton = {
-                TextButton(onClick = { purging = null }) { Text(stringResource(R.string.site_dialog_cancel)) }
+                JiabanButton(
+                    text = stringResource(R.string.site_dialog_cancel),
+                    onClick = { purging = null },
+                    role = JiabanButtonRole.GHOST,
+                )
             },
         )
     }
@@ -584,7 +598,7 @@ private fun RowIconAction(
         Modifier
             .size(IconBoxSpec.tile.box)
             .pressScale(interaction, pressedScale = 0.88f)
-            .clip(RoundedCornerShape(Radius.small))
+            .clip(engineShape(Radius.small))
             .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -601,27 +615,31 @@ fun ProjectNameDialog(
     onConfirm: (String) -> Unit,
 ) {
     var text by remember { mutableStateOf(initial) }
-    AlertDialog(
+    JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            androidx.compose.material3.OutlinedTextField(
+            FloatingLabelTextField(
                 value = text,
                 onValueChange = { text = it.take(30) },
-                label = { Text(stringResource(R.string.site_project_name_label)) },
-                singleLine = true,
+                label = stringResource(R.string.site_project_name_label),
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(Radius.textField),
             )
         },
         confirmButton = {
-            TextButton(
+            JiabanButton(
+                text = stringResource(R.string.site_dialog_ok),
                 onClick = { if (text.isNotBlank()) onConfirm(text) },
+                role = JiabanButtonRole.GHOST,
                 enabled = text.isNotBlank(),
-            ) { Text(stringResource(R.string.site_dialog_ok)) }
+            )
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.site_dialog_cancel)) }
+            JiabanButton(
+                text = stringResource(R.string.site_dialog_cancel),
+                onClick = onDismiss,
+                role = JiabanButtonRole.GHOST,
+            )
         },
     )
 }

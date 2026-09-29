@@ -82,6 +82,8 @@ data class AppearanceConfig(
     val sheetBackdropMode: SheetBackdropMode = SheetBackdropMode.BLUR,
     /** 日历格隐藏农历日期（默认关 = 显示农历；节日名不受影响） */
     val hideLunarDate: Boolean = false,
+    /** 主题引擎（v0.7.8）：MD3 = 现行 Material3 主题；MIUIX = miuix 风格引擎。缺省 MD3（老配置/老备份兼容） */
+    val themeEngine: ThemeEngine = ThemeEngine.MD3,
 ) {
     companion object {
         const val PALETTE_CLASSIC_BLUE = "classic_blue"

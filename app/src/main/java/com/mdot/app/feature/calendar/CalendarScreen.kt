@@ -1,5 +1,10 @@
 package com.mdot.app.feature.calendar
 
+import com.mdot.app.core.designsystem.component.JiabanAlertDialog
+import com.mdot.app.core.designsystem.dialogContainerColor
+import com.mdot.app.core.designsystem.engineShape
+import com.mdot.app.core.designsystem.secondaryLabelColor
+import com.mdot.app.core.designsystem.EngineIcons
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -32,7 +37,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -119,6 +123,9 @@ import java.time.LocalDate
 import java.time.YearMonth
 import javax.inject.Inject
 import kotlin.math.roundToInt
+import com.mdot.app.core.designsystem.component.JiabanButton
+import com.mdot.app.core.designsystem.component.JiabanButtonRole
+import com.mdot.app.core.designsystem.component.JiabanIconButton
 
 data class CalendarCell(
     val date: LocalDate?,
@@ -552,7 +559,7 @@ fun CalendarScreen(
 private fun MonthHeaderRow(vm: CalendarViewModel) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     Row(verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = vm::prevMonth) {
+        JiabanIconButton(onClick = vm::prevMonth) {
             Icon(painterResource(R.drawable.ic_ms_keyboard_arrow_left), contentDescription = stringResource(R.string.calendar_prev_month))
         }
         AnimatedContent(
@@ -571,10 +578,13 @@ private fun MonthHeaderRow(vm: CalendarViewModel) {
                 style = MaterialTheme.typography.titleLarge,
             )
         }
-        TextButton(onClick = vm::goToday) { Text(stringResource(R.string.calendar_back_today)) }
+        // 已选中今天时不显示「回到今天」：没有可回之处（同月选别的日期仍要能一键回今天）
+        if (state.selectedDate != LocalDate.now()) {
+            TextButton(onClick = vm::goToday) { Text(stringResource(R.string.calendar_back_today)) }
+        }
         // 当前月即尽头（未来不可记）：› 置灰，与网格横滑规则一致
-        IconButton(onClick = vm::nextMonth, enabled = state.month.isBefore(YearMonth.now())) {
-            Icon(painterResource(R.drawable.ic_ms_keyboard_arrow_right), contentDescription = stringResource(R.string.calendar_next_month))
+        JiabanIconButton(onClick = vm::nextMonth, enabled = state.month.isBefore(YearMonth.now())) {
+            Icon(EngineIcons.chevron(), contentDescription = stringResource(R.string.calendar_next_month))
         }
     }
 }
@@ -842,10 +852,12 @@ private fun BatchActionBar(
             }
             TextButton(onClick = onCancel) { Text(stringResource(R.string.calendar_batch_cancel)) }
             Spacer(Modifier.width(Spacing.xs))
-            Button(
+            JiabanButton(
+                text = stringResource(R.string.calendar_batch_title),
                 onClick = onSelectConfirm,
+                role = JiabanButtonRole.PRIMARY,
                 enabled = selectedCount > 0,
-            ) { Text(stringResource(R.string.calendar_batch_title)) }
+            )
         }
     }
 }
@@ -859,7 +871,7 @@ private fun BatchOtDialog(
     onDismiss: () -> Unit,
 ) {
     var minutes by remember { mutableStateOf(0) }
-    androidx.compose.material3.AlertDialog(
+    JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.calendar_batch_title)) },
         text = {
@@ -890,13 +902,19 @@ private fun BatchOtDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            JiabanButton(
+                text = stringResource(R.string.calendar_batch_confirm),
                 onClick = { onConfirm(minutes) },
+                role = JiabanButtonRole.GHOST,
                 enabled = minutes in 1..1440,
-            ) { Text(stringResource(R.string.calendar_batch_confirm)) }
+            )
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.calendar_batch_cancel)) }
+            JiabanButton(
+                text = stringResource(R.string.calendar_batch_cancel),
+                onClick = onDismiss,
+                role = JiabanButtonRole.GHOST,
+            )
         },
     )
 }
@@ -962,7 +980,7 @@ private fun CalendarCellView(
     )
     val haptic = LocalHapticFeedback.current
     val interaction = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(Radius.button)
+    val shape = engineShape(Radius.button)
     Box(
         modifier = modifier
             .pressScale(interaction, pressedScale = 0.93f)
@@ -1104,7 +1122,8 @@ private fun CellMainRow(
                     fontSize = CalendarCellSpec.sideFontSize,
                     lineHeight = CalendarCellSpec.sideLineHeight,
                     // 节日与农历同色同重（用户 2026-09-20 二轮规格）：两者都是挂靠信息，不争主次
-                    color = colorScheme.outline,
+                    // 取色走引擎分发（2026-09-30 用户报 MIUIX 下太淡：MIUIX 的 outline 是分隔线级浅灰）
+                    color = secondaryLabelColor(),
                     maxLines = DAY_LABEL_MAX_CHARS,
                     softWrap = false,
                     overflow = TextOverflow.Clip,

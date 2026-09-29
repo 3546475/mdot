@@ -1,5 +1,7 @@
 package com.mdot.app.feature.site
 
+import com.mdot.app.core.designsystem.component.JiabanAlertDialog
+import com.mdot.app.core.designsystem.dialogContainerColor
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
@@ -81,6 +82,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
+import com.mdot.app.core.designsystem.component.JiabanButton
+import com.mdot.app.core.designsystem.component.JiabanButtonRole
 
 data class SiteSettlementUi(
     val loading: Boolean = true,
@@ -568,7 +571,7 @@ fun SiteSettlementPane(
     }
 
     state.preview?.let { p ->
-        AlertDialog(
+        JiabanAlertDialog(containerColor = dialogContainerColor(), 
             onDismissRequest = { vm.dismissPreview() },
             title = { Text(stringResource(R.string.site_settlement_preview_title)) },
             text = {
@@ -613,27 +616,44 @@ fun SiteSettlementPane(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { vm.confirmSettlement() }) { Text(stringResource(R.string.site_settlement_confirm)) }
+                JiabanButton(
+                    text = stringResource(R.string.site_settlement_confirm),
+                    onClick = { vm.confirmSettlement() },
+                    role = JiabanButtonRole.GHOST,
+                )
             },
             dismissButton = {
-                TextButton(onClick = { vm.dismissPreview() }) { Text(stringResource(R.string.site_dialog_cancel)) }
+                JiabanButton(
+                    text = stringResource(R.string.site_dialog_cancel),
+                    onClick = { vm.dismissPreview() },
+                    role = JiabanButtonRole.GHOST,
+                )
             },
         )
     }
 
     confirmRevertId?.let { id ->
-        AlertDialog(
+        JiabanAlertDialog(containerColor = dialogContainerColor(), 
             onDismissRequest = { confirmRevertId = null },
             title = { Text(stringResource(R.string.site_settlement_revert_title)) },
             text = { Text(stringResource(R.string.site_settlement_revert_body)) },
             confirmButton = {
-                TextButton(onClick = {
+                JiabanButton(
+                        text = stringResource(R.string.site_settlement_revert),
+                        onClick = {
                     confirmRevertId = null
                     vm.revertSettlement(id)
-                }) { Text(stringResource(R.string.site_settlement_revert), color = MaterialTheme.colorScheme.error) }
+                },
+                        role = JiabanButtonRole.GHOST,
+                        contentColorOverride = MaterialTheme.colorScheme.error,
+                    )
             },
             dismissButton = {
-                TextButton(onClick = { confirmRevertId = null }) { Text(stringResource(R.string.site_dialog_cancel)) }
+                JiabanButton(
+                    text = stringResource(R.string.site_dialog_cancel),
+                    onClick = { confirmRevertId = null },
+                    role = JiabanButtonRole.GHOST,
+                )
             },
         )
     }

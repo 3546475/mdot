@@ -1,10 +1,13 @@
 package com.mdot.app.core.designsystem
 
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mdot.app.domain.model.ThemeEngine
 
 /** 设计令牌（04 文档 §4.1：feature 层禁用魔法值）；M3 Expressive：形状整体加圆、动效弹簧化 */
 object Spacing {
@@ -52,15 +55,50 @@ object RainbowColors {
     }
 }
 
+/**
+ * 圆角令牌。`card`/`textField` 两值随**主题引擎**切换（外观页「主题引擎」，v0.7.8）：
+ * MD3 = 现行 M3 Expressive 档（24/20dp）；MIUIX = miuix 词表（miuix 项目
+ * `CardDefaults`/`TextFieldDefaults` 的 `CornerRadius` 均 16dp）。其余值两引擎同值
+ * （button 16dp 恰与 miuix `ButtonDefaults` 同值、small 12dp 恰与 miuix `TabRow` 同值）。
+ *
+ * ⚠️ 引擎相关值必须走**快照状态**（mutableStateOf）而不是普通 val：读点散在各组件
+ * 组合体内，普通 val 在引擎切换后不触发重组、圆角会残留到下次无关重组才变。
+ * 写入由 [JiabanTheme] 组装内容前调用 [applyEngine]（同值写入不触发重组，安全）。
+ */
 object Radius {
     val xs = 8.dp
     val small = 12.dp
     val button = 16.dp
-    val card = 24.dp
     val bar = 32.dp
     val sheet = 28.dp
     val pill = 100.dp
-    val textField = 20.dp
+
+    private val engineState = mutableStateOf(ThemeEngine.MD3)
+
+    /** 当前主题引擎（形状/图标分发用，见 EngineStyle.kt） */
+    val engine: ThemeEngine get() = engineState.value
+
+    /** 分区卡圆角：MD3 = 24dp，MIUIX = 16dp */
+    val card: Dp get() = if (engineState.value == ThemeEngine.MIUIX) 16.dp else 24.dp
+
+    /** 输入框/圆钮圆角：MD3 = 20dp，MIUIX = 16dp */
+    val textField: Dp get() = if (engineState.value == ThemeEngine.MIUIX) 16.dp else 20.dp
+
+    /** 主题引擎切换入口（JiabanTheme 调用；单测也用它切/复位） */
+    fun applyEngine(e: ThemeEngine) {
+        engineState.value = e
+    }
+}
+
+/**
+ * 对话框规格：最小/最大宽对齐 M3 AlertDialog 量纲（280/560dp），
+ * 按钮行高度取 HyperOS 分栏按钮行的观感值。
+ * （MIUIX 对话框卡片自绘，见 component/DialogBackdrop.kt 的 MiuixDialogCard）
+ */
+object DialogSpec {
+    val minWidth = 280.dp
+    val maxWidth = 560.dp
+    val buttonRowHeight = 52.dp
 }
 
 object Duration {

@@ -7,6 +7,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
 import com.mdot.app.R
 import android.os.Build
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -19,13 +21,23 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mdot.app.domain.model.AppearanceConfig
+import com.mdot.app.domain.model.ThemeEngine
 import com.mdot.app.domain.model.ThemeMode
+import com.mdot.app.core.designsystem.miuix.MiuixIndication
+import com.mdot.app.core.designsystem.miuix.MiuixMotionScheme
+import com.mdot.app.core.designsystem.miuix.MiuixOverscrollFactory
+import com.mdot.app.core.designsystem.miuix.MiuixShapes
+import com.mdot.app.core.designsystem.miuix.MiuixTypography
+import com.mdot.app.core.designsystem.miuix.miuixColorScheme
+import com.mdot.app.core.designsystem.miuix.miuixLibraryColors
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 // ---- 配色方案（03 文档 §2.2 原 4 套 + docs/18 新增 4 套，共 8 套预设种子色锚点） ----
 
@@ -558,9 +570,9 @@ private fun paletteOf(id: String): Palette = palettes.firstOrNull { it.id == id 
 
 /** 语义色补充：调休 = tertiary，节假日 = secondary（03 文档 §2.1 走 M3 角色，不新增色值） */
 
-// ---- 排印：数字启用 tnum（03 文档 §3.1） ----
+// ---- 排印：数字启用 tnum（03 文档 §3.1；miuix 引擎排印同款，见 miuix/MiuixTheme.kt） ----
 
-private fun TextStyle.tnum() = copy(fontFeatureSettings = "tnum")
+internal fun TextStyle.tnum() = copy(fontFeatureSettings = "tnum")
 
 /** M3 Expressive 形状档：按钮/chip/分段控件走 small(20)，FAB/对话框走 large/extraLarge */
 private val ExpressiveShapes = Shapes(
@@ -586,18 +598,17 @@ val JiabanTypography: Typography = run {
     )
 }
 
-// ---- 主题唯一入口（04 文档 §4.1） ----
+// ---- 主题唯一入口（04 文档 §4.1）——引擎分发也在这里：MD3 / MIUIX（外观页「主题引擎」） ----
 
 /**
  * 主题切换跨淡（docs/15 T6 #20）：palette / 明暗 / 动态色变化时，
  * 用逐色动画包装目标 ColorScheme——单棵组合树内颜色平滑过渡（无 Crossfade 双树复制的状态风险）。
- * 首次组合 target 即初始值，无入场动画；target 变化时逐色过渡（motionScheme defaultEffects）。
+ * 首次组合 target 即初始值，无入场动画；target 变化时逐色过渡（默认效果档，随引擎运动方案）。
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun rememberAnimatedColorScheme(target: ColorScheme): ColorScheme {
-    val motion = remember { MotionScheme.expressive() }
-    val spec = remember { motion.defaultEffectsSpec<Color>() }
+private fun rememberAnimatedColorScheme(target: ColorScheme, motionScheme: MotionScheme): ColorScheme {
+    val spec = remember(motionScheme) { motionScheme.defaultEffectsSpec<Color>() }
     @Composable fun anim(c: Color): Color = animateColorAsState(c, spec, label = "schemeColor").value
     return ColorScheme(
         primary = anim(target.primary),
@@ -651,18 +662,61 @@ fun JiabanTheme(
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
     val context = LocalContext.current
-    val colorScheme = when {
+    // 强调色源（配色方案 / 动态取色）：两个引擎共用——MIUIX 引擎只换中性色/排印/形状语言，
+    // 配色与动态取色照常生效（miuix 引擎同 miuix ThemeController(keyColor) 的设计）
+    val accentSource = when {
         appearance.dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
 
         darkTheme -> paletteOf(appearance.paletteId).dark
         else -> paletteOf(appearance.paletteId).light
     }
-    MaterialExpressiveTheme(
-        colorScheme = rememberAnimatedColorScheme(colorScheme),
-        motionScheme = MotionScheme.expressive(),
-        typography = JiabanTypography,
-        shapes = ExpressiveShapes,
-        content = content,
-    )
+    val engine = appearance.themeEngine
+    // 圆角令牌随引擎切换（Radius.card/textField，见 Tokens.kt）；写同值不触发重组
+    Radius.applyEngine(engine)
+    val colorScheme = when (engine) {
+        ThemeEngine.MIUIX -> miuixColorScheme(accentSource, darkTheme)
+        ThemeEngine.MD3 -> accentSource
+    }
+    // 运动方案随引擎：MIUIX = folme 弹簧（轻微回弹），MD3 = M3 Expressive
+    val motionScheme = when (engine) {
+        ThemeEngine.MIUIX -> MiuixMotionScheme
+        ThemeEngine.MD3 -> MotionScheme.expressive()
+    }
+    // MIUIX 引擎的交互层：按压高亮（替代涟漪观感）+ 橡皮筋回弹（替代边缘辉光）
+    val indication = when (engine) {
+        ThemeEngine.MIUIX -> remember(colorScheme.onBackground) { MiuixIndication(colorScheme.onBackground) }
+        ThemeEngine.MD3 -> LocalIndication.current
+    }
+    val overscroll = when (engine) {
+        ThemeEngine.MIUIX -> MiuixOverscrollFactory
+        ThemeEngine.MD3 -> LocalOverscrollFactory.current
+    }
+    // 库组件（miuix-ui 的 Switch/Slider 等）读它自己的 LocalColors——MIUIX 下包一层其
+    // MiuixTheme 把明暗/强调色桥进去（miuixLibraryColors 与 M3 侧同源）；其内部会提供
+    // 它自己的 Indication/Overscroll，故本 App 的提供（边缘接力保护 + 边界触感）放**内层**覆盖
+    val themeContent: @Composable () -> Unit = {
+        MaterialExpressiveTheme(
+            colorScheme = rememberAnimatedColorScheme(colorScheme, motionScheme),
+            motionScheme = motionScheme,
+            typography = when (engine) {
+                ThemeEngine.MIUIX -> MiuixTypography
+                ThemeEngine.MD3 -> JiabanTypography
+            },
+            shapes = when (engine) {
+                ThemeEngine.MIUIX -> MiuixShapes
+                ThemeEngine.MD3 -> ExpressiveShapes
+            },
+            content = content,
+        )
+    }
+    // ⚠️ 恒定组合结构：不得用 if/else 包不同主题容器——引擎切换会重建整棵子树、NavHost
+    // 回栈丢失（真机现象：切引擎闪跳首页）。MiuixTheme 恒包一层（MD3 下其 locals 无人消费，
+    // 无副作用），引擎差异全部走参数/内层 provide。
+    MiuixTheme(colors = miuixLibraryColors(darkTheme, accentSource)) {
+        CompositionLocalProvider(
+            LocalIndication provides indication,
+            LocalOverscrollFactory provides overscroll,
+        ) { themeContent() }
+    }
 }

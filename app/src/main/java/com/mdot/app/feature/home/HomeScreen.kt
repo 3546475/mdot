@@ -1,5 +1,6 @@
 package com.mdot.app.feature.home
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -33,7 +34,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -79,6 +79,8 @@ import com.mdot.app.domain.util.Money
 import com.mdot.app.domain.util.TimeUtils
 import java.time.LocalDate
 import kotlin.math.roundToInt
+import com.mdot.app.core.designsystem.engineIsMiuix
+import com.mdot.app.core.designsystem.emphasisCardInk
 
 /** 首页（03 文档 §5.1 线框）；顶栏由 AppRoot 的固定一级顶栏统一提供。
  *  响应式（docs 03 §3.2）：EXPANDED（≥840dp）双栏——左数据（大数字/收入）| 右操作（入口卡/记加班主按钮），
@@ -332,7 +334,7 @@ private fun DataSection(state: HomeUiState, onOpenStats: () -> Unit, onOpenRecor
             val periodInteraction = remember { MutableInteractionSource() }
             Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(Radius.pill))
+                    .clip(engineShape(Radius.pill))
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .clickable(
                         interactionSource = periodInteraction,
@@ -467,12 +469,15 @@ private fun TodayPill(text: String, filled: Boolean, onRecord: () -> Unit) {
             Text(
                 text = t,
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = if (engineIsMiuix) MaterialTheme.colorScheme.primary else emphasisCardInk(),
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier
                     .padding(top = Spacing.s)
-                    .clip(RoundedCornerShape(Radius.pill))
-                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .clip(engineShape(Radius.pill))
+                    .background(
+                        if (engineIsMiuix) MaterialTheme.colorScheme.surfaceContainerHigh
+                        else MaterialTheme.colorScheme.primaryContainer,
+                    )
                     .padding(horizontal = Spacing.m, vertical = Spacing.xs),
             )
         } else {
@@ -485,8 +490,8 @@ private fun TodayPill(text: String, filled: Boolean, onRecord: () -> Unit) {
                 modifier = Modifier
                     .padding(top = Spacing.s)
                     .pressScale(interaction, pressedScale = 0.93f)
-                    .clip(RoundedCornerShape(Radius.pill))
-                    .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(Radius.pill))
+                    .clip(engineShape(Radius.pill))
+                    .border(1.dp, MaterialTheme.colorScheme.primary, engineShape(Radius.pill))
                     .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onRecord)
                     .padding(horizontal = Spacing.m, vertical = Spacing.xs),
             )
@@ -504,18 +509,27 @@ private fun EntryCard(
 ) {
     SectionCard(modifier, onClick = onClick) {
         Column {
-            // M3 Expressive：图标置于圆角 tonal 方块上
-            Box(
-                modifier = Modifier
-                    .size(IconBoxSpec.entry.box)
-                    .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(Radius.button)),
-                contentAlignment = Alignment.Center,
-            ) {
+            // MIUIX：**去掉图标瓦片**（用户 2026-09-30）——裸图标 + 主色，与顶栏裸图标同一口径；
+            // MD3 保持原圆角 tonal 方块（“图标置于 tonal 底上”是 M3E 的节奏手法）。
+            if (engineIsMiuix) {
                 Icon(
                     painterResource(iconRes), null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(IconBoxSpec.entry.icon),
                 )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(IconBoxSpec.entry.box)
+                        .background(MaterialTheme.colorScheme.secondaryContainer, engineShape(Radius.button)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painterResource(iconRes), null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(IconBoxSpec.entry.icon),
+                    )
+                }
             }
             Spacer(Modifier.height(Spacing.s))
             Text(stringResource(labelRes), style = MaterialTheme.typography.titleMedium)
@@ -539,7 +553,7 @@ private fun HomeSkeleton() {
     @Composable
     fun SkeletonBlock(mod: Modifier) {
         Surface(
-            shape = RoundedCornerShape(Radius.button),
+            shape = engineShape(Radius.button),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             modifier = mod.alpha(alpha),
         ) { Box(Modifier) }
@@ -563,13 +577,13 @@ private fun HomeSkeleton() {
 private fun RecordHeroButton(workSystem: WorkSystem, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     Surface(
-        shape = RoundedCornerShape(Radius.pill),
+        shape = engineShape(Radius.pill),
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier
             .fillMaxWidth()
             .height(72.dp)
             .pressScale(interaction, pressedScale = 0.96f)
-            .clip(RoundedCornerShape(Radius.pill))
+            .clip(engineShape(Radius.pill))
             .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick),
     ) {
         Row(
@@ -606,40 +620,45 @@ private fun IncomeCard(
     onOpenDetail: () -> Unit,
 ) {
     // hero 卡（primaryContainer，与统计/明细页同视觉体系）；整卡与右端「明细 ›」小字均进入明细页
-    SectionCard(onClick = onOpenDetail, containerColor = MaterialTheme.colorScheme.primaryContainer) {
+    SectionCard(
+        onClick = onOpenDetail,
+        // 首页收色（2026-09-30 用户口径）：MIUIX 卡底走中性（强调整色只留给数字/链接）；MD3 保持原强调色底
+        containerColor = if (engineIsMiuix) MaterialTheme.colorScheme.surfaceContainer
+        else MaterialTheme.colorScheme.primaryContainer,
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
                     if (workSystem == WorkSystem.HOURLY) stringResource(R.string.home_income_hourly) else stringResource(R.string.home_income_ot),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                    color = emphasisCardInk().copy(alpha = 0.7f),
                 )
                 if (cycleOtPay != null) {
                     AnimatedMoneyText(
                         cycleOtPay,
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = emphasisCardInk(),
                         label = "incomeCyclePay",
                     )
                 } else {
-                    Text("-", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text("-", style = MaterialTheme.typography.titleMedium, color = emphasisCardInk())
                 }
             }
             Column(Modifier.weight(1.2f)) {
                 Text(
                     stringResource(R.string.home_income_month),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                    color = emphasisCardInk().copy(alpha = 0.7f),
                 )
                 if (monthIncome != null) {
                     AnimatedMoneyText(
                         monthIncome,
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = emphasisCardInk(),
                         label = "incomeMonth",
                     )
                 } else {
-                    Text("-", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text("-", style = MaterialTheme.typography.titleMedium, color = emphasisCardInk())
                 }
             }
             // 「工资 ›」小字：只有这一小块进入工资设定
@@ -647,7 +666,7 @@ private fun IncomeCard(
             Row(
                 modifier = Modifier
                     .pressScale(interaction, pressedScale = 0.88f)
-                    .clip(RoundedCornerShape(Radius.button))
+                    .clip(engineShape(Radius.button))
                     .clickable(
                         interactionSource = interaction,
                         indication = LocalIndication.current,
@@ -659,13 +678,13 @@ private fun IncomeCard(
                 Text(
                     stringResource(R.string.home_income_detail),
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = emphasisCardInk(),
                 )
                 Spacer(Modifier.width(2.dp))
                 Text(
                     "›",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = emphasisCardInk(),
                 )
             }
         }
@@ -752,7 +771,12 @@ private fun SiteDataContent(state: HomeUiState, site: SiteHomeUi, onOpenRecord: 
  *  数字口径 =「本期待结」（上次结算次日 → 今天，21 文档 B1），与结算页摘要同源逐分一致。 */
 @Composable
 private fun SitePendingCard(site: SiteHomeUi, onOpenDetail: () -> Unit) {
-    SectionCard(onClick = onOpenDetail, containerColor = MaterialTheme.colorScheme.primaryContainer) {
+    SectionCard(
+        onClick = onOpenDetail,
+        // 首页收色（2026-09-30 用户口径）：MIUIX 卡底走中性（强调整色只留给数字/链接）；MD3 保持原强调色底
+        containerColor = if (engineIsMiuix) MaterialTheme.colorScheme.surfaceContainer
+        else MaterialTheme.colorScheme.primaryContainer,
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 // 待结区间（M/d – M/d）：口径可见，与结算页「本期待结摘要」对账用（21 文档 B1）
@@ -763,18 +787,18 @@ private fun SitePendingCard(site: SiteHomeUi, onOpenDetail: () -> Unit) {
                             "${TimeUtils.mdCn(site.rangeFrom)} – ${TimeUtils.mdCn(site.rangeTo)}",
                         ),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                        color = emphasisCardInk().copy(alpha = 0.7f),
                     )
                 }
                 Text(
                     stringResource(R.string.site_settlement_receivable),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                    color = emphasisCardInk().copy(alpha = 0.7f),
                 )
                 AnimatedMoneyText(
                     site.workPayCents,
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = emphasisCardInk(),
                     label = "siteReceivable",
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
@@ -812,13 +836,13 @@ private fun SitePendingCard(site: SiteHomeUi, onOpenDetail: () -> Unit) {
             Row(
                 modifier = Modifier
                     .pressScale(interaction, pressedScale = 0.88f)
-                    .clip(RoundedCornerShape(Radius.button))
+                    .clip(engineShape(Radius.button))
                     .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onOpenDetail)
                     .padding(horizontal = Spacing.s, vertical = Spacing.m),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(stringResource(R.string.home_income_detail), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text(stringResource(R.string.home_income_detail), style = MaterialTheme.typography.labelMedium, color = emphasisCardInk())
+                Text("›", style = MaterialTheme.typography.titleMedium, color = emphasisCardInk())
             }
         }
     }
@@ -862,4 +886,3 @@ private fun HomeHeatmapCard(
         )
     }
 }
-

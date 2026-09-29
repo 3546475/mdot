@@ -1,5 +1,6 @@
 package com.mdot.app.core.designsystem.component
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -46,6 +47,7 @@ import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.domain.util.TimeUtils
 import com.mdot.app.domain.model.WorkSystem
 import java.time.LocalDate
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /**
@@ -68,6 +70,11 @@ fun MonthBarCard(
     /** 各柱 X 轴标签；null = 自动日标签（1/5/10/15/20/25/30）。周聚合传「M/d」稀疏标签 */
     barLabels: List<String?>? = null,
 ) {
+    // 是否周柱（21 文档 B3）：判据是**标签里有没有非空值**，而不是「列表本身是否为 null」——
+    // 调用方传 `bars.map { it.label }`（日柱时元素全为 null 的**非空**列表）时，旧判据 `barLabels != null`
+    // 会把日柱误判成周柱 ⇒ 按周提示、宽柱、周式「最多」全跑出来（2026-09-30 用户报「月柱状图非工地也显示按周汇总」）。
+    // 按周聚合只应发生在工地记工且区间 > 31 天：非工地区间 ≤ 29 天（周期收窄 1–29）恒为日柱。
+    val weeklyBars = barLabels?.any { it != null } == true
     val days = values.size
     if (days < 2) return
     val barDates = (0 until days).map { dates?.getOrNull(it) ?: from.plusDays(it.toLong()) }
@@ -87,7 +94,7 @@ fun MonthBarCard(
     // 自绘容器：底距比统一卡片更紧（最多日文字贴近下缘）
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(Radius.card),
+        shape = engineShape(Radius.card),
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         ChartHintBox(hint = hint.value, columns = days) {
@@ -151,7 +158,7 @@ fun MonthBarCard(
                                                 )
                                                 .then(
                                                     // 周聚合柱：占槽宽比例（加宽收紧、与细日柱明显区分）；日柱固定细宽
-                                                    if (barLabels != null) {
+                                                    if (weeklyBars) {
                                                         Modifier.fillMaxWidth(if (selected) 0.92f else 0.72f)
                                                     } else {
                                                         Modifier.width(if (selected) 7.dp else 5.dp)
@@ -164,13 +171,13 @@ fun MonthBarCard(
                                                     ) else Brush.verticalGradient(
                                                         listOf(barTopColor, barBottomColor),
                                                     ),
-                                                    RoundedCornerShape(ChartSpec.cellRadius),
+                                                    engineShape(ChartSpec.cellRadius),
                                                 )
                                                 .then(
                                                     if (selected) Modifier.border(
                                                         1.5.dp,
                                                         MaterialTheme.colorScheme.onPrimary,
-                                                        RoundedCornerShape(ChartSpec.cellRadius),
+                                                        engineShape(ChartSpec.cellRadius),
                                                     ) else Modifier
                                                 ),
                                         )
@@ -183,7 +190,7 @@ fun MonthBarCard(
                                                 .border(
                                                     1.5.dp,
                                                     MaterialTheme.colorScheme.onPrimary,
-                                                    RoundedCornerShape(ChartSpec.cellRadius),
+                                                    engineShape(ChartSpec.cellRadius),
                                                 ),
                                         )
                                     }
@@ -191,20 +198,30 @@ fun MonthBarCard(
                             }
                         }
                     }
-                    // X 轴标签：周聚合桶自带「M/d」标签（≤13 桶全标、更多隔一标一防重叠）；日柱自动 1 5 10 15 20 25 30
+                    // X 轴标签：周聚合桶自带「M/d」标签；日柱自动 1 5 10 15 20 25 30。
+                    // 周桶稀疏**按实测宽度定步长**（相邻标签留间隙、保证不重叠）：按年筛选时周桶可达 53 个，
+                    // 原「≤13 全标、否则隔一标一」会画出 26 个标签糊成一整条（2026-09-30 用户报）。
                     val labelStyle = MaterialTheme.typography.labelSmall
                     val measurer = rememberTextMeasurer()
-                    val labelTexts: List<Pair<Int, String>> = if (barLabels != null) {
-                        val all = barLabels.mapIndexedNotNull { i, l -> l?.let { i to it } }
-                        val step = if (all.size <= 13) 1 else 2
-                        all.filterIndexed { i, _ -> i % step == 0 }
+                    val labelTexts: List<Pair<Int, String>> = if (weeklyBars) {
+                        barLabels.orEmpty().mapIndexedNotNull { i, l -> l?.let { i to it } }
                     } else {
                         barDates.mapIndexedNotNull { i, d ->
                             if (d.dayOfMonth == 1 || d.dayOfMonth % 5 == 0) i to d.dayOfMonth.toString() else null
                         }
                     }
                     Canvas(Modifier.fillMaxWidth().height(18.dp)) {
-                        labelTexts.forEach { (idx, text) ->
+                        val shown = if (weeklyBars && labelTexts.isNotEmpty()) {
+                            val slotW = size.width / days
+                            val labelW = labelTexts.maxOf {
+                                measurer.measure(AnnotatedString(it.second), labelStyle).size.width
+                            }
+                            val step = maxOf(1, ceil((labelW + Spacing.xs.toPx()) / slotW).toInt())
+                            labelTexts.filterIndexed { i, _ -> i % step == 0 }
+                        } else {
+                            labelTexts
+                        }
+                        shown.forEach { (idx, text) ->
                             val measured = measurer.measure(
                                 AnnotatedString(text),
                                 labelStyle,
@@ -245,7 +262,8 @@ fun MonthBarCard(
                 }
             }
             // 周聚合说明（21 文档 B3 用户反馈：周柱与日柱同形，需明示聚合口径）
-            if (barLabels != null) {
+            // 仅在真·周柱时出现（工地记工且区间 > 31 天）；日柱不显示（2026-09-30 用户要求）
+            if (weeklyBars) {
                 Spacer(Modifier.height(Spacing.xs))
                 Text(
                     stringResource(R.string.stats_bar_weekly_hint),
@@ -259,7 +277,7 @@ fun MonthBarCard(
             if (maxV > 0f) {
                 Spacer(Modifier.height(Spacing.m))
                 Text(
-                    if (barLabels != null) {
+                    if (weeklyBars) {
                         stringResource(
                             R.string.stats_bar_best_label,
                             "${barDates[bestIdx].monthValue}/${barDates[bestIdx].dayOfMonth}",

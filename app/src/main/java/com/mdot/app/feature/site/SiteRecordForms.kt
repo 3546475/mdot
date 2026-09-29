@@ -1,5 +1,6 @@
 package com.mdot.app.feature.site
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -13,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -306,7 +306,7 @@ private fun UnitPickButton(current: String, onClick: () -> Unit) {
         Modifier
             .height(44.dp)
             .pressScale(interaction, pressedScale = 0.94f)
-            .clip(RoundedCornerShape(Radius.textField))
+            .clip(engineShape(Radius.textField))
             .background(MaterialTheme.colorScheme.secondaryContainer)
             .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick)
             .padding(horizontal = Spacing.m),

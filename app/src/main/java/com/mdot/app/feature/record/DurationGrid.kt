@@ -1,5 +1,6 @@
 package com.mdot.app.feature.record
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -160,7 +160,7 @@ fun DurationGrid(
                             animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
                             label = "customCellText",
                         )
-                        val cellShape = RoundedCornerShape(Radius.button)
+                        val cellShape = engineShape(Radius.button)
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -253,7 +253,7 @@ private fun DurationCell(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(Radius.button)
+    val shape = engineShape(Radius.button)
     val interaction = remember { MutableInteractionSource() }
     // 选中态平滑过渡：背景/描边/文字颜色渐变 + 按压缩放
     val bg by animateColorAsState(

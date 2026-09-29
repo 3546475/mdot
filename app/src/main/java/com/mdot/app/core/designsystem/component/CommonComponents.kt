@@ -1,5 +1,7 @@
 package com.mdot.app.core.designsystem.component
 
+import com.mdot.app.core.designsystem.dialogContainerColor
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.res.stringResource
@@ -22,7 +24,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -50,6 +51,11 @@ import com.mdot.app.core.designsystem.IconBoxSpec
 import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.miuix.MiuixSectionCard
+import com.mdot.app.core.designsystem.miuix.MiuixSettingRow
+import com.mdot.app.core.designsystem.miuix.MiuixSwitchRow
+import com.mdot.app.core.designsystem.miuix.SettingRowIcon
+import com.mdot.app.domain.model.ThemeEngine
 
 /** 统一卡片容器：16dp 圆角、surfaceContainer 色阶（03 文档 §3.3）；可点卡片带按压缩放；containerColor 可覆盖底色（如工钱 hero 卡） */
 @Composable
@@ -59,12 +65,18 @@ fun SectionCard(
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
     content: @Composable () -> Unit,
 ) {
+    // MIUIX 引擎：容器改 miuix Card（库的圆角/底色/层级语言）；显式覆盖底色时才把颜色带过去
+    if (Radius.engine == ThemeEngine.MIUIX) {
+        val override = if (containerColor == MaterialTheme.colorScheme.surfaceContainer) null else containerColor
+        MiuixSectionCard(modifier, onClick, override, content)
+        return
+    }
     val interaction = remember { MutableInteractionSource() }
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .then(if (onClick != null) Modifier.pressScale(interaction) else Modifier),
-        shape = RoundedCornerShape(Radius.card),
+        shape = engineShape(Radius.card),
         color = containerColor,
         onClick = onClick ?: {},
         enabled = onClick != null,
@@ -116,7 +128,7 @@ fun EmptyState(
         }
         if (actionText != null && onAction != null) {
             Spacer(Modifier.height(Spacing.l))
-            TextButton(onClick = onAction) { Text(actionText) }
+            JiabanButton(text = actionText, onClick = onAction, role = JiabanButtonRole.GHOST)
         }
     }
 }
@@ -131,20 +143,25 @@ fun ConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(text) },
         confirmButton = {
-            TextButton(
+            JiabanButton(
+                text = confirmText,
                 onClick = onConfirm,
-                colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                    contentColor = if (danger) MaterialTheme.colorScheme.error
-                    else MaterialTheme.colorScheme.primary,
-                ),
-            ) { Text(confirmText) }
+                role = JiabanButtonRole.GHOST,
+                contentColorOverride = if (danger) MaterialTheme.colorScheme.error else null,
+            )
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.ds_cancel)) } },
+        dismissButton = {
+            JiabanButton(
+                text = stringResource(R.string.ds_cancel),
+                onClick = onDismiss,
+                role = JiabanButtonRole.GHOST,
+            )
+        },
     )
 }
 
@@ -158,6 +175,12 @@ fun SettingRow(
     modifier: Modifier = Modifier,
     trailing: (@Composable () -> Unit)? = null,
 ) {
+    // MIUIX 引擎且为可点行：交 miuix-preference 的 ArrowPreference（箭头/按压/字体走库）；
+    // 不可点行回落下方 MD3 行（库组件恒画箭头，不可点行不该有箭头）
+    if (Radius.engine == ThemeEngine.MIUIX && onClick != null) {
+        MiuixSettingRow(title, value, icon, onClick, modifier, trailing)
+        return
+    }
     val interaction = remember { MutableInteractionSource() }
     Row(
         modifier = modifier
@@ -177,20 +200,7 @@ fun SettingRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
-            // M3 Expressive：行图标置于圆角 tonal 小底上，增强节奏感（盒+图标成对，见 IconBoxSpec）
-            Box(
-                modifier = Modifier
-                    .size(IconBoxSpec.tile.box)
-                    .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(Radius.small)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(IconBoxSpec.tile.icon),
-                )
-            }
+            SettingRowIcon(icon)
             Spacer(Modifier.size(Spacing.l))
         }
         Text(title, style = MaterialTheme.typography.titleMedium)
@@ -225,6 +235,11 @@ fun SwitchRow(
     modifier: Modifier = Modifier,
     desc: String? = null,
 ) {
+    // MIUIX 引擎：交 miuix-preference 的 SwitchPreference（整行 Role.Switch + 库内 Switch）
+    if (Radius.engine == ThemeEngine.MIUIX) {
+        MiuixSwitchRow(title, checked, onCheckedChange, modifier, desc)
+        return
+    }
     Row(
         modifier
             .fillMaxWidth()
@@ -243,7 +258,7 @@ fun SwitchRow(
             }
         }
         Spacer(Modifier.size(Spacing.s))
-        Switch(checked = checked, onCheckedChange = null)
+        JiabanSwitch(checked = checked, onCheckedChange = null)
     }
 }
 
@@ -275,9 +290,16 @@ fun TierRow(
 }
 
 /**
- * 浮动 label 输入框：label 在空且未聚焦时缩在框内作占位，聚焦或有值后浮到顶边框（M3 标准动效）；
- * 输入框高度固定，不随 label 状态变化。
- * 基于 OutlinedTextField 实现，圆角统一 20dp（Radius.textField）；[suffix] 渲染为右侧尾随内容。
+ * 浮动 label 输入框（全 App 输入框统一入口）：label 在空且未聚焦时缩在框内作占位，聚焦或有值后浮到顶边框
+ * （M3 标准动效）；输入框高度固定，不随 label 状态变化。
+ * 基于 OutlinedTextField 实现（MD3）/ 库 basic.TextField（MIUIX），圆角统一走 [Radius.textField]；
+ * [suffix] 渲染为右侧尾随内容。
+ *
+ * 2026-09-30 拓宽 API：加入 placeholder / enabled / readOnly / isError / maxLines / leadingIcon / textStyle，
+ * 目的是让其余 20 处“裸 OutlinedTextField”能逐步迁进来、统一两引擎观感。
+ * ⚠️ 库端两处语义差异（已在下面映射）：
+ *  1. **库没有独立 placeholder**——无标签时把 placeholder 当 label + `useLabelAsPlaceholder` 表达；
+ *  2. **库没有 isError**——用 `textFieldColors(labelColor/borderColor = error)` 表达。
  */
 @Composable
 fun FloatingLabelTextField(
@@ -287,18 +309,89 @@ fun FloatingLabelTextField(
     modifier: Modifier = Modifier,
     keyboardOptions: KeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
     suffix: (@Composable () -> Unit)? = null,
+    placeholder: String? = null,
+    enabled: Boolean = true,
+    readOnly: Boolean = false,
+    isError: Boolean = false,
+    maxLines: Int = 1,
+    leadingIcon: (@Composable () -> Unit)? = null,
+    textStyle: androidx.compose.ui.text.TextStyle? = null,
+    /** 辅助/报错文案（M3 supportingText）；MIUIX 无此参数属性 → 包一层 Column 画在输入框下方 */
+    supportingText: (@Composable () -> Unit)? = null,
+    /** 自定义外形；null = 本 App 统一圆角 [Radius.textField]。⚠️ MIUIX 只能取圆角值，非圆角形状会退化为该令牌 */
+    shape: androidx.compose.ui.graphics.Shape? = null,
 ) {
+    val style = textStyle ?: MaterialTheme.typography.titleMedium
+    // 引擎分发：MIUIX 用库 TextField（库自带 label 浮动/占位行为，与 M3 浮动标签等价）；
+    // MD3 保持 M3 OutlinedTextField（原样，不动被点名的另一侧）
+    if (com.mdot.app.core.designsystem.Radius.engine == com.mdot.app.domain.model.ThemeEngine.MIUIX) {
+        val cs = MaterialTheme.colorScheme
+        val field: @Composable () -> Unit = {
+            top.yukonga.miuix.kmp.basic.TextField(
+                value = value,
+                onValueChange = onValueChange,
+                modifier = modifier,
+                label = if (label.isNotBlank()) label else (placeholder ?: ""),
+                // 空且未聚焦时把 label 当占位（≈ M3 浮动标签的空态），聚焦/有值后上浮
+                useLabelAsPlaceholder = true,
+                enabled = enabled,
+                readOnly = readOnly,
+                textStyle = style,
+                keyboardOptions = keyboardOptions,
+                singleLine = maxLines == 1,
+                maxLines = maxLines,
+                leadingIcon = leadingIcon,
+                trailingIcon = suffix,
+                colors = if (isError) {
+                    top.yukonga.miuix.kmp.basic.TextFieldDefaults.textFieldColors(
+                        backgroundColor = cs.surfaceContainerHigh,
+                        labelColor = cs.error,
+                        borderColor = cs.error,
+                    )
+                } else {
+                    // 2026-09-30 用户口径「输入框颜色太多」：
+                    // ① **底色改中性**——库默认 secondaryContainer 属**强调色角色**（由本 App 配色方案注入）
+                    //   ⇒ 每个输入框都带一层强调色调，这才是「花」的主因（用户第二轮反馈）；
+                    //   改用本 App 的中性凹陷灰 surfaceContainerHigh（浅#F0F0F0 / 深#2D2D2D）。
+                    // ② 标签用中性次级文字色（onSurfaceVariant）。
+                    // 聚焦边框/光标仍保留主题色（用户认可的那一抹聚焦反馈）。
+                    top.yukonga.miuix.kmp.basic.TextFieldDefaults.textFieldColors(
+                        backgroundColor = cs.surfaceContainerHigh,
+                        labelColor = cs.onSurfaceVariant,
+                    )
+                },
+            )
+        }
+        // 库无 supportingText：自行包一层 Column 画在下方（保持与 MD3 同信息层级）
+        if (supportingText != null) {
+            Column(modifier = Modifier) { field(); supportingText() }
+        } else {
+            field()
+        }
+        return
+    }
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         // 标签锁单行：三栏窄容器下避免「平时」被后缀挤成两行撑高卡片
-        label = { Text(label, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Clip) },
+        label = if (label.isNotBlank()) {
+            { Text(label, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Clip) }
+        } else {
+            null
+        },
+        placeholder = placeholder?.let { { Text(it) } },
         modifier = modifier,
-        shape = RoundedCornerShape(Radius.textField),
+        shape = shape ?: engineShape(Radius.textField),
+        supportingText = supportingText,
         keyboardOptions = keyboardOptions,
-        singleLine = true,
-        textStyle = MaterialTheme.typography.titleMedium,
+        singleLine = maxLines == 1,
+        maxLines = maxLines,
+        textStyle = style,
+        leadingIcon = leadingIcon,
         trailingIcon = suffix,
+        enabled = enabled,
+        readOnly = readOnly,
+        isError = isError,
     )
 }
 

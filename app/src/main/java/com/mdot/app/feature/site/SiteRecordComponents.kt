@@ -1,5 +1,7 @@
 package com.mdot.app.feature.site
 
+import com.mdot.app.core.designsystem.engineShape
+import com.mdot.app.core.designsystem.EngineIcons
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -23,7 +25,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
@@ -64,38 +65,30 @@ import java.time.format.DateTimeFormatter
  * 工钱 hero 卡、选择瓦片、徽标胶囊与金额格式化工具。
  */
 
-/** 分段胶囊（子页签共用：点工/包工、借支/结算、单位选择等；顶栏主 Tab 已改为滑块式 RecordHeader） */
+import androidx.compose.material3.FilterChip
+import com.mdot.app.core.designsystem.jiabanFilterChipColors
+import com.mdot.app.core.designsystem.emphasisCardSurface
+import com.mdot.app.core.designsystem.emphasisCardInk
+
+/**
+ * 分组胶囊（子页签共用：点工/包工、借支/结算、单位选择等）——
+ * **2026-09-30 起按项目口径统一为轻量 chip**（重要且具图标语义的选项才用 ChoicePillRow；
+ * 次要信息/口径切换用轻量 FilterChip，见 ChoicePillRow 文档与用户口径）。
+ * 参数与调用点不变，仅本体换成 chip。
+ */
 @Composable
 internal fun SegmentPill(text: String, selected: Boolean, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val bgColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
-        label = "segBg",
-    )
-    val fgColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-        else MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
-        label = "segFg",
-    )
-    val scale by animateFloatAsState(
-        targetValue = if (selected) 1f else 0.96f,
-        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-        label = "segScale",
-    )
-    Text(
-        text,
-        modifier = Modifier
-            .scale(scale)
-            .clip(RoundedCornerShape(Radius.pill))
-            .background(bgColor)
-            .pressScale(interaction, pressedScale = 0.94f)
-            .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick)
-            .padding(horizontal = Spacing.l, vertical = Spacing.s),
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        color = fgColor,
+    FilterChip(
+        colors = jiabanFilterChipColors(),
+        selected = selected,
+        onClick = onClick,
+        label = {
+            Text(
+                text,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            )
+        },
     )
 }
 
@@ -199,7 +192,7 @@ internal fun TappableTonalRow(
         onTrailing = onTrailing, showChevron = true,
         modifier = Modifier
             .pressScale(interaction, pressedScale = 0.98f)
-            .clip(RoundedCornerShape(Radius.button))
+            .clip(engineShape(Radius.button))
             .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick)
             .padding(vertical = Spacing.xs),
     )
@@ -228,7 +221,7 @@ private fun TonalRow(
         Box(
             Modifier
                 .size(IconBoxSpec.tile.box)
-                .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(Radius.small)),
+                .background(MaterialTheme.colorScheme.secondaryContainer, engineShape(Radius.small)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -257,13 +250,13 @@ private fun TonalRow(
                 Text(
                     trailingText,
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (trailingActive) MaterialTheme.colorScheme.onPrimaryContainer
+                    color = if (trailingActive) emphasisCardInk()
                     else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     modifier = Modifier
                         .pressScale(trailInteraction, pressedScale = 0.94f)
                         .minimumInteractiveComponentSize()
-                        .clip(RoundedCornerShape(Radius.pill))
+                        .clip(engineShape(Radius.pill))
                         .background(
                             if (trailingActive) MaterialTheme.colorScheme.primaryContainer
                             else MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -306,13 +299,13 @@ internal fun PayHeroCard(
     val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     SectionCard(
         onClick = onClick,
-        containerColor = MaterialTheme.colorScheme.primaryContainer,
+        containerColor = emphasisCardSurface(),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier
                     .size(IconBoxSpec.tile.box)
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.small)),
+                    .background(MaterialTheme.colorScheme.surface, engineShape(Radius.small)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -325,7 +318,7 @@ internal fun PayHeroCard(
             Text(
                 stringResource(R.string.site_pay),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = emphasisCardInk(),
             )
             Spacer(Modifier.width(Spacing.m))
             AnimatedContent(
@@ -344,7 +337,7 @@ internal fun PayHeroCard(
                     stringResource(R.string.site_yuan_symbol) + " " + Money.yuanText(cents).replace(",", ""),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = emphasisCardInk(),
                     maxLines = 1,
                 )
             }
@@ -353,7 +346,7 @@ internal fun PayHeroCard(
                 Text(
                     summary,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                    color = emphasisCardInk().copy(alpha = 0.7f),
                     textAlign = TextAlign.End,
                 )
             }
@@ -377,7 +370,7 @@ internal fun SelectTile(
         label = "tileBg",
     )
     val fgColor by animateColorAsState(
-        targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+        targetValue = if (selected) emphasisCardInk()
         else MaterialTheme.colorScheme.onSurfaceVariant,
         animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
         label = "tileFg",
@@ -391,7 +384,7 @@ internal fun SelectTile(
         modifier
             .scale(scale)
             .height(44.dp)
-            .clip(RoundedCornerShape(Radius.button))
+            .clip(engineShape(Radius.button))
             .background(bgColor)
             .pressScale(interaction, pressedScale = 0.92f)
             .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick),
@@ -406,7 +399,7 @@ internal fun SelectTile(
         // 选中角标：右上角小对勾，强化互斥选中确认感
         if (selected) {
             Icon(
-                painterResource(R.drawable.ic_ms_check), null,
+                EngineIcons.check(), null,
                 tint = fgColor,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -421,7 +414,7 @@ internal fun SelectTile(
 private fun PlannedSegment(text: String) {
     Box(
         Modifier
-            .clip(RoundedCornerShape(Radius.pill))
+            .clip(engineShape(Radius.pill))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f))
             .padding(horizontal = Spacing.l, vertical = Spacing.s),
     ) {
@@ -449,7 +442,7 @@ private fun BadgePill(text: String, bg: Color, fg: Color) {
         color = fg,
         modifier = Modifier
             .padding(start = Spacing.s)
-            .clip(RoundedCornerShape(Radius.pill))
+            .clip(engineShape(Radius.pill))
             .background(bg)
             .padding(horizontal = Spacing.s, vertical = Spacing.xs),
     )
@@ -474,7 +467,7 @@ internal fun BigAmountRow(
             Box(
                 Modifier
                     .size(IconBoxSpec.tile.box)
-                    .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(Radius.small)),
+                    .background(MaterialTheme.colorScheme.secondaryContainer, engineShape(Radius.small)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(

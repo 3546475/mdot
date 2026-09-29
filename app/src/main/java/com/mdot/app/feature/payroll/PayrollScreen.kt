@@ -1,5 +1,7 @@
 package com.mdot.app.feature.payroll
 
+import com.mdot.app.core.designsystem.component.JiabanSwitch
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -23,7 +25,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -33,9 +34,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -92,6 +91,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.mdot.app.core.designsystem.jiabanFilterChipColors
 
 data class PayrollUiState(
     val mode: SalaryMode = SalaryMode.BASE,
@@ -386,17 +386,21 @@ private fun SalaryModeSection(state: PayrollUiState, vm: PayrollViewModel) {
             Text(stringResource(R.string.payroll_mode_title), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Spacing.xs))
 
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                SegmentedButton(
+            // 次要选项口径（2026-09-28 用户定，2026-09-30 用户确认「按次要选项来」）：
+            // 计薪方式是次要切换 → 轻量 chip（药丸满宽实底太占视觉重心），与座右铭/工地口径一致
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                FilterChip(
+                    colors = jiabanFilterChipColors(),
                     selected = state.mode == SalaryMode.BASE,
                     onClick = { vm.onMode(SalaryMode.BASE) },
-                    shape = SegmentedButtonDefaults.itemShape(0, 2),
-                ) { Text(stringResource(R.string.payroll_mode_base), style = MaterialTheme.typography.bodyMedium) }
-                SegmentedButton(
+                    label = { Text(stringResource(R.string.payroll_mode_base), style = MaterialTheme.typography.labelMedium) },
+                )
+                FilterChip(
+                    colors = jiabanFilterChipColors(),
                     selected = state.mode == SalaryMode.MANUAL,
                     onClick = { vm.onMode(SalaryMode.MANUAL) },
-                    shape = SegmentedButtonDefaults.itemShape(1, 2),
-                ) { Text(stringResource(R.string.payroll_mode_manual), style = MaterialTheme.typography.bodyMedium) }
+                    label = { Text(stringResource(R.string.payroll_mode_manual), style = MaterialTheme.typography.labelMedium) },
+                )
             }
 
             Spacer(Modifier.height(Spacing.s))
@@ -404,20 +408,18 @@ private fun SalaryModeSection(state: PayrollUiState, vm: PayrollViewModel) {
             if (state.mode == SalaryMode.MANUAL) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.payroll_include_base), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                    Switch(checked = state.includeBase, onCheckedChange = vm::onIncludeBase)
+                    JiabanSwitch(checked = state.includeBase, onCheckedChange = vm::onIncludeBase)
                 }
                 Spacer(Modifier.height(Spacing.s))
             }
 
             if (state.mode == SalaryMode.BASE || state.includeBase) {
-                OutlinedTextField(
-                shape = RoundedCornerShape(Radius.textField),
+                FloatingLabelTextField(
                     value = state.baseText,
                     onValueChange = vm::onBase,
-                    label = { Text(stringResource(R.string.payroll_base_label)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
+                    label = stringResource(R.string.payroll_base_label),
                     modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     textStyle = MaterialTheme.typography.titleMedium,
                 )
                 val baseCents = Money.parseYuanToCents(state.baseText) ?: 0
@@ -460,27 +462,23 @@ private fun LeaveCoefficientSection(state: PayrollUiState, vm: PayrollViewModel)
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.m),
                 ) {
-                    OutlinedTextField(
-                    shape = RoundedCornerShape(Radius.textField),
+                    FloatingLabelTextField(
                         value = (state.coefPercents[leaveTypes[i]] ?: 0).toString(),
                         onValueChange = { text -> text.toIntOrNull()?.let { vm.onCoef(leaveTypes[i], it) } },
-                        label = { Text(leaveTypes[i].displayName) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
+                        label = leaveTypes[i].displayName,
                         modifier = Modifier.weight(1f),
-                        trailingIcon = { Text("%") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        suffix = { Text("%") },
                         textStyle = MaterialTheme.typography.bodyMedium,
                     )
                     if (i + 1 < leaveTypes.size) {
-                        OutlinedTextField(
-                        shape = RoundedCornerShape(Radius.textField),
+                        FloatingLabelTextField(
                             value = (state.coefPercents[leaveTypes[i + 1]] ?: 0).toString(),
                             onValueChange = { text -> text.toIntOrNull()?.let { vm.onCoef(leaveTypes[i + 1], it) } },
-                            label = { Text(leaveTypes[i + 1].displayName) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
+                            label = leaveTypes[i + 1].displayName,
                             modifier = Modifier.weight(1f),
-                            trailingIcon = { Text("%") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            suffix = { Text("%") },
                             textStyle = MaterialTheme.typography.bodyMedium,
                         )
                     } else {
@@ -526,14 +524,12 @@ private fun HourlyPayrollContent(state: PayrollUiState, vm: PayrollViewModel) {
         Column {
             Text(stringResource(R.string.payroll_hourly_title), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Spacing.xs))
-            OutlinedTextField(
-            shape = RoundedCornerShape(Radius.textField),
+            FloatingLabelTextField(
                 value = state.hourlyRateText,
                 onValueChange = vm::onHourlyRate,
-                label = { Text(stringResource(R.string.payroll_hourly_rate_label)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
+                label = stringResource(R.string.payroll_hourly_rate_label),
                 modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 textStyle = MaterialTheme.typography.titleLarge,
             )
         }
@@ -552,14 +548,12 @@ private fun ComprehensivePayrollContent(state: PayrollUiState, vm: PayrollViewMo
         Column {
             Text(stringResource(R.string.payroll_std_title), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(Spacing.xs))
-            OutlinedTextField(
-            shape = RoundedCornerShape(Radius.textField),
+            FloatingLabelTextField(
                 value = state.stdHoursText,
                 onValueChange = vm::onStdHours,
-                label = { Text(stringResource(R.string.payroll_std_label)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
+                label = stringResource(R.string.payroll_std_label),
                 modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 textStyle = MaterialTheme.typography.titleMedium,
             )
             Text(

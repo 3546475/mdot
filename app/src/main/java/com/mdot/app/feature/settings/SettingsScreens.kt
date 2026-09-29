@@ -1,5 +1,8 @@
 package com.mdot.app.feature.settings
 
+import com.mdot.app.core.designsystem.engineShape
+import com.mdot.app.core.designsystem.secondaryLabelColor
+import com.mdot.app.core.designsystem.EngineIcons
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
@@ -25,7 +28,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -228,7 +230,7 @@ private fun SystemCard(
         label = "systemCardBorderWidth",
     )
     Surface(
-        shape = RoundedCornerShape(Radius.card),
+        shape = engineShape(Radius.card),
         color = containerColor,
         border = BorderStroke(borderWidth, borderColor),
         modifier = Modifier.fillMaxWidth(),
@@ -237,7 +239,7 @@ private fun SystemCard(
         // 方形涟漪四角会溢出圆角卡片（用户反馈像「直角阴影」）。放到内容层、clip 之后即可。
         Column(
             Modifier
-                .clip(RoundedCornerShape(Radius.card))
+                .clip(engineShape(Radius.card))
                 .clickable(enabled = enabled, onClick = onClick)
                 .padding(Spacing.l),
         ) {
@@ -262,7 +264,7 @@ private fun SystemCard(
                     ) + fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec()),
                 ) {
                     Icon(
-                        painterResource(R.drawable.ic_ms_check),
+                        EngineIcons.check(),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(end = Spacing.s),
@@ -277,7 +279,7 @@ private fun SystemCard(
                     !enabled -> Text(
                         stringResource(R.string.settings_planned),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
+                        color = secondaryLabelColor(),
                     )
                 }
             }

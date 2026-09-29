@@ -23,6 +23,8 @@ docs/test-s3.local.properties
 # pi / specify 工具状态（会话、计划等，勿入库）
 .pi/
 .specify/
+# Reasonix 会话/工具状态（attachments 等，勿入库）
+.reasonix/
 
 # archify 架构图导出物（本地产物，不入库）
 docs/结构图/
@@ -50,5 +52,7 @@ CLAUDE.md
 CODEBUDDY.md
 GEMINI.md
 
-# UI 验收临时产物（录屏/抽帧/分析脚本，勿入库）
+# UI 验收临时产物（截图/dump/分析脚本，勿入库）
 /Temp/
+# 任何层级的 .agent-* 临时文件都忽略（只写 /.agent-* 时，源码子目录里的截图曾被误提交，见 docs/11 070）；注意 .agent/ 是 skills 目录，不带连字符，不受影响
+.agent-*

@@ -1,5 +1,8 @@
 package com.mdot.app.feature.export
 
+import com.mdot.app.core.designsystem.component.JiabanAlertDialog
+import com.mdot.app.core.designsystem.dialogContainerColor
+import com.mdot.app.core.designsystem.engineShape
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
@@ -21,7 +24,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -65,6 +67,7 @@ import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.core.util.PayslipRenderer
 import java.io.File
 import java.time.LocalDate
+import com.mdot.app.core.designsystem.jiabanFilterChipColors
 
 /** 导出页：先生成预览，预览弹窗内可「保存」（系统选择位置）或「分享」 */
 @Composable
@@ -118,6 +121,7 @@ fun ExportScreen(
         ) {
             ExportDimension.entries.forEach { dim ->
                 FilterChip(
+                    colors = jiabanFilterChipColors(),
                     selected = state.dimension == dim,
                     onClick = { vm.onDimension(dim) },
                     label = { Text(stringResource(dim.labelRes)) },
@@ -193,6 +197,7 @@ fun ExportScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                         PayslipSource.entries.forEach { src ->
                             FilterChip(
+                                colors = jiabanFilterChipColors(),
                                 selected = state.payslipSource == src,
                                 onClick = { vm.onPayslipSource(src) },
                                 label = { Text(stringResource(src.labelRes)) },
@@ -264,7 +269,7 @@ private fun ExportPreviewDialog(
         }
     }
 
-    AlertDialog(
+    JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
         title = { Text(if (artifact is PreviewArtifact.Payslip) stringResource(R.string.export_preview_payslip_title) else stringResource(R.string.export_preview_csv_title)) },
         text = {
@@ -306,7 +311,7 @@ private fun ExportPreviewDialog(
                                 Box(
                                     Modifier
                                         .size(96.dp)
-                                        .background(Color(0xFF217346), RoundedCornerShape(Radius.button)),
+                                        .background(Color(0xFF217346), engineShape(Radius.button)),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Icon(

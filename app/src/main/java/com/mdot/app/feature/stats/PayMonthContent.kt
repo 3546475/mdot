@@ -1,5 +1,9 @@
 package com.mdot.app.feature.stats
 
+import com.mdot.app.core.designsystem.component.JiabanAlertDialog
+import com.mdot.app.core.designsystem.dialogContainerColor
+import com.mdot.app.core.designsystem.engineShape
+import com.mdot.app.core.designsystem.EngineIcons
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
@@ -31,11 +35,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -105,6 +108,13 @@ import com.mdot.app.domain.util.TimeUtils
 import java.time.LocalDate
 import kotlin.math.roundToInt
 import java.time.YearMonth
+import com.mdot.app.core.designsystem.component.JiabanButton
+import com.mdot.app.core.designsystem.component.JiabanButtonRole
+import com.mdot.app.core.designsystem.component.JiabanIconButton
+import com.mdot.app.core.designsystem.component.FloatingLabelTextField
+import com.mdot.app.core.designsystem.emphasisCardSurface
+import com.mdot.app.core.designsystem.emphasisCardInk
+import com.mdot.app.core.designsystem.jiabanFilterChipColors
 
 /**
  * 记月页（统计页第 1 页）：月度工资单编辑。金额走**实时预览**（与首页数据区同款）：
@@ -167,13 +177,13 @@ fun PayMonthContent(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = vm::prevMonth) {
+                JiabanIconButton(onClick = vm::prevMonth) {
                     Icon(painterResource(R.drawable.ic_ms_keyboard_arrow_left), stringResource(R.string.paymonth_prev_cd))
                 }
                 Row(
                     Modifier
                         .widthIn(min = 120.dp)
-                        .clip(RoundedCornerShape(Radius.pill))
+                        .clip(engineShape(Radius.pill))
                         .clickable { showMonthPicker = true }
                         .padding(horizontal = Spacing.s, vertical = Spacing.xs),
                     verticalAlignment = Alignment.CenterVertically,
@@ -194,7 +204,9 @@ fun PayMonthContent(
                 }
                 if (!isCurrentMonth) {
                     Spacer(Modifier.width(Spacing.xs))
-                    AssistChip(
+                    FilterChip(
+                                                colors = jiabanFilterChipColors(),
+                        selected = false,
                         onClick = vm::goToCurrentMonth,
                         label = {
                             Text(
@@ -204,8 +216,8 @@ fun PayMonthContent(
                         },
                     )
                 }
-                IconButton(onClick = vm::nextMonth) {
-                    Icon(painterResource(R.drawable.ic_ms_keyboard_arrow_right), stringResource(R.string.paymonth_next_cd))
+                JiabanIconButton(onClick = vm::nextMonth) {
+                    Icon(EngineIcons.chevron(), stringResource(R.string.paymonth_next_cd))
                 }
             }
             Spacer(Modifier.height(Spacing.s))
@@ -422,7 +434,7 @@ private fun PayMonthSummaryCard(
     val totalDays = period.lengthOfMonth()
     // 底色与「首页/明细页的 hero 卡」**完全一致**：primaryContainer + onPrimaryContainer
     //（早先用的是自创的 surfaceContainerHigh + ¥ 字形圆底，与另两页不一致，2026-09-23 统一）
-    SectionCard(containerColor = MaterialTheme.colorScheme.primaryContainer) {
+    SectionCard(containerColor = emphasisCardSurface()) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -443,7 +455,7 @@ private fun PayMonthSummaryCard(
                     to = HeroAmountTier.Standard,
                     fraction = shrink,
                 ),
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = emphasisCardInk(),
                 fontWeight = FontWeight.Bold,
                 label = "payMonthNet",
             )
@@ -500,7 +512,7 @@ private fun PayMonthSummaryCard(
                         Text(
                             stringResource(R.string.paymonth_attendance_none),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                            color = emphasisCardInk().copy(alpha = 0.75f),
                             modifier = Modifier.weight(1f),
                         )
                     } else {
@@ -519,9 +531,9 @@ private fun PayMonthSummaryCard(
                         exit = fadeOut(morph) + scaleOut(animationSpec = morph),
                     ) {
                         Icon(
-                            painterResource(R.drawable.ic_ms_keyboard_arrow_right),
+                            EngineIcons.chevron(),
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                            tint = emphasisCardInk().copy(alpha = 0.75f),
                             modifier = Modifier.size(IconSpec.inline),
                         )
                     }
@@ -538,7 +550,7 @@ private fun PayMonthSummaryCard(
                 Text(
                     stringResource(R.string.paymonth_empty_hint),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = emphasisCardInk(),
                     modifier = Modifier.padding(top = Spacing.xs),
                 )
             }
@@ -558,21 +570,21 @@ private fun PayMonthSummaryCard(
                         Text(
                             stringResource(R.string.paymonth_period_progress, elapsedDays, totalDays),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                            color = emphasisCardInk().copy(alpha = 0.75f),
                         )
                         Spacer(Modifier.width(Spacing.s))
                         Box(
                             Modifier
                                 .weight(1f)
                                 .height(Spacing.xs)
-                                .clip(RoundedCornerShape(Radius.pill))
-                                .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)),
+                                .clip(engineShape(Radius.pill))
+                                .background(emphasisCardInk().copy(alpha = 0.12f)),
                         ) {
                             Box(
                                 Modifier
                                     .fillMaxWidth(elapsedDays.toFloat() / totalDays)
                                     .fillMaxHeight()
-                                    .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.55f)),
+                                    .background(emphasisCardInk().copy(alpha = 0.55f)),
                             )
                         }
                     }
@@ -607,7 +619,7 @@ private fun SliceBar(
         Modifier
             .fillMaxWidth()
             .height(barHeight)
-            .clip(RoundedCornerShape(Radius.pill)),
+            .clip(engineShape(Radius.pill)),
     ) {
         slices.forEach { slice ->
             Box(
@@ -648,7 +660,7 @@ private fun SliceBar(
                                 (slice.cents * 100.0 / total).roundToInt(),
                             ),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                            color = emphasisCardInk().copy(alpha = 0.75f),
                         )
                     }
                 }
@@ -665,9 +677,9 @@ private fun SliceBar(
  */
 @Composable
 private fun sliceColor(kind: IncomeSliceKind): Color = when (kind) {
-    IncomeSliceKind.BASE -> MaterialTheme.colorScheme.onPrimaryContainer
-    IncomeSliceKind.OVERTIME -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f)
-    IncomeSliceKind.OTHER_INCOME -> MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.22f)
+    IncomeSliceKind.BASE -> emphasisCardInk()
+    IncomeSliceKind.OVERTIME -> emphasisCardInk().copy(alpha = 0.5f)
+    IncomeSliceKind.OTHER_INCOME -> emphasisCardInk().copy(alpha = 0.22f)
 }
 
 private fun sliceLabelRes(kind: IncomeSliceKind): Int = when (kind) {
@@ -687,13 +699,13 @@ private fun SumCell(label: String, cents: Long, negative: Boolean, modifier: Mod
         Text(
             label,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+            color = emphasisCardInk().copy(alpha = 0.75f),
         )
         Spacer(Modifier.height(Spacing.xs))
         Text(
             (if (negative && !zero) "−" else "") + Money.yuanTrimText(cents),
             style = MaterialTheme.typography.bodyMedium,
-            color = if (zero) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.45f) else MaterialTheme.colorScheme.onPrimaryContainer,
+            color = if (zero) emphasisCardInk().copy(alpha = 0.45f) else emphasisCardInk(),
             fontWeight = if (zero) null else FontWeight.SemiBold,
         )
     }
@@ -705,10 +717,10 @@ private fun AttendanceBadge(text: String) {
     Text(
         text,
         style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+        color = emphasisCardInk().copy(alpha = 0.75f),
         modifier = Modifier
-            .clip(RoundedCornerShape(Radius.pill))
-            .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f))
+            .clip(engineShape(Radius.pill))
+            .background(emphasisCardInk().copy(alpha = 0.12f))
             .padding(horizontal = Spacing.s, vertical = Spacing.xs),
     )
 }
@@ -764,7 +776,7 @@ private fun SummaryCardHeader(
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.small))
+            .clip(engineShape(Radius.small))
             .clickable(onClick = onToggleCompact)
             .padding(vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
@@ -776,7 +788,7 @@ private fun SummaryCardHeader(
         Text(
             stringResource(R.string.paymonth_net_title),
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+            color = emphasisCardInk().copy(alpha = 0.8f),
             modifier = Modifier.weight(1f),
         )
         // 环比上月（上月没填过则不显示）：小药丸 + ↑↓ 方向（↓ 偏 error 色提醒）
@@ -785,8 +797,8 @@ private fun SummaryCardHeader(
             val down = delta < 0
             Row(
                 Modifier
-                    .clip(RoundedCornerShape(Radius.pill))
-                    .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f))
+                    .clip(engineShape(Radius.pill))
+                    .background(emphasisCardInk().copy(alpha = 0.12f))
                     .padding(horizontal = Spacing.s, vertical = Spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -794,13 +806,13 @@ private fun SummaryCardHeader(
                     if (down) "↓" else "↑",
                     style = MaterialTheme.typography.labelMedium,
                     color = if (down) MaterialTheme.colorScheme.error
-                    else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                    else emphasisCardInk().copy(alpha = 0.75f),
                 )
                 Spacer(Modifier.width(Spacing.xs))
                 Text(
                     stringResource(R.string.paymonth_mom, signedYuanText(delta)),
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+                    color = emphasisCardInk().copy(alpha = 0.75f),
                 )
             }
             Spacer(Modifier.width(Spacing.xs))
@@ -811,7 +823,7 @@ private fun SummaryCardHeader(
                 if (compact) R.drawable.ic_ms_expand_more else R.drawable.ic_ms_expand_less,
             ),
             contentDescription = stringResource(R.string.paymonth_card_toggle_cd),
-            tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f),
+            tint = emphasisCardInk().copy(alpha = 0.75f),
         )
     }
 }
@@ -839,13 +851,13 @@ private fun ReconRow(recon: List<Reconciliation>, onOpenReconcile: () -> Unit) {
                     signedYuanText(recon.sumOf { it.diffCents }),
                 ),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = emphasisCardInk(),
                 modifier = Modifier.weight(1f),
             )
             Icon(
-                painterResource(R.drawable.ic_ms_keyboard_arrow_right),
+                EngineIcons.chevron(),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                tint = emphasisCardInk(),
                 modifier = Modifier.size(IconSpec.inline),
             )
         }
@@ -868,7 +880,7 @@ private fun ReconciliationDialog(
     onDismiss: () -> Unit,
 ) {
     val rows = sheet.reconciliations()
-    AlertDialog(
+    JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.paymonth_recon_title)) },
         text = {
@@ -907,11 +919,17 @@ private fun ReconciliationDialog(
         },
         confirmButton = {
             if (rows.size > 1) {
-                TextButton(onClick = { onRestoreAll(); onDismiss() }) {
-                    Text(stringResource(R.string.paymonth_recon_restore_all))
-                }
+                JiabanButton(
+                    text = stringResource(R.string.paymonth_recon_restore_all),
+                    onClick = { onRestoreAll(); onDismiss() },
+                    role = JiabanButtonRole.GHOST,
+                )
             }
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.paymonth_close)) }
+            JiabanButton(
+                text = stringResource(R.string.paymonth_close),
+                onClick = onDismiss,
+                role = JiabanButtonRole.GHOST,
+            )
         },
     )
 }
@@ -1066,7 +1084,7 @@ private fun PayGroupCard(
                         }
                         Spacer(Modifier.width(Spacing.xs))
                         Icon(
-                            painterResource(R.drawable.ic_ms_keyboard_arrow_right),
+                            EngineIcons.chevron(),
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(IconSpec.inline),
@@ -1150,27 +1168,23 @@ private fun EditItemDialog(
 
     fun effBase(): Long =
         if (baseFollows) (insurance?.baseSalaryCents ?: 0L) else (Money.parseYuanToCents(baseText) ?: 0L)
-    AlertDialog(
+    JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.paymonth_edit_title)) },
         text = {
             Column {
                 if (!item.builtin) {
-                    OutlinedTextField(
+                    FloatingLabelTextField(
                         value = name,
                         onValueChange = { name = it },
-                        label = { Text(stringResource(R.string.paymonth_name_label)) },
-                        singleLine = true,
-                        shape = RoundedCornerShape(Radius.textField),
+                        label = stringResource(R.string.paymonth_name_label),
                     )
                     Spacer(Modifier.height(Spacing.s))
                 }
-                OutlinedTextField(
+                FloatingLabelTextField(
                     value = amount,
                     onValueChange = { amount = it },
-                    label = { Text(stringResource(R.string.paymonth_amount_label)) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(Radius.textField),
+                    label = stringResource(R.string.paymonth_amount_label),
                     isError = cents == null,
                 )
 
@@ -1188,6 +1202,7 @@ private fun EditItemDialog(
                     ) {
                         presets.forEach { bp ->
                             FilterChip(
+                                                                colors = jiabanFilterChipColors(),
                                 selected = !rateCustom && rateBp == bp,
                                 onClick = {
                                     rateBp = bp
@@ -1208,6 +1223,7 @@ private fun EditItemDialog(
                             )
                         }
                         FilterChip(
+                                                        colors = jiabanFilterChipColors(),
                             selected = rateCustom,
                             onClick = { rateCustom = true },
                             label = {
@@ -1220,15 +1236,13 @@ private fun EditItemDialog(
                     }
                     if (rateCustom) {
                         Spacer(Modifier.height(Spacing.s))
-                        OutlinedTextField(
+                        FloatingLabelTextField(
                             value = rateText,
                             onValueChange = {
                                 rateText = it.filter { c -> c.isDigit() || c == '.' }
                                 amount = Money.yuanTrimText(insurancePreview(effRate(), effBase()))
                             },
-                            label = { Text(stringResource(R.string.payroll_rate_custom_label)) },
-                            singleLine = true,
-                            shape = RoundedCornerShape(Radius.textField),
+                            label = stringResource(R.string.payroll_rate_custom_label),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -1239,42 +1253,43 @@ private fun EditItemDialog(
                         modifier = Modifier.padding(top = Spacing.xs),
                     )
                     Spacer(Modifier.height(Spacing.s))
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        SegmentedButton(
+                    // 次要选项口径（2026-09-28 定 / 2026-09-30 确认）：基数「跟随/自定义」→ 轻量 chip
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                        FilterChip(
+                            colors = jiabanFilterChipColors(),
                             selected = baseFollows,
                             onClick = {
                                 baseFollows = true
                                 amount = Money.yuanTrimText(insurancePreview(effRate(), ins.baseSalaryCents))
                             },
-                            shape = SegmentedButtonDefaults.itemShape(0, 2),
-                        ) {
-                            Text(
-                                stringResource(R.string.payroll_base_follow),
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                        SegmentedButton(
+                            label = {
+                                Text(
+                                    stringResource(R.string.payroll_base_follow),
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                            },
+                        )
+                        FilterChip(
+                            colors = jiabanFilterChipColors(),
                             selected = !baseFollows,
                             onClick = { baseFollows = false },
-                            shape = SegmentedButtonDefaults.itemShape(1, 2),
-                        ) {
-                            Text(
-                                stringResource(R.string.payroll_base_custom),
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
+                            label = {
+                                Text(
+                                    stringResource(R.string.payroll_base_custom),
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                            },
+                        )
                     }
                     if (!baseFollows) {
                         Spacer(Modifier.height(Spacing.s))
-                        OutlinedTextField(
+                        FloatingLabelTextField(
                             value = baseText,
                             onValueChange = {
                                 baseText = it.filter { c -> c.isDigit() || c == '.' }
                                 amount = Money.yuanTrimText(insurancePreview(effRate(), effBase()))
                             },
-                            label = { Text(stringResource(R.string.payroll_insurance_base_label)) },
-                            singleLine = true,
-                            shape = RoundedCornerShape(Radius.textField),
+                            label = stringResource(R.string.payroll_insurance_base_label),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -1297,8 +1312,8 @@ private fun EditItemDialog(
             }
         },
         confirmButton = {
-            TextButton(
-                enabled = cents != null && (item.builtin || name.isNotBlank()),
+            JiabanButton(
+                text = stringResource(R.string.paymonth_save),
                 onClick = {
                     onSave(
                         item.copy(name = if (item.builtin) item.name else name.trim(), amountCents = cents ?: 0),
@@ -1306,19 +1321,25 @@ private fun EditItemDialog(
                         if (baseFollows) 0L else (Money.parseYuanToCents(baseText) ?: 0L),
                     )
                 },
-            ) { Text(stringResource(R.string.paymonth_save)) }
+                role = JiabanButtonRole.GHOST,
+                enabled = cents != null && (item.builtin || name.isNotBlank()),
+            )
         },
         dismissButton = {
             Row {
                 if (!item.builtin) {
-                    TextButton(onClick = onDelete) {
-                        Text(
-                            stringResource(R.string.paymonth_delete),
-                            color = MaterialTheme.colorScheme.error,
+                    JiabanButton(
+                            text = stringResource(R.string.paymonth_delete),
+                            onClick = onDelete,
+                            role = JiabanButtonRole.GHOST,
+                            contentColorOverride = MaterialTheme.colorScheme.error,
                         )
-                    }
                 }
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.paymonth_cancel)) }
+                JiabanButton(
+                    text = stringResource(R.string.paymonth_cancel),
+                    onClick = onDismiss,
+                    role = JiabanButtonRole.GHOST,
+                )
             }
         },
     )
@@ -1341,25 +1362,21 @@ private fun AddItemDialog(
     var amount by remember { mutableStateOf("") }
     val cents = if (amount.isBlank()) 0L else Money.parseYuanToCents(amount)
     val names = if (picked.isNotEmpty()) picked.toList() else listOf(custom.trim()).filter { it.isNotEmpty() }
-    AlertDialog(
+    JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.paymonth_add_title)) },
         text = {
             Column {
-                OutlinedTextField(
+                FloatingLabelTextField(
                     value = custom,
                     onValueChange = { custom = it; if (it.isNotBlank()) picked = emptySet() },
-                    label = { Text(stringResource(R.string.paymonth_name_label)) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(Radius.textField),
+                    label = stringResource(R.string.paymonth_name_label),
                 )
                 Spacer(Modifier.height(Spacing.s))
-                OutlinedTextField(
+                FloatingLabelTextField(
                     value = amount,
                     onValueChange = { amount = it },
-                    label = { Text(stringResource(R.string.paymonth_amount_label)) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(Radius.textField),
+                    label = stringResource(R.string.paymonth_amount_label),
                     isError = amount.isNotBlank() && cents == null,
                 )
                 Spacer(Modifier.height(Spacing.s))
@@ -1370,6 +1387,7 @@ private fun AddItemDialog(
                     presets.forEach { preset ->
                         val on = preset in picked
                         FilterChip(
+                                                        colors = jiabanFilterChipColors(),
                             selected = on,
                             onClick = {
                                 picked = if (on) picked - preset else picked + preset
@@ -1388,18 +1406,20 @@ private fun AddItemDialog(
             }
         },
         confirmButton = {
-            TextButton(
-                enabled = names.isNotEmpty() && cents != null,
-                onClick = { onSave(names, cents ?: 0L) },
-            ) {
-                Text(
-                    if (names.size > 1) stringResource(R.string.paymonth_add_count, names.size)
+            JiabanButton(
+                text = if (names.size > 1) stringResource(R.string.paymonth_add_count, names.size)
                     else stringResource(R.string.paymonth_save),
-                )
-            }
+                onClick = { onSave(names, cents ?: 0L) },
+                role = JiabanButtonRole.GHOST,
+                enabled = names.isNotEmpty() && cents != null,
+            )
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.paymonth_cancel)) }
+            JiabanButton(
+                text = stringResource(R.string.paymonth_cancel),
+                onClick = onDismiss,
+                role = JiabanButtonRole.GHOST,
+            )
         },
     )
 }

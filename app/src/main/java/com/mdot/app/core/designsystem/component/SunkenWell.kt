@@ -1,12 +1,12 @@
 package com.mdot.app.core.designsystem.component
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -46,7 +46,7 @@ import com.mdot.app.core.designsystem.Radius
 @Composable
 fun SunkenWell(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(Radius.textField),
+    shape: Shape = engineShape(Radius.textField),
     innerPadding: PaddingValues = PaddingValues(Spacing.s),
     content: @Composable BoxScope.() -> Unit,
 ) {

@@ -1,5 +1,6 @@
 package com.mdot.app.feature.record
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -44,9 +45,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -92,11 +91,15 @@ import com.mdot.app.domain.util.TimeUtils
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import com.mdot.app.core.designsystem.component.JiabanButton
-import com.mdot.app.core.designsystem.component.JiabanButtonRole
 import com.mdot.app.core.designsystem.component.JiabanButtonSize
 import java.time.LocalDate
 import java.time.ZoneOffset
 import kotlinx.coroutines.delay
+import com.mdot.app.core.designsystem.component.JiabanButtonRole
+import com.mdot.app.core.designsystem.component.LocalDialogButtonNative
+import com.mdot.app.core.designsystem.component.FloatingLabelTextField
+import com.mdot.app.core.designsystem.jiabanFilterChipColors
+import com.mdot.app.core.designsystem.engineIsMiuix
 
 /** 记录底部弹层（03 文档 §5.2 线框）：两段式——简洁面板（类型+时长）⇄ 完整面板 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -129,7 +132,8 @@ fun RecordSheet(
     // 自实现底部弹层（M3 ModalBottomSheet 在内容高度变化时锚点会误判滑出，故弃用）
     var dismissRequested by rememberSaveable { mutableStateOf(false) }
     // B6-02：弹层进出场接入 motionScheme（原 tween(Duration.*) 绕过动效体系）
-    val sheetEnterSpec = MaterialTheme.motionScheme.slowSpatialSpec<androidx.compose.ui.unit.IntOffset>()
+    // 弹层提速只动 MIUIX（用户 2026-09-30 明示：MD3 保持原速）——档位选择见 sheetSpatialSpec()
+    val sheetEnterSpec = com.mdot.app.core.designsystem.sheetSpatialSpec<androidx.compose.ui.unit.IntOffset>()
     val sheetFadeSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
 
     fun requestDismiss() {
@@ -181,8 +185,8 @@ fun RecordSheet(
                         .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.92f).dp)
                         .padding(bottom = if (wide) Spacing.l else 0.dp)
                         .clip(
-                            if (wide) RoundedCornerShape(Radius.sheet)
-                            else RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet)
+                            if (wide) engineShape(Radius.sheet)
+                            else engineShape(topStart = Radius.sheet, topEnd = Radius.sheet, bottomEnd = 0.dp, bottomStart = 0.dp)
                         )
                         .background(MaterialTheme.colorScheme.surfaceContainer)
                         .clickable(enabled = false) { }
@@ -240,17 +244,21 @@ fun RecordSheet(
                                     )
                                 }
                             }
-                            SingleChoiceSegmentedButtonRow {
-                                SegmentedButton(
+                            // 次要选项口径（2026-09-30 用户确认「按次要选项来」）：加班/请假是次要切换 →
+                            // 轻量 chip（与座右铭、工地口径同一套 chip 语言）
+                            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                                FilterChip(
+                                    colors = jiabanFilterChipColors(),
                                     selected = state.tab == RecordType.OT,
                                     onClick = { vm.onTabChange(RecordType.OT) },
-                                    shape = SegmentedButtonDefaults.itemShape(0, 2),
-                                ) { Text(stringResource(otLabel(state.salary.workSystem))) }
-                                SegmentedButton(
+                                    label = { Text(stringResource(otLabel(state.salary.workSystem)), style = MaterialTheme.typography.labelMedium) },
+                                )
+                                FilterChip(
+                                    colors = jiabanFilterChipColors(),
                                     selected = state.tab == RecordType.LEAVE,
                                     onClick = { vm.onTabChange(RecordType.LEAVE) },
-                                    shape = SegmentedButtonDefaults.itemShape(1, 2),
-                                ) { Text(stringResource(R.string.record_tab_leave)) }
+                                    label = { Text(stringResource(R.string.record_tab_leave), style = MaterialTheme.typography.labelMedium) },
+                                )
                             }
                         }
 
@@ -286,18 +294,20 @@ fun RecordSheet(
                                     )
                                 }
                             }
-                            // 小时 / 分钟 切换（样式与上方加班/请假分段按钮一致）
-                            SingleChoiceSegmentedButtonRow {
-                                SegmentedButton(
+                            // 小时 / 分钟 切换（同样按「次要选项」口径 = 轻量 chip）
+                            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                                FilterChip(
+                                    colors = jiabanFilterChipColors(),
                                     selected = state.durationMode == DurationInputMode.HOURS,
                                     onClick = { vm.onDurationModeChange(DurationInputMode.HOURS) },
-                                    shape = SegmentedButtonDefaults.itemShape(0, 2),
-                                ) { Text(stringResource(R.string.record_mode_hours)) }
-                                SegmentedButton(
+                                    label = { Text(stringResource(R.string.record_mode_hours), style = MaterialTheme.typography.labelMedium) },
+                                )
+                                FilterChip(
+                                    colors = jiabanFilterChipColors(),
                                     selected = state.durationMode == DurationInputMode.MINUTES,
                                     onClick = { vm.onDurationModeChange(DurationInputMode.MINUTES) },
-                                    shape = SegmentedButtonDefaults.itemShape(1, 2),
-                                ) { Text(stringResource(R.string.record_mode_minutes)) }
+                                    label = { Text(stringResource(R.string.record_mode_minutes), style = MaterialTheme.typography.labelMedium) },
+                                )
                             }
                         }
 
@@ -403,6 +413,7 @@ fun RecordSheet(
                                             // 综合工时无周末档（10 文档 D5）
                                             if (isComprehensive && tier == RateTier.WEEKEND) return@forEach
                                             FilterChip(
+                                                colors = jiabanFilterChipColors(),
                                                 selected = state.tier == tier,
                                                 onClick = { vm.onTierSelect(tier) },
                                                 label = { Text(tier.displayName) },
@@ -410,6 +421,7 @@ fun RecordSheet(
                                         }
                                         if (state.tierManual) {
                                             FilterChip(
+                                                colors = jiabanFilterChipColors(),
                                                 selected = false,
                                                 onClick = { vm.onTierReset() },
                                                 label = { Text(stringResource(R.string.record_tier_auto)) },
@@ -430,7 +442,7 @@ fun RecordSheet(
                                             Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
                                                 OutlinedButton(
                                                     onClick = { vm.onToCompDelta(-30) },
-                                                    shape = RoundedCornerShape(
+                                                    shape = engineShape(
                                                         topStart = Radius.textField,
                                                         bottomStart = Radius.textField,
                                                         topEnd = 4.dp,
@@ -441,7 +453,7 @@ fun RecordSheet(
                                                 }
                                                 OutlinedButton(
                                                     onClick = { vm.onToCompDelta(30) },
-                                                    shape = RoundedCornerShape(
+                                                    shape = engineShape(
                                                         topStart = 4.dp,
                                                         bottomStart = 4.dp,
                                                         topEnd = Radius.textField,
@@ -470,13 +482,11 @@ fun RecordSheet(
                                 Spacer(Modifier.height(Spacing.m))
 
                                 // ---- 备注 ----
-                                OutlinedTextField(
-                                shape = RoundedCornerShape(Radius.textField),
+                                FloatingLabelTextField(
                                     value = state.note,
                                     onValueChange = vm::onNote,
-                                    label = { Text(stringResource(R.string.record_note_label)) },
+                                    label = stringResource(R.string.record_note_label),
                                     modifier = Modifier.fillMaxWidth(),
-                                    minLines = 1,
                                     maxLines = 3,
                                 )
                             }
@@ -534,22 +544,26 @@ fun RecordSheet(
                                     )
                                 }
                             }
-                            OutlinedButton(
+                            androidx.compose.runtime.CompositionLocalProvider(LocalDialogButtonNative provides true) {
+                                JiabanButton(
+                                text = stringResource(R.string.record_cancel),
                                 onClick = { requestDismiss() },
-                                contentPadding = PaddingValues(
-                                    horizontal = Spacing.s,
-                                    vertical = Spacing.s,
-                                ),
+                                role = JiabanButtonRole.SECONDARY,
                                 modifier = Modifier.weight(1f).padding(end = Spacing.m),
-                            ) { Text(stringResource(R.string.record_cancel)) }
-                            Button(
+                            )
+                            }
+                            androidx.compose.runtime.CompositionLocalProvider(LocalDialogButtonNative provides true) {
+                                JiabanButton(
+                                text = stringResource(R.string.record_save),
                                 onClick = {
                                     saveHaptic()
                                     vm.save()
                                 },
+                                role = JiabanButtonRole.PRIMARY,
                                 enabled = state.durationMinutes() > 0,
                                 modifier = Modifier.weight(1.6f),
-                            ) { Text(stringResource(R.string.record_save)) }
+                            )
+                            }
                         }
                     }
                 }
@@ -563,6 +577,10 @@ fun RecordSheet(
             initial = state.date,
             onPick = { vm.onDateChange(it); showDatePicker = false },
             onDismiss = { showDatePicker = false },
+            // MIUIX 特例（用户 2026-09-30）：本对话框**不画自己的背景效果**——它自带的背景层（压暗/模糊）
+            // 会盖掉记加班弹层自己的背景。要求是"弹层无任何背景变化，之前是什么就显示什么"。
+            // MD3 保持原样（不动没被点名的一侧）。
+            backdrop = !engineIsMiuix,
         )
     }
 }
@@ -638,7 +656,7 @@ private fun ChipFlow(options: List<ChipOption>, onSelect: (String) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(Spacing.s),
     ) {
         options.forEach { opt ->
-            FilterChip(selected = opt.selected, onClick = { onSelect(opt.key) }, label = { Text(opt.label) })
+            FilterChip(colors = jiabanFilterChipColors(), selected = opt.selected, onClick = { onSelect(opt.key) }, label = { Text(opt.label) })
         }
     }
 }

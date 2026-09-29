@@ -1,5 +1,6 @@
 package com.mdot.app.feature.settings
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -24,7 +25,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -276,7 +276,7 @@ private fun ContributorChip(
             // 它内部是 graphicsLayer，只作用于链中其后的绘制——放后面则背景与边框不缩放，
             // 表现为"按下去没反应"（真机实测砖块宽度恒为 144px，见 docs/11 020）
             .pressScale(interaction, pressedScale = 0.965f)
-            .clip(RoundedCornerShape(Radius.small))
+            .clip(engineShape(Radius.small))
             .drawBehind {
                 // 外光晕：极低 alpha 白色扩散，替代阴影提供"浮起"暗示
                 drawRoundRect(
@@ -319,7 +319,7 @@ private fun ContributorChip(
                         Color.White.copy(alpha = 0.25f), // 底部弱边
                     ),
                 ),
-                shape = RoundedCornerShape(Radius.small),
+                shape = engineShape(Radius.small),
             )
             // 无长按/点击语义，仅保留按压反馈；interactionSource 仍由 pressScale 共用
             .clickable(

@@ -1,5 +1,6 @@
 package com.mdot.app.core.designsystem.component
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -126,7 +127,7 @@ fun WorkHeatmap(
                         (0 until 7).forEach { r ->
                             val date = grid.getOrNull(c * 7 + r)
                             val level = date?.let { heatLevel(values[it] ?: 0f, maxV) } ?: -1
-                            val shape = RoundedCornerShape(ChartSpec.cellRadius)
+                            val shape = engineShape(ChartSpec.cellRadius)
                             val isSelected = date != null && date == selectedDate
                             Box(
                                 Modifier

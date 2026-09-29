@@ -1,5 +1,8 @@
 package com.mdot.app.core.designsystem.component
 
+import com.mdot.app.core.designsystem.dialogContainerColor
+import com.mdot.app.core.designsystem.engineShape
+import com.mdot.app.core.designsystem.EngineIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,6 +44,7 @@ import com.mdot.app.core.designsystem.Spacing
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
+import androidx.compose.foundation.layout.fillMaxHeight
 
 /**
  * ══ 统一的日期 / 月份选择（docs/03 §日期选择）═════════════════════════
@@ -86,6 +89,8 @@ fun DayPickDialog(
     onPick: (LocalDate) -> Unit,
     onPickDates: (Set<LocalDate>) -> Unit = {},
     onDismiss: () -> Unit,
+    /** 见 [JiabanAlertDialog]：从底部弹层里打开的对话框传 false，避免盖掉弹层自己的背景 */
+    backdrop: Boolean = true,
 ) {
     val today = LocalDate.now()
     var month by remember { mutableStateOf(YearMonth.from(initial)) }
@@ -94,8 +99,9 @@ fun DayPickDialog(
     var selection by remember { mutableStateOf(initialSelection.ifEmpty { setOf(initial) }) }
     val maxDate = if (allowFuture) null else today
 
-    AlertDialog(
+    JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
+        backdrop = backdrop,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(title, modifier = Modifier.weight(1f))
@@ -157,16 +163,46 @@ fun DayPickDialog(
         },
         confirmButton = {
             if (multi) {
-                TextButton(onClick = { onPickDates(selection) }) { Text(stringResource(R.string.ds_pick_done)) }
+                JiabanButton(
+                    text = stringResource(R.string.ds_pick_done),
+                    onClick = { onPickDates(selection) },
+                    role = JiabanButtonRole.GHOST,
+                )
             } else if (confirmRequired) {
-                TextButton(onClick = { onPick(pending) }) { Text(stringResource(R.string.ds_pick_confirm)) }
+                JiabanButton(
+                    text = stringResource(R.string.ds_pick_confirm),
+                    onClick = { onPick(pending) },
+                    role = JiabanButtonRole.GHOST,
+                )
             }
         },
         dismissButton = {
             if (multi) {
-                TextButton(onClick = { selection = setOf(initial) }) { Text(stringResource(R.string.ds_clear_selection)) }
+                // 多选态该槽放**两颗**（清除选择 + 取消）：各包一层等宽 Box，配合卡片的「整格可点」
+                // 标记 ⇒ 各占半格、各自整格可点，互不挤占（2026-09-30：此前只下发到单颗场景）
+                Row(Modifier.fillMaxWidth().fillMaxHeight()) {
+                    Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                        JiabanButton(
+                            text = stringResource(R.string.ds_clear_selection),
+                            onClick = { selection = setOf(initial) },
+                            role = JiabanButtonRole.GHOST,
+                        )
+                    }
+                    Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                        JiabanButton(
+                            text = stringResource(R.string.ds_cancel),
+                            onClick = onDismiss,
+                            role = JiabanButtonRole.GHOST,
+                        )
+                    }
+                }
+            } else {
+                JiabanButton(
+                    text = stringResource(R.string.ds_cancel),
+                    onClick = onDismiss,
+                    role = JiabanButtonRole.GHOST,
+                )
             }
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.ds_cancel)) }
         },
     )
 }
@@ -179,7 +215,7 @@ private fun ModeChip(text: String, onClick: () -> Unit) {
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier
-            .clip(RoundedCornerShape(Radius.pill))
+            .clip(engineShape(Radius.pill))
             .clickable(onClick = onClick)
             .padding(horizontal = Spacing.s, vertical = Spacing.xs),
     )
@@ -196,7 +232,7 @@ fun MonthPickDialog(
     val thisMonth = YearMonth.now()
     var year by remember { mutableStateOf(selected.year) }
 
-    AlertDialog(
+    JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
@@ -230,7 +266,11 @@ fun MonthPickDialog(
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.ds_cancel)) }
+            JiabanButton(
+                text = stringResource(R.string.ds_cancel),
+                onClick = onDismiss,
+                role = JiabanButtonRole.GHOST,
+            )
         },
     )
 }
@@ -270,7 +310,7 @@ private fun MonthNavBar(
         }
         IconButton(onClick = onNext) {
             Icon(
-                painterResource(R.drawable.ic_ms_keyboard_arrow_right),
+                EngineIcons.chevron(),
                 contentDescription = stringResource(R.string.ds_next_month),
                 modifier = Modifier.size(IconSpec.boxed),
             )
@@ -286,7 +326,7 @@ private fun ShortcutChip(text: String, onClick: () -> Unit) {
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier
-            .clip(RoundedCornerShape(Radius.pill))
+            .clip(engineShape(Radius.pill))
             .clickable(onClick = onClick)
             .padding(horizontal = Spacing.s, vertical = Spacing.xs),
     )
@@ -411,7 +451,7 @@ private fun MonthCell(
         modifier
             .padding(Spacing.xs / 2)
             .aspectRatio(2.2f)
-            .clip(RoundedCornerShape(Radius.small))
+            .clip(engineShape(Radius.small))
             .background(
                 if (selected) MaterialTheme.colorScheme.primary
                 else androidx.compose.ui.graphics.Color.Transparent

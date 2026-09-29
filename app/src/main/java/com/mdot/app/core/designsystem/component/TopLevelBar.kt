@@ -1,5 +1,6 @@
 package com.mdot.app.core.designsystem.component
 
+import com.mdot.app.core.designsystem.engineShape
 import com.mdot.app.R
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
@@ -15,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +35,7 @@ import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.domain.model.WorkSystem
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.widthIn
+import com.mdot.app.core.designsystem.EngineIcons
 
 /** 一级页面顶栏高度（不含状态栏） */
 val TopBarHeight = 56.dp
@@ -58,7 +59,10 @@ fun TopLevelBar(
     onOpenAppearance: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // 响应式：背景（AppRoot 提供）全宽，内容限宽居中与页面内容对齐（docs 03 §3.2）
+    // MIUIX：顶栏「收色」——左侧入口改**中性胶囊**、右侧动作改**无底色裸图标**
+    // （用户 2026-09-30：首页顶栏要更像 miuix）；MD3 保持原 tonal 胶囊 + 圆形 tonal 图标钮
+    // （不动被点名的另一侧）。裸图标走 JiabanIconButton（引擎分发包装，MIUIX=库 IconButton）。
+    val miuix = com.mdot.app.core.designsystem.Radius.engine == com.mdot.app.domain.model.ThemeEngine.MIUIX
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
     Row(
         modifier = Modifier
@@ -66,14 +70,16 @@ fun TopLevelBar(
             .fillMaxWidth()
             .statusBarsPadding()
             .height(TopBarHeight)
-            .padding(horizontal = Spacing.s),
+            // MIUIX：水平内边距对齐库顶栏令牌（动作侧 16dp）——与页面内容 16dp 页边距对齐；MD3 保持 8dp
+            .padding(horizontal = if (miuix) Spacing.l else Spacing.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // 工时制度：tonal 胶囊（clickable 置于 Surface 内部，涟漪被形状裁剪）
+        // 工时制度：入口胶囊（clickable 置于 Surface 内部，涟漪被形状裁剪）
         val switchInteraction = remember { MutableInteractionSource() }
         Surface(
-            shape = RoundedCornerShape(Radius.pill),
-            color = MaterialTheme.colorScheme.secondaryContainer,
+            shape = engineShape(Radius.pill),
+            color = if (miuix) MaterialTheme.colorScheme.surfaceContainerHigh
+            else MaterialTheme.colorScheme.secondaryContainer,
             modifier = Modifier.pressScale(switchInteraction, pressedScale = 0.94f),
         ) {
             Row(
@@ -90,47 +96,71 @@ fun TopLevelBar(
                 Text(
                     workSystem.displayName,
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    // 2026-09-30 用户口径：顶栏入口文字也用**主题色**（与图标一致、两引擎统一）
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 Icon(
-                    painterResource(R.drawable.ic_ms_swap_horiz),
+                    painter = EngineIcons.swap(),
                     contentDescription = stringResource(R.string.ds_topbar_switch_cd),
                     modifier = Modifier.size(IconSpec.inline),
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    // 2026-09-30 用户口径：顶栏图标用**主题色**（对齐「我的」页图标那种主色 tint），两引擎一致
+                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
         }
         Spacer(Modifier.weight(1f))
-        // 外观：圆形 tonal 图标按钮（与齿轮同款；设置入口兜底，见类注释 ⚠️）
-        val appearanceInteraction = remember { MutableInteractionSource() }
-        FilledTonalIconButton(
-            onClick = onOpenAppearance,
-            modifier = Modifier
-                .size(40.dp)
-                .pressScale(appearanceInteraction, pressedScale = 0.9f),
-        ) {
-            Icon(
-                painterResource(R.drawable.ic_ms_palette),
-                contentDescription = stringResource(R.string.ds_topbar_appearance_cd),
-                modifier = Modifier.size(IconSpec.bar),
-                tint = MaterialTheme.colorScheme.primary,
-            )
+        // 外观：MIUIX = 无底色裸图标；MD3 = 圆形 tonal（设置入口兜底，见类注释 ⚠️）
+        if (miuix) {
+            JiabanIconButton(onClick = onOpenAppearance, modifier = Modifier.size(40.dp)) {
+                Icon(
+                    painterResource(R.drawable.ic_ms_palette),
+                    contentDescription = stringResource(R.string.ds_topbar_appearance_cd),
+                    modifier = Modifier.size(IconSpec.bar),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        } else {
+            val appearanceInteraction = remember { MutableInteractionSource() }
+            FilledTonalIconButton(
+                onClick = onOpenAppearance,
+                modifier = Modifier
+                    .size(40.dp)
+                    .pressScale(appearanceInteraction, pressedScale = 0.9f),
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_ms_palette),
+                    contentDescription = stringResource(R.string.ds_topbar_appearance_cd),
+                    modifier = Modifier.size(IconSpec.bar),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
         Spacer(Modifier.size(Spacing.s))
-        // 设置：圆形 tonal 图标按钮（M3E 改造：换 FilledTonalIconButton，涟漪/尺寸由组件自带）
-        val settingsInteraction = remember { MutableInteractionSource() }
-        FilledTonalIconButton(
-            onClick = onOpenSettings,
-            modifier = Modifier
-                .size(40.dp)
-                .pressScale(settingsInteraction, pressedScale = 0.9f),
-        ) {
-            Icon(
-                painterResource(R.drawable.ic_ms_settings),
-                contentDescription = stringResource(R.string.ds_topbar_settings_cd),
-                modifier = Modifier.size(IconSpec.bar),
-                tint = MaterialTheme.colorScheme.primary,
-            )
+        // 设置：同上
+        if (miuix) {
+            JiabanIconButton(onClick = onOpenSettings, modifier = Modifier.size(40.dp)) {
+                Icon(
+                    painterResource(R.drawable.ic_ms_settings),
+                    contentDescription = stringResource(R.string.ds_topbar_settings_cd),
+                    modifier = Modifier.size(IconSpec.bar),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        } else {
+            val settingsInteraction = remember { MutableInteractionSource() }
+            FilledTonalIconButton(
+                onClick = onOpenSettings,
+                modifier = Modifier
+                    .size(40.dp)
+                    .pressScale(settingsInteraction, pressedScale = 0.9f),
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_ms_settings),
+                    contentDescription = stringResource(R.string.ds_topbar_settings_cd),
+                    modifier = Modifier.size(IconSpec.bar),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
     }
     }

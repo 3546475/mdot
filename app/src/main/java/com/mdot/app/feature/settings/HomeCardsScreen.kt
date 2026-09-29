@@ -1,5 +1,11 @@
 package com.mdot.app.feature.settings
 
+import com.mdot.app.core.designsystem.miuix.ConfigRowIcon
+import com.mdot.app.core.designsystem.component.JiabanAlertDialog
+import com.mdot.app.core.designsystem.component.JiabanSwitch
+import com.mdot.app.core.designsystem.dialogContainerColor
+import com.mdot.app.core.designsystem.engineShape
+import com.mdot.app.core.designsystem.EngineIcons
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
@@ -18,15 +24,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -71,6 +72,8 @@ import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.domain.model.HomeCardContents
 import com.mdot.app.domain.model.HomeCardsConfig
+import com.mdot.app.core.designsystem.component.JiabanButton
+import com.mdot.app.core.designsystem.component.JiabanButtonRole
 
 /**
  * 首页卡片配置（v0.6.0 首页卡片可编辑）：显示中（拖拽排序 + 开关）/ 已隐藏（开关回开）。
@@ -160,7 +163,7 @@ private fun HomeCardContentDialog(
     val multi = HomeCardContents.isMultiSelect(cardId)
     // 多选用本地草稿（弹层内先改、确定才落盘，取消能真取消）
     var draft by remember(cardId) { mutableStateOf(current) }
-    AlertDialog(
+    JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
         title = {
             Text(stringResource(if (multi) R.string.home_card_content_entries_title else R.string.home_card_content_title))
@@ -193,11 +196,17 @@ private fun HomeCardContentDialog(
         },
         confirmButton = {
             if (multi) {
-                TextButton(onClick = { onApply(draft); onDismiss() }) {
-                    Text(stringResource(R.string.home_card_content_done))
-                }
+                JiabanButton(
+                    text = stringResource(R.string.home_card_content_done),
+                    onClick = { onApply(draft); onDismiss() },
+                    role = JiabanButtonRole.GHOST,
+                )
             } else {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.home_card_content_cancel)) }
+                JiabanButton(
+                    text = stringResource(R.string.home_card_content_cancel),
+                    onClick = onDismiss,
+                    role = JiabanButtonRole.GHOST,
+                )
             }
         },
     )
@@ -220,27 +229,17 @@ private fun EntryChoiceRow(ui: HomeCardContentUi, checked: Boolean, onToggle: ()
             .padding(vertical = Spacing.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(IconBoxSpec.tile.box)
-                .background(
-                    if (checked) MaterialTheme.colorScheme.secondaryContainer
-                    else MaterialTheme.colorScheme.surfaceContainerHighest,
-                    RoundedCornerShape(Radius.small),
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                painterResource(ui.iconRes), null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(IconBoxSpec.tile.icon),
-            )
-        }
+        // 行图标：MIUIX 裸图标（与「我的」页统一，用户 2026-09-30）/ MD3 瓦片（底色随开关浅深）
+        ConfigRowIcon(
+            icon = painterResource(ui.iconRes),
+            tileColor = if (checked) MaterialTheme.colorScheme.secondaryContainer
+            else MaterialTheme.colorScheme.surfaceContainerHighest,
+        )
         Spacer(Modifier.width(Spacing.m))
         Text(stringResource(ui.labelRes), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
         if (checked) {
             Icon(
-                painterResource(R.drawable.ic_ms_check), null,
+                EngineIcons.check(), null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(IconSpec.inline),
             )
@@ -297,7 +296,7 @@ private fun HomeCardsConfigCard(
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .height(56.dp)
+                            .height(com.mdot.app.core.designsystem.component.TopBarHeight)
                             .graphicsLayer {
                                 translationY = if (isDragged) dragY else 0f
                                 scaleX = dragScale
@@ -434,20 +433,8 @@ private fun HomeCardRow(
                 ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // 图标 tonal 容器（03 文档 §3.4）：secondaryContainer 底 + primary 图标，盒+图标成对
-            Box(
-                modifier = Modifier
-                    .size(IconBoxSpec.tile.box)
-                    .background(iconBoxColor, RoundedCornerShape(Radius.small)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    painterResource(spec.iconRes),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(IconBoxSpec.tile.icon),
-                )
-            }
+            // 行图标：MIUIX 裸图标（与「我的」页统一，用户 2026-09-30）/ MD3 瓦片（底色随开关浅深）
+            ConfigRowIcon(icon = painterResource(spec.iconRes), tileColor = iconBoxColor)
             Spacer(Modifier.width(Spacing.m))
             Text(
                 stringResource(spec.labelRes),
@@ -466,6 +453,6 @@ private fun HomeCardRow(
                 Spacer(Modifier.width(Spacing.s))
             }
         }
-        Switch(checked = isOn, onCheckedChange = if (closable) { { onToggle() } } else null, enabled = closable)
+        JiabanSwitch(checked = isOn, onCheckedChange = if (closable) { { onToggle() } } else null, enabled = closable)
     }
 }

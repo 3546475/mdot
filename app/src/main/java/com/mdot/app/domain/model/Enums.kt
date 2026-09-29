@@ -61,6 +61,17 @@ enum class AdvancePurpose { WAGE, LIVING, LODGING, LODGING_ALLOW, MEALS, MEALS_A
 enum class ThemeMode { LIGHT, DARK, SYSTEM }
 
 /**
+ * 主题引擎（外观页「主题引擎」，v0.7.8）：
+ * [MD3]=Material3 Expressive（现行主题，配色方案/动态取色走 M3 角色）；
+ * [MIUIX]=miuix 风格引擎（灰底白卡 + miuix 排印/圆角词表，实现见 core/designsystem/miuix/，
+ * 参考开源项目 miuix——github.com/compose-miuix-ui/miuix）。
+ * 两引擎共用同一套「配色方案 / 动态取色」强调色源，只换中性色、排印与形状语言。
+ *
+ * ⚠️ 持久化字段（AppearanceConfig.themeEngine），名字一经发布不可改。
+ */
+enum class ThemeEngine { MD3, MIUIX }
+
+/**
  * 弹层背景效果三档（外观页可选，v0.6.18）：
  * [DIM]=整屏压暗（改造前观感）、[BLUR]=背景模糊、[BLUR_SCALE]=背景模糊 + 缩小成圆角卡片。
  * 后两档在 Android 11 及以下无 RenderEffect，自动回退为压暗（见 SheetBackdropLayer）。

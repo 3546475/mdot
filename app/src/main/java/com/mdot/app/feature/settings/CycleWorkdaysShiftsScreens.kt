@@ -1,5 +1,9 @@
 package com.mdot.app.feature.settings
 
+import com.mdot.app.core.designsystem.component.JiabanAlertDialog
+import com.mdot.app.core.designsystem.component.JiabanSwitch
+import com.mdot.app.core.designsystem.dialogContainerColor
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -23,7 +27,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -73,6 +76,10 @@ import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.domain.model.Shift
 import java.time.DayOfWeek
+import com.mdot.app.core.designsystem.component.JiabanButton
+import com.mdot.app.core.designsystem.component.JiabanButtonRole
+import com.mdot.app.core.designsystem.component.JiabanCheckbox
+import com.mdot.app.core.designsystem.component.FloatingLabelTextField
 
 /** 考勤周期内容主体（设定多页签「周期」页签复用；F7-3：1–29 号起始日，29 在天数不足的月份自动落到月末） */
 @Composable
@@ -100,7 +107,7 @@ fun CyclePane(vm: CycleViewModel = hiltViewModel()) {
                 )
                 Spacer(Modifier.height(Spacing.s))
                 Surface(
-                    shape = RoundedCornerShape(Radius.card),
+                    shape = engineShape(Radius.card),
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -165,7 +172,7 @@ private fun DayCell(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(Radius.button)
+    val shape = engineShape(Radius.button)
     val interaction = remember { MutableInteractionSource() }
     // 选中态平滑过渡 + 按压缩放
     val bg by animateColorAsState(
@@ -245,7 +252,7 @@ fun WorkdaysPane(vm: WorkdaysViewModel = hiltViewModel()) {
                 days.forEach { (day, label) ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                        Checkbox(checked = day in workdays, onCheckedChange = { vm.toggle(day) })
+                        JiabanCheckbox(checked = day in workdays, onCheckedChange = { vm.toggle(day) })
                     }
                 }
             }
@@ -307,7 +314,7 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
                 // 新建：tonal 胶囊
                 val createInteraction = remember { MutableInteractionSource() }
                 Surface(
-                    shape = RoundedCornerShape(Radius.pill),
+                    shape = engineShape(Radius.pill),
                     color = MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier.pressScale(createInteraction, pressedScale = 0.92f),
                 ) {
@@ -451,7 +458,7 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
                                             Modifier
                                                 .weight(1f)
                                                 .pressScale(bodyInteraction, pressedScale = 0.98f)
-                                                .clip(RoundedCornerShape(Radius.small))
+                                                .clip(engineShape(Radius.small))
                                                 .clickable(
                                                     interactionSource = bodyInteraction,
                                                     indication = LocalIndication.current,
@@ -470,7 +477,7 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
                                                         modifier = Modifier
                                                             .background(
                                                                 MaterialTheme.colorScheme.surfaceContainerHighest,
-                                                                RoundedCornerShape(Radius.pill),
+                                                                engineShape(Radius.pill),
                                                             )
                                                             .padding(horizontal = Spacing.s, vertical = Spacing.xs),
                                                     ) {
@@ -505,7 +512,7 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
                                             Spacer(Modifier.width(Spacing.xs))
                                         }
                                         // 显示开关：开=显示，关=隐藏
-                                        Switch(
+                                        JiabanSwitch(
                                             checked = !shift.hidden,
                                             onCheckedChange = { vm.setHidden(shift.id, !shift.hidden) },
                                         )
@@ -572,24 +579,30 @@ private fun ShiftNameDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            OutlinedTextField(
-                shape = RoundedCornerShape(Radius.textField),
+            FloatingLabelTextField(
                 value = value,
                 onValueChange = onValueChange,
-                label = { Text(label) },
-                singleLine = true,
+                label = label,
                 modifier = Modifier.fillMaxWidth(),
             )
         },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text(stringResource(R.string.shifts_ok)) }
+            JiabanButton(
+                text = stringResource(R.string.shifts_ok),
+                onClick = onConfirm,
+                role = JiabanButtonRole.GHOST,
+            )
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.shifts_cancel)) }
+            JiabanButton(
+                text = stringResource(R.string.shifts_cancel),
+                onClick = onDismiss,
+                role = JiabanButtonRole.GHOST,
+            )
         },
     )
 }

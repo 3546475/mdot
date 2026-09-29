@@ -1,5 +1,6 @@
 package com.mdot.app.core.designsystem.component
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -139,15 +139,15 @@ private fun ChartHintBubble(text: String) {
     Box(
         Modifier
             .wrapContentSize(Alignment.Center)
-            .shadow(2.dp, RoundedCornerShape(Radius.xs))
+            .shadow(2.dp, engineShape(Radius.xs))
             .background(
                 MaterialTheme.colorScheme.surfaceContainerHigh,
-                RoundedCornerShape(Radius.xs),
+                engineShape(Radius.xs),
             )
             .border(
                 1.dp,
                 MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
-                RoundedCornerShape(Radius.xs),
+                engineShape(Radius.xs),
             )
             .padding(horizontal = Spacing.m, vertical = Spacing.xs),
     ) {

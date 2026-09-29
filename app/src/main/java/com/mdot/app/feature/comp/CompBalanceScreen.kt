@@ -1,5 +1,6 @@
 package com.mdot.app.feature.comp
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.ui.res.stringResource
 import com.mdot.app.R
 import androidx.compose.foundation.layout.Arrangement
@@ -14,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -60,6 +60,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
+import com.mdot.app.core.designsystem.component.FloatingLabelTextField
+import com.mdot.app.core.designsystem.jiabanFilterChipColors
 
 data class CompBalanceUiState(
     val balanceMinutes: Int = 0,
@@ -208,11 +210,13 @@ fun CompBalancePane(
                 Text(stringResource(R.string.comp_adjust_title), style = MaterialTheme.typography.titleSmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
                     FilterChip(
+                        colors = jiabanFilterChipColors(),
                         selected = add,
                         onClick = { add = true },
                         label = { Text(stringResource(R.string.comp_chip_add)) },
                     )
                     FilterChip(
+                        colors = jiabanFilterChipColors(),
                         selected = !add,
                         onClick = { add = false },
                         label = { Text(stringResource(R.string.comp_chip_deduct)) },
@@ -231,12 +235,10 @@ fun CompBalancePane(
                         },
                     )
                 }
-                OutlinedTextField(
-                shape = RoundedCornerShape(Radius.textField),
+                FloatingLabelTextField(
                     value = note,
                     onValueChange = { note = it.take(50) },
-                    label = { Text(stringResource(R.string.comp_note_hint)) },
-                    singleLine = true,
+                    label = stringResource(R.string.comp_note_hint),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 ShrinkFeedbackButton(

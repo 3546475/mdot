@@ -1,5 +1,8 @@
 package com.mdot.app.feature.site
 
+import com.mdot.app.core.designsystem.component.JiabanAlertDialog
+import com.mdot.app.core.designsystem.dialogContainerColor
+import com.mdot.app.core.designsystem.engineShape
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -24,7 +27,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +54,10 @@ import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.pressScale
 import java.io.File
+import com.mdot.app.core.designsystem.component.JiabanButton
+import com.mdot.app.core.designsystem.component.JiabanButtonRole
+import com.mdot.app.core.designsystem.emphasisCardSurface
+import com.mdot.app.core.designsystem.emphasisCardInk
 
 /**
  * 记工页照片区（PickVisualMedia 免权限；本地保存，备份包不含，D10）与备注/照片卡。
@@ -81,7 +87,7 @@ private fun NotePhotoCard(
                     Box(
                         Modifier
                             .size(IconBoxSpec.tile.box)
-                            .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(Radius.small)),
+                            .background(MaterialTheme.colorScheme.secondaryContainer, engineShape(Radius.small)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
@@ -155,8 +161,8 @@ private fun PhotoSection(photos: List<String>, onAdd: (List<String>) -> Unit, on
             Modifier
                 .size(76.dp)
                 .pressScale(addInteraction, pressedScale = 0.92f)
-                .clip(RoundedCornerShape(Radius.button))
-                .border(2.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.button))
+                .clip(engineShape(Radius.button))
+                .border(2.dp, MaterialTheme.colorScheme.outlineVariant, engineShape(Radius.button))
                 .clickable(interactionSource = addInteraction, indication = LocalIndication.current) {
                     launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 },
@@ -170,19 +176,19 @@ private fun PhotoSection(photos: List<String>, onAdd: (List<String>) -> Unit, on
             Text(
                 stringResource(R.string.site_photo_evidence),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = emphasisCardInk(),
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(Spacing.xs)
-                    .clip(RoundedCornerShape(Radius.pill))
-                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .clip(engineShape(Radius.pill))
+                    .background(emphasisCardSurface())
                     .padding(horizontal = Spacing.s, vertical = 1.dp),
             )
         }
     }
 
     viewing?.let { path ->
-        AlertDialog(
+        JiabanAlertDialog(containerColor = dialogContainerColor(), 
             onDismissRequest = { viewing = null },
             confirmButton = {},
             text = {
@@ -199,9 +205,12 @@ private fun PhotoSection(photos: List<String>, onAdd: (List<String>) -> Unit, on
                 }
             },
             dismissButton = {
-                TextButton(onClick = { viewing = null; onRemove(path) }) {
-                    Text(stringResource(R.string.site_delete), color = MaterialTheme.colorScheme.error)
-                }
+                JiabanButton(
+                        text = stringResource(R.string.site_delete),
+                        onClick = { viewing = null; onRemove(path) },
+                        role = JiabanButtonRole.GHOST,
+                        contentColorOverride = MaterialTheme.colorScheme.error,
+                    )
             },
         )
     }
@@ -220,7 +229,7 @@ private fun PhotoThumb(path: String, onClick: () -> Unit, onLong: () -> Unit) {
         Modifier
             .size(76.dp)
             .pressScale(interaction, pressedScale = 0.92f)
-            .clip(RoundedCornerShape(Radius.button))
+            .clip(engineShape(Radius.button))
             .combinedClickable(
                 interactionSource = interaction,
                 indication = LocalIndication.current,

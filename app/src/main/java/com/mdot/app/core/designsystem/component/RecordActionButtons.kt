@@ -1,5 +1,6 @@
 package com.mdot.app.core.designsystem.component
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.LocalIndication
@@ -14,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -77,7 +77,7 @@ fun RecordPillButton(
         label = "recordPillElevation",
     )
     // 方圆形 20dp，与底栏配置页预览完全一致（按压反馈由 pressScale 缩放 + 阴影贴合承担，无形状 morph）
-    val shape = RoundedCornerShape(Radius.textField)
+    val shape = engineShape(Radius.textField)
     Surface(
         shape = shape,
         color = MaterialTheme.colorScheme.primary,

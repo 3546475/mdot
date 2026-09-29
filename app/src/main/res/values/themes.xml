@@ -19,9 +19,22 @@
     <style name="FloatingDialogWindowTheme">
         <item name="android:windowClipToOutline">false</item>
         <item name="android:backgroundDimEnabled">false</item>
+        <!-- 窗口动画必须**在主题里关**：对话框窗口默认动画是「从下往上推入」，铺满窗的背景层
+             会表现为「模糊自下而上扫入」（2026-09-30 用户两次投诉）。组合副作用里
+             setWindowAnimations(0) 无效——窗口动画在 addView 时就定了，副作用永远晚一步。
+             影响面：本主题用于 decorFitsSystemWindows=false 的弹窗——对话框背景装饰窗
+             与工地记工弹层窗（其内容自带 slideInVertically 进出场，窗口动画本就重复）。
+             入场无窗口动画（背景渐强由组合侧相位驱动）；**出场**=淡出（2026-09-30 定制） -->
+        <item name="android:windowAnimationStyle">@null</item>
     </style>
     <!-- 保持与库原样一致（避免重名覆盖时丢项）；decorFitsSystemWindows=true 的弹窗用它 -->
     <style name="DialogWindowTheme">
         <item name="android:windowClipToOutline">false</item>
+        <!-- 对话框**卡片窗**：入场不走窗口动画（从下往上推入=『从下往上模糊』，帧取证过）——
+             入场由组合侧 Animatable 驱动（中心 0.8→1 放大 + 渐显，与模糊渐强/背景缩小共用
+             一条曲线）；**出场**=入场的反向（中心 1→0.8 缩小 + 淡出）。出场用窗口动画的原因：
+             取消/保存按钮、返回、点外都是调用方状态翻转直接移除对话框，组合侧拦不到按钮关闭，
+             窗口退出动画对**所有关闭路径**统一生效 -->
+        <item name="android:windowAnimationStyle">@null</item>
     </style>
 </resources>

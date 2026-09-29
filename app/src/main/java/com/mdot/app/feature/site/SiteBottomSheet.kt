@@ -1,5 +1,6 @@
 package com.mdot.app.feature.site
 
+import com.mdot.app.core.designsystem.engineShape
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
@@ -22,7 +23,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -96,7 +96,8 @@ internal fun SiteBottomSheet(
     // v0.6.18：背景效果（压暗/模糊/缩小）改由宿主窗口的 SheetBackdropLayer 负责——
     // 本弹层是独立窗口，透明区域会露出宿主窗口，故遮罩盒子只留「挡板」职责（消费点击、
     // 拦截穿透）；仅当宿主未提供共享状态时自绘兑底压暗，避免弹层失去层级感
-    val sheetSlideSpec = MaterialTheme.motionScheme.slowSpatialSpec<androidx.compose.ui.unit.IntOffset>()
+    // 弹层提速只动 MIUIX；MD3 原速（sheetSpatialSpec 档位选择，与记加班弹层同款）
+    val sheetSlideSpec = com.mdot.app.core.designsystem.sheetSpatialSpec<androidx.compose.ui.unit.IntOffset>()
     val sheetFadeSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     Dialog(
         onDismissRequest = { requestDismiss() },
@@ -140,8 +141,8 @@ internal fun SiteBottomSheet(
                             .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.92f).dp)
                             .padding(bottom = if (wide) Spacing.l else 0.dp)
                             .clip(
-                                if (wide) RoundedCornerShape(Radius.sheet)
-                                else RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet)
+                                if (wide) engineShape(Radius.sheet)
+                                else engineShape(topStart = Radius.sheet, topEnd = Radius.sheet, bottomEnd = 0.dp, bottomStart = 0.dp)
                             )
                             .background(MaterialTheme.colorScheme.surfaceContainer)
                             .clickable(enabled = false) { }

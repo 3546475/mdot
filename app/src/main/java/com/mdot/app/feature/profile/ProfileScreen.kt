@@ -1,5 +1,8 @@
 package com.mdot.app.feature.profile
 
+import com.mdot.app.core.designsystem.component.JiabanAlertDialog
+import com.mdot.app.core.designsystem.dialogContainerColor
+import com.mdot.app.core.designsystem.engineShape
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -63,7 +66,6 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.graphics.Color
@@ -93,6 +95,8 @@ import androidx.compose.material3.FilterChip
 import com.mdot.app.core.designsystem.component.JiabanButton
 import com.mdot.app.core.designsystem.component.JiabanButtonRole
 import com.mdot.app.core.designsystem.component.JiabanButtonSize
+import com.mdot.app.core.designsystem.component.FloatingLabelTextField
+import com.mdot.app.core.designsystem.jiabanFilterChipColors
 
 /**
  * 我的页：资料卡（头像可换/昵称可改）+ 本年数据摘要 + 常用入口。
@@ -358,19 +362,17 @@ fun ProfileScreen(
     }
 
     if (editingName) {
-        AlertDialog(
+        JiabanAlertDialog(containerColor = dialogContainerColor(), 
             onDismissRequest = { editingName = false },
             title = { Text(stringResource(R.string.profile_edit_nickname)) },
             text = {
-                OutlinedTextField(
-                shape = RoundedCornerShape(Radius.textField),
+                FloatingLabelTextField(
                     value = nameText,
                     onValueChange = { raw ->
                         nameOverLimit = raw.length > 24
                         nameText = raw.take(24)
                     },
-                    label = { Text(stringResource(R.string.profile_nickname_label)) },
-                    singleLine = true,
+                    label = stringResource(R.string.profile_nickname_label),
                     isError = nameOverLimit,
                     supportingText = {
                         if (nameOverLimit) {
@@ -380,15 +382,23 @@ fun ProfileScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
+                JiabanButton(
+                    text = stringResource(R.string.profile_save),
+                    onClick = {
                     if (!nameOverLimit) {
                         vm.setNickname(nameText)
                         editingName = false
                     }
-                }) { Text(stringResource(R.string.profile_save)) }
+                },
+                    role = JiabanButtonRole.GHOST,
+                )
             },
             dismissButton = {
-                TextButton(onClick = { editingName = false }) { Text(stringResource(R.string.profile_cancel)) }
+                JiabanButton(
+                    text = stringResource(R.string.profile_cancel),
+                    onClick = { editingName = false },
+                    role = JiabanButtonRole.GHOST,
+                )
             },
         )
     }
@@ -551,7 +561,7 @@ private fun MottoDialog(
     var picked by remember { mutableStateOf(current) }
     var custom by remember { mutableStateOf(current !in presets) }
     var text by remember { mutableStateOf(if (current in presets) "" else current) }
-    AlertDialog(
+    JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.profile_motto_title)) },
         text = {
@@ -562,12 +572,14 @@ private fun MottoDialog(
                 ) {
                     presets.forEach { p ->
                         FilterChip(
+                            colors = jiabanFilterChipColors(),
                             selected = !custom && picked == p,
                             onClick = { custom = false; picked = p },
                             label = { Text(p, style = MaterialTheme.typography.labelMedium) },
                         )
                     }
                     FilterChip(
+                        colors = jiabanFilterChipColors(),
                         selected = custom,
                         onClick = { custom = true },
                         label = {
@@ -580,12 +592,10 @@ private fun MottoDialog(
                 }
                 if (custom) {
                     Spacer(Modifier.height(Spacing.m))
-                    OutlinedTextField(
+                    FloatingLabelTextField(
                         value = text,
                         onValueChange = { text = it.take(24) },
-                        label = { Text(stringResource(R.string.profile_motto_label)) },
-                        singleLine = true,
-                        shape = RoundedCornerShape(Radius.textField),
+                        label = stringResource(R.string.profile_motto_label),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -601,7 +611,11 @@ private fun MottoDialog(
             )
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.profile_cancel)) }
+            JiabanButton(
+                text = stringResource(R.string.profile_cancel),
+                onClick = onDismiss,
+                role = JiabanButtonRole.GHOST,
+            )
         },
     )
 }
@@ -612,7 +626,7 @@ private fun ActionIconButton(icon: Painter, label: String, onClick: () -> Unit) 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clip(RoundedCornerShape(Radius.button))
+            .clip(engineShape(Radius.button))
             .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick)
             .padding(horizontal = Spacing.l, vertical = Spacing.s),
     ) {
