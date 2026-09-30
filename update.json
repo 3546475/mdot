@@ -1,16 +1,16 @@
 {
-  "versionName": "0.7.8",
-  "versionCode": 60,
-  "tag": "v0.7.8",
-  "releaseNotes": "## 更新内容\n\n**新增「miuix」主题引擎（可选）**\n\n- 外观页新增「主题引擎」选择：**MD3 / MIUIX** 两套可随时切换（MIUIX = 小米澎湃 HyperOS 观感）\n- 底栏、顶栏、按钮、开关、单选/复选、进度、输入框、卡片与对话框都按所选引擎渲染\n- HyperOS 观感的对话框：整宽分栏按钮（左取消 / 右确认）+ 细分隔线\n\n**界面**\n\n- **收色**：强调色只用在图标、可点文字、选中态与关键数字上，卡片与容器回归中性色（层次更清楚、不花）\n- 顶栏改为透明底，内容自然延伸其下（一级页/二级页形态与返回逻辑不变）\n- 首页卡片内容可自定义；「我的」页与配置页的行图标统一为无底瓦片样式\n- 日历页农历/节日文字加深（此前在 MIUIX 引擎下几乎看不见）\n- 统计页按「年」筛选时柱状图日期标签不再挤成一团；月视图不再误显示「按周汇总」说明\n\n**修复**\n\n- 实心主色按钮可能显示成黑底黑字，已修复（备份页等所有主按钮）\n- 统计在底栏时，首页「统计」入口进入底栏的一级统计页；不在底栏时仍进带返回的二级页\n- 记加班弹窗的日期选择：取消按钮整格可点；打开日期选择时弹窗背景不再被二次压暗/模糊\n\n\n系统要求：Android 10（API 29）及以上。",
+  "versionName": "0.7.8.1",
+  "versionCode": 61,
+  "tag": "v0.7.8.1",
+  "releaseNotes": "## 更新内容\n\n**修复**\n\n- 修复部分机型（Android 16 / 澎湃 OS）上**打开弹窗时背景会\"往下弹一下再回来\"的抖动** ——\n  全 App 弹窗改为**页内模态**实现（不再使用系统对话框窗口），从结构上消除了这类机型差异\n- 修复**只打开记加班弹窗时，背后页面变成一片空白**（不再模糊）的问题\n- 修复**弹窗被弹层盖住**（从记加班弹层里点日期时，日期选择显示在弹层下面）\n- 修复**弹窗里再开弹窗**（如删除确认）时的上下层关系\n- 修复「模糊缩小」档下弹层下缘被裁掉、露出后面页面\n\n**界面**\n\n- 弹窗观感保持不变：背景照「弹层背景」设置模糊 / 压暗，弹窗卡片按所选主题引擎（MD3 / MIUIX）渲染\n- 弹窗里的日期选择、确认框等与之前完全一样的用法\n\n\n系统要求：Android 10（API 29）及以上。",
   "apkUrl": {
-    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.7.8/MDOT-RELEASE-0.7.8-v8a.apk",
-    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.7.8/MDOT-RELEASE-0.7.8-v7a.apk",
-    "universal": "https://github.com/3546475/mdot/releases/download/v0.7.8/MDOT-RELEASE-0.7.8-dual.apk"
+    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.7.8.1/MDOT-RELEASE-0.7.8.1-v8a.apk",
+    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.7.8.1/MDOT-RELEASE-0.7.8.1-v7a.apk",
+    "universal": "https://github.com/3546475/mdot/releases/download/v0.7.8.1/MDOT-RELEASE-0.7.8.1-dual.apk"
   },
   "apkSha256": {
-    "arm64-v8a": "7694586c268ffe32addeb1d4238fdd15bc3a805c3a1604f87e46e9a2cd194904",
-    "armeabi-v7a": "1e76138576d16aad87adc62b66dbc761b078ea271b651961bf21c169b8e8c19b",
-    "universal": "f2912fa93e5e3467482bdca38058e13ae6d2e2f7dd42a4fc4cf3772323da9c0c"
+    "arm64-v8a": "b07f19288bb067437d713a00cbf9e04092dde94399ac42df577632a2a2d304f1",
+    "armeabi-v7a": "6e0bcf64c4ff4a34fc435322248fdf7e5598873aeafd9e9e7f0e7f4bc4f6e8c4",
+    "universal": "a55982c70f9738a40eab180aed88a9aa22e2b3adf03108cd1893956c9861e1fc"
   }
 }
