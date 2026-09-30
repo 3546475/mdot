@@ -99,7 +99,6 @@ import com.mdot.app.core.designsystem.component.JiabanButtonRole
 import com.mdot.app.core.designsystem.component.LocalDialogButtonNative
 import com.mdot.app.core.designsystem.component.FloatingLabelTextField
 import com.mdot.app.core.designsystem.jiabanFilterChipColors
-import com.mdot.app.core.designsystem.engineIsMiuix
 
 /** 记录底部弹层（03 文档 §5.2 线框）：两段式——简洁面板（类型+时长）⇄ 完整面板 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -577,10 +576,10 @@ fun RecordSheet(
             initial = state.date,
             onPick = { vm.onDateChange(it); showDatePicker = false },
             onDismiss = { showDatePicker = false },
-            // MIUIX 特例（用户 2026-09-30）：本对话框**不画自己的背景效果**——它自带的背景层（压暗/模糊）
-            // 会盖掉记加班弹层自己的背景。要求是"弹层无任何背景变化，之前是什么就显示什么"。
-            // MD3 保持原样（不动没被点名的一侧）。
-            backdrop = !engineIsMiuix,
+            // 两引擎一致（用户 2026-09-30 追加）：本对话框**不画自己的背景效果**——它自带的背景层
+            // （压暗/模糊）会盖掉记加班弹层自己的背景。要求是"弹层无任何背景变化，之前是什么就显示什么"。
+            // 注：backdrop=false 只是把绘制归零，背景窗仍会创建（demand 与入场进度门控都靠它，见 DialogBackdrop.kt）。
+            backdrop = false,
         )
     }
 }

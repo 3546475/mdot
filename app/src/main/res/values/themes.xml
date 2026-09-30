@@ -26,6 +26,11 @@
              与工地记工弹层窗（其内容自带 slideInVertically 进出场，窗口动画本就重复）。
              入场无窗口动画（背景渐强由组合侧相位驱动）；**出场**=淡出（2026-09-30 定制） -->
         <item name="android:windowAnimationStyle">@null</item>
+        <!-- 2026-09-30 追加（K80 PRO / Android 16 上仍抖）：`windowAnimationStyle=@null` 只清掉「动画样式引用」，
+             若设备基线对话框主题**直接指定**了 enter/exit 动画，它盖不住 ⇒ 这里把两项也显式归空。
+             （出场淡出由 Compose 侧 progress.animateTo(0f) 驱动，与窗口动画无关，归空不会丢出场） -->
+        <item name="android:windowEnterAnimation">@null</item>
+        <item name="android:windowExitAnimation">@null</item>
     </style>
     <!-- 保持与库原样一致（避免重名覆盖时丢项）；decorFitsSystemWindows=true 的弹窗用它 -->
     <style name="DialogWindowTheme">
@@ -36,5 +41,8 @@
              取消/保存按钮、返回、点外都是调用方状态翻转直接移除对话框，组合侧拦不到按钮关闭，
              窗口退出动画对**所有关闭路径**统一生效 -->
         <item name="android:windowAnimationStyle">@null</item>
+        <!-- 同上：显式归零 enter/exit（防止设备基线主题直接指定动画，Android 16 上实测仍有抖动） -->
+        <item name="android:windowEnterAnimation">@null</item>
+        <item name="android:windowExitAnimation">@null</item>
     </style>
 </resources>

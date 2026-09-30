@@ -31,7 +31,6 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -61,6 +60,7 @@ import androidx.compose.ui.draw.clip
 import com.mdot.app.core.designsystem.DialogSpec
 import com.mdot.app.core.designsystem.Spacing
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.layout.onGloballyPositioned
 
 /**
  * 共享录制源的**无门控**下发（宿主持有源即提供；毛玻璃开关只门控 [LocalBackdropGlassState]
@@ -251,8 +251,39 @@ fun JiabanAlertDialog(
      * 会覆盖掉记加班弹窗的背景，让记加班弹窗无任何背景变化，之前是什么就显示什么」）。
      */
     backdrop: Boolean = true,
+    /**
+     * **默认走页内模态覆盖层**（2026-09-30 用户拍板：扩到所有弹窗）。
+     * 页内覆盖层不开独立窗口 ⇒ 彻底避开 ROM 的对话框窗口动画（K80 PRO/Android 16 上主题与窗口属性
+     * 都关不掉它，见 [DialogWindowSettleProbe] 注释），并且**两引擎同一套结构**（只有卡片皮肤分叉）。
+     * 传 false 保留原「双窗」实现（背景效果窗 + 卡片窗），仅作回退用。
+     */
+    asOverlay: Boolean = true,
     properties: DialogProperties = DialogProperties(),
 ) {
+    // ── 原型：页内模态覆盖层（**不开窗**）────────────────────────────────────────────
+    // 由 [OverlayDialogs.scope] 决定（试用的页面置位，如「我的」页）。动机见 OverlayDialog.kt：
+    // 这台 ROM 在对话框**窗口表面**上加动画，主题/窗口属性/系统缩放都关不掉 ⇒ 不新开窗才能绕开。
+    // 覆盖层自带入场动画与返回键处理，故此处直接 return，不建任何 Dialog 窗、也不走下面的进度机器。
+    if (asOverlay) {
+        DisposableEffect(Unit) {
+            val entry = OverlayEntry(
+                onDismiss = onDismissRequest,
+                content = {
+                    OverlayDialogCard(
+                        containerColor = containerColor,
+                        icon = icon,
+                        title = title,
+                        text = text,
+                        confirmButton = confirmButton,
+                        dismissButton = dismissButton,
+                    )
+                },
+            )
+            OverlayDialogs.push(entry)
+            onDispose { OverlayDialogs.remove(entry) }
+        }
+        return
+    }
     // 入场动画（卡片中心由小变大 + 渐显）与模糊渐强/背景缩小**共用同一 Animatable**：
     // ⚠️ 必须 Animatable(0f) 起步——animateFloatAsState 首次组合直接从目标值起步＝无过程
     //（『卡片突兀出现』根因）；快照就绪才起跑（否则缩小过程被快照缺失的头几帧吞掉）。
@@ -265,8 +296,22 @@ fun JiabanAlertDialog(
         (sourceState?.layer != null && sourceState.recordTick > openTick)
     val progress = remember { Animatable(0f) }
     val progressSpec = sheetSpatialSpec<Float>()
-    LaunchedEffect(snapshotReady) {
-        if (snapshotReady) {
+    // 卡片在**屏幕上**的位置稳定门控（2026-09-30 真机逐帧取证：K80 PRO / Android 16）：
+    // 只盯”源录制新鲜度 + 固定 6 帧“不够——**对话框窗自身被系统摆位/insets 迟到**，卡片前几帧被画在
+    // 最终位置下方 ~120~156px（实测：干净刚性平移、残差 4.7~8.5，且是”跳下去→停住→跳回来“
+    // 而不是逐帧平滑移动 ⇒ **不是窗口推入动画**），表现为入场时卡片“往下弹一下再回来”。
+    // ⚠️ 上一版用 `positionInWindow` 测不到：**窗口自己的位移在“窗内坐标”里看不见**，必须用屏幕坐标。
+    // 判据：卡片在屏幕上的 y 连续两帧不变才起跑；最多等 45 帧（≈0.75s，兼做兜底，防“永远不显示”）。
+    // **对话框窗位置已稳定**门控（2026-09-30 真机续查）：只用"源快照新鲜度"会**漏掉窗口摆位**——
+    // 首次打开时源还没开始录、门控自然多等几帧（窗口已摆好 ⇒ 不弹）；**之后每次**源一直在录、
+    // recordTick 一帧内就前进 ⇒ 门控立刻放行 ⇒ 动画在窗口还没摆好时起跑 ⇒ 卡片先低 ~150px 再跳回
+    // （用户观察："第一次点击不会下弹，之后再点就会了"）。判据 = 对话框**自己 view** 的屏幕位置
+    // 连续两帧不变（由 [DialogWindowSettleProbe] 提供）。
+    // ⚠️ 别用 Compose 的 `LayoutCoordinates.positionOnScreen()`：那是**上一次布局的快照**，窗口移动而没有
+    // 布局 pass 时永远返回旧值（上一版就栽在这，门控等于没生效）；必须用 View 的实时 API。
+    var windowSettled by remember { mutableStateOf(false) }
+    LaunchedEffect(snapshotReady, windowSettled) {
+        if (snapshotReady && windowSettled) {
             // ⚠️ 再等约 6 帧（≈100ms）才起跑：宿主（活动窗）在开窗瞬间的头 1~3 帧仍处于布局/动画
             // 中间态，源此时录到的帧与稳定态有 ~16px 级差异 ⇒ 背景画面『弹一下再回来』
             //（2026-09-30 逐帧取证：首帧偏 16~17px、约 3 帧归零，与用户『几百毫秒弹动』吻合）。
@@ -313,6 +358,7 @@ fun JiabanAlertDialog(
         // MIUIX：自绘卡片 + **整宽分栏按钮行**（HyperOS 观感：左取消 / 右确定 + 细分隔线）
         MiuixDialogCard(
             onDismissRequest = requestClose,
+            onWindowSettled = { windowSettled = true },
             cardModifier = cardModifier,
             containerColor = containerColor,
             icon = icon,
@@ -328,6 +374,9 @@ fun JiabanAlertDialog(
             onDismissRequest = requestClose,
             confirmButton = {
                 DisablePlatformDim()
+                // 与上面同一处：确认格包装**一定会被组合**（DisablePlatformDim 一直靠它生效），
+                // 故窗口位置探针也挂这里（三处探针幂等，谁先跑都行）
+                DialogWindowSettleProbe { windowSettled = true }
                 confirmButton()
             },
             modifier = cardModifier,
@@ -343,6 +392,49 @@ fun JiabanAlertDialog(
 }
 
 /**
+ * 对话框窗口「位置已稳定」探针：取**对话框自己的 view**（[LocalView] 在对话框内容里 = 该窗口的根 view）
+ * 的**实时屏幕位置**逐帧轮询，连续两帧不变即回调。最多 45 帧（≈0.75s）兜底 ⇒ 不会出现"永远不显示"。
+ * ⚠️ 必须用 View 的实时 API，不能用 Compose `LayoutCoordinates.positionOnScreen()`（布局快照，会骗人）。
+ *
+ * ⚠️⚠️ 但**这个门控治不了 K80 PRO（Android 16 / HyperOS）的"卡片下弹"** —— 2026-09-30 真机打点证明：
+ * 连续 300 帧里对话框 view 的 y/x/宽高、父 view、root 全部**恒定不变**，而屏幕上卡片却整体平移
+ * ±76~108px（开、关各一次，单帧完成）⇒ 位移发生在**视图层之下（窗口表面）**，与布局/入场时序无关。
+ * 同一台机器上：主题里 `windowAnimationStyle` 与 enter/exit 全部 `@null`（已核对编译产物）**无效**；
+ * 运行期 `window.setWindowAnimations(0)` **无效**；把三档系统动画缩放临时置 0 **仍会跳** ⇒
+ * 判定为 **ROM 侧自己的对话框窗口动画**（App 侧关不掉）。要根治只能**不新开窗**（页内模态覆盖层）。
+ */
+@Composable
+private fun DialogWindowSettleProbe(onSettled: () -> Unit) {
+    val view = LocalView.current
+    // 关键一招（2026-09-30 真机定位）：这台 ROM（K80 PRO / Android 16 / HyperOS）**无视**主题里的
+    // windowAnimationStyle=@null 与 windowEnter/ExitAnimation=@null —— 视图层级打点证明窗口内
+    // 一切位置/尺寸恒定，而屏幕上卡片却整体平移 ~80~108px（开、关各一次）⇒ 平台在**窗口表面**上
+    // 加了自己的对话框动画。故直接对窗口下令：不放动画。
+    LaunchedEffect(Unit) {
+        val w = (view.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window
+        if (w != null) {
+            w.setWindowAnimations(0)
+            w.attributes = w.attributes.apply { windowAnimations = 0 }
+        }
+    }
+    LaunchedEffect(Unit) {
+        val loc = IntArray(2)
+        var last = Int.MIN_VALUE
+        var stable = 0
+        var guard = 0
+        while (stable < 2 && guard < 45) {
+            withFrameNanos {
+                view.getLocationOnScreen(loc)
+                if (loc[1] == last) stable++ else stable = 0
+                last = loc[1]
+            }
+            guard++
+        }
+        onSettled()
+    }
+}
+
+/**
  * MIUIX 对话框卡片（HyperOS 观感）：自绘卡片 + **整宽分栏按钮行**——
  * 左「取消」/ 右「确认」各占一半宽、中间一条细竖分隔线，按钮行上方一条横分隔线。
  *
@@ -353,6 +445,7 @@ fun JiabanAlertDialog(
 @Composable
 private fun MiuixDialogCard(
     onDismissRequest: () -> Unit,
+    onWindowSettled: () -> Unit,
     cardModifier: Modifier,
     containerColor: Color,
     icon: (@Composable () -> Unit)?,
@@ -366,6 +459,7 @@ private fun MiuixDialogCard(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         DisablePlatformDim()
+        DialogWindowSettleProbe(onWindowSettled)
         val dividerColor = MaterialTheme.colorScheme.outlineVariant
         Column(
             modifier = cardModifier

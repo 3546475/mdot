@@ -91,6 +91,9 @@ fun DayPickDialog(
     onDismiss: () -> Unit,
     /** 见 [JiabanAlertDialog]：从底部弹层里打开的对话框传 false，避免盖掉弹层自己的背景 */
     backdrop: Boolean = true,
+    /** 见 [JiabanAlertDialog]：**独立 Dialog 窗口里的弹层**（如工地弹层）内打开的弹窗必须传 false ——
+     *  否则页内覆盖层会渲染到那个窗口**下面**（看不见）。等该弹层改成页内再一并转过来。 */
+    asOverlay: Boolean = true,
 ) {
     val today = LocalDate.now()
     var month by remember { mutableStateOf(YearMonth.from(initial)) }
@@ -102,6 +105,7 @@ fun DayPickDialog(
     JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
         backdrop = backdrop,
+        asOverlay = asOverlay,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(title, modifier = Modifier.weight(1f))
