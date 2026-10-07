@@ -57,7 +57,14 @@ class PayMonthViewModel @Inject constructor(
     private val _month = MutableStateFlow(YearMonth.now())
     val month: StateFlow<YearMonth> = _month.asStateFlow()
 
-    /** 存盘单据（写目标 + 实时预览的底稿）；未编辑过的月份回落出厂单 */
+    /**
+     * 存盘单据（**只读展示用**）；未编辑过的月份回落出厂单。
+     *
+     * ⚠️⚠️ **写盘路径一律不许读它**——见 [freshSheet]。它是无订阅者的 `WhileSubscribed` StateFlow，
+     * 页面只订阅 [displaySheet]/[attendance]/[collapsed]，所以它的 `.value` 恒为种子 `PayMonthSheet.default()`。
+     * 当初所有 mutate 都在这里读底稿 ⇒ 每次增/改/删都把整张单子覆盖成「出厂默认 + 那一处改动」，
+     * 已记金额与用户新增行当场蒸发（2026-10-07 用户报「增加项目后数据清 0 / 改任意数据时新增项消失」）。
+     */
     val sheet: StateFlow<PayMonthSheet> = _month
         .flatMapLatest { m -> storedFlow(m) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PayMonthSheet.default())
@@ -226,24 +233,28 @@ class PayMonthViewModel @Inject constructor(
     /** 一键恢复全部手改行（口径同 [restoreEngineValue]：只动对账里那些行，恢复到**实时**引擎值） */
     fun restoreAllEngineValues() {
         viewModelScope.launch {
-            val cur = sheet.value
-            val targets = displaySheet.value.reconciliations()
-                .mapNotNull { r -> r.item.engineCents?.let { (r.group to r.item.id) to it } }
-                .toMap()
-            fun restore(group: PayGroup, list: List<PayMonthItem>) = list.map { item ->
-                val engine = targets[group to item.id]
-                if (engine == null) item
-                else item.copy(amountCents = engine, engineCents = engine, source = PayMonthSource.SYNCED)
+            val m = _month.value
+            sheetEditMutex.withLock {
+                // 底稿现取（不读 sheet.value，见 freshSheet）：否则整张单子被覆盖成出厂默认
+                val cur = freshSheet(m)
+                val targets = displaySheet.value.reconciliations()
+                    .mapNotNull { r -> r.item.engineCents?.let { (r.group to r.item.id) to it } }
+                    .toMap()
+                fun restore(group: PayGroup, list: List<PayMonthItem>) = list.map { item ->
+                    val engine = targets[group to item.id]
+                    if (engine == null) item
+                    else item.copy(amountCents = engine, engineCents = engine, source = PayMonthSource.SYNCED)
+                }
+                settings.setPayMonth(
+                    m.toString(),
+                    cur.copy(
+                        basic = restore(PayGroup.BASIC, cur.basic),
+                        subsidy = restore(PayGroup.SUBSIDY, cur.subsidy),
+                        deduction = restore(PayGroup.DEDUCTION, cur.deduction),
+                        other = restore(PayGroup.OTHER, cur.other),
+                    ),
+                )
             }
-            settings.setPayMonth(
-                _month.value.toString(),
-                cur.copy(
-                    basic = restore(PayGroup.BASIC, cur.basic),
-                    subsidy = restore(PayGroup.SUBSIDY, cur.subsidy),
-                    deduction = restore(PayGroup.DEDUCTION, cur.deduction),
-                    other = restore(PayGroup.OTHER, cur.other),
-                ),
-            )
         }
     }
 
@@ -304,11 +315,12 @@ class PayMonthViewModel @Inject constructor(
      */
     fun importPrevMonth() {
         val cur = _month.value
-        // 同步取快照（sheet 已是 StateFlow 值），避免「撤销早于导入落盘」被覆盖的竞态
-        importBackup = sheet.value
-        importBackupMonth = cur
         viewModelScope.launch {
             sheetEditMutex.withLock {
+                // 快照与覆盖在**同一把锁内**取：既杜绝「撤销早于覆盖落盘」的竞态，
+                // 快照也必须现取（不读 sheet.value，见 freshSheet）——否则撤销会把整张单子恢复成出厂默认
+                importBackup = freshSheet(cur)
+                importBackupMonth = cur
                 settings.setPayMonth(cur.toString(), previewFlow(cur.minusMonths(1)).first())
             }
         }
@@ -327,16 +339,37 @@ class PayMonthViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 写盘前的**权威底稿**：现取 DataStore 里的存盘单据（读取侧已补出厂固定行）。
+     *
+     * ⚠️ 写路径**必须**用它、不能用 [sheet] 的 `.value`。这是记月丢数据的根因
+     * （2026-10-07 用户报「增加项目后已记录数据清 0；改任意项目数据时新增项消失」）：
+     * [sheet] 是 `stateIn(WhileSubscribed)`，而页面只订阅 [displaySheet]/[attendance]/[collapsed]，
+     * 从不订阅 [sheet] ⇒ 无订阅者 ⇒ 上游永不启动 ⇒ `sheet.value` 永远是种子值
+     * `PayMonthSheet.default()`（全 0、无用户行）。拿它当底稿写盘，
+     * 每一次增/改/删都会把整张单子覆盖成「出厂默认 + 那一处改动」，其余金额与用户行当场蒸发；
+     * 又因为 UI 读的是 [displaySheet]（每次从存盘单据重算），看上去「有数据」，把写盘侧的持续丢数盖住了。
+     *
+     * 附带修掉的同族隐患：`nextUserRowId()` 也从这份底稿算 id——底稿恒为 default 时
+     * **连加两行都拿到 id 1000**（互相撞车，`saveItem`/`removeItem` 按 id 匹配会改错删错行）。
+     */
+    private suspend fun freshSheet(month: YearMonth): PayMonthSheet =
+        settings.payMonthFlow(month.toString()).first() ?: PayMonthSheet.default()
+
     private fun mutate(group: PayGroup, block: (List<PayMonthItem>) -> List<PayMonthItem>) {
         viewModelScope.launch {
-            val cur = sheet.value
-            val next = when (group) {
-                PayGroup.BASIC -> cur.copy(basic = block(cur.basic))
-                PayGroup.SUBSIDY -> cur.copy(subsidy = block(cur.subsidy))
-                PayGroup.DEDUCTION -> cur.copy(deduction = block(cur.deduction))
-                PayGroup.OTHER -> cur.copy(other = block(cur.other))
+            // 月份锁内取一次：读盘与写盘必须是同一个 key，否则翻月瞬间会跨月写
+            val m = _month.value
+            sheetEditMutex.withLock {
+                val cur = freshSheet(m)
+                val next = when (group) {
+                    PayGroup.BASIC -> cur.copy(basic = block(cur.basic))
+                    PayGroup.SUBSIDY -> cur.copy(subsidy = block(cur.subsidy))
+                    PayGroup.DEDUCTION -> cur.copy(deduction = block(cur.deduction))
+                    PayGroup.OTHER -> cur.copy(other = block(cur.other))
+                }
+                settings.setPayMonth(m.toString(), next)
             }
-            settings.setPayMonth(_month.value.toString(), next)
         }
     }
 }

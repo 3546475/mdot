@@ -264,7 +264,9 @@ fun JiabanAlertDialog(
     // 由 [OverlayDialogs.scope] 决定（试用的页面置位，如「我的」页）。动机见 OverlayDialog.kt：
     // 这台 ROM 在对话框**窗口表面**上加动画，主题/窗口属性/系统缩放都关不掉 ⇒ 不新开窗才能绕开。
     // 覆盖层自带入场动画与返回键处理，故此处直接 return，不建任何 Dialog 窗、也不走下面的进度机器。
-    if (asOverlay) {
+    val overlayCtl = LocalOverlayDialogs.current
+    // controller 缺失（预览/测试/App 之外的组合）⇒ 落到下面原有的「双窗」实现兜底，功能不丢
+    if (asOverlay && overlayCtl != null) {
         DisposableEffect(Unit) {
             val entry = OverlayEntry(
                 onDismiss = onDismissRequest,
@@ -279,8 +281,8 @@ fun JiabanAlertDialog(
                     )
                 },
             )
-            OverlayDialogs.push(entry)
-            onDispose { OverlayDialogs.remove(entry) }
+            overlayCtl.push(entry)
+            onDispose { overlayCtl.remove(entry) }
         }
         return
     }

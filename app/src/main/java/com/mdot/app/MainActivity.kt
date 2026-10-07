@@ -28,6 +28,9 @@ import com.mdot.app.core.navigation.AppRoot
 import dagger.hilt.android.AndroidEntryPoint
 import com.mdot.app.core.designsystem.component.JiabanButton
 import com.mdot.app.core.designsystem.component.JiabanButtonRole
+import com.mdot.app.core.designsystem.component.OverlayDialogController
+import com.mdot.app.core.designsystem.component.LocalOverlayDialogs
+import androidx.compose.runtime.CompositionLocalProvider
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -40,7 +43,16 @@ class MainActivity : ComponentActivity() {
             window.isNavigationBarContrastEnforced = false
             window.isStatusBarContrastEnforced = false
         }
-        setContent { MdJiabanApp() }
+        setContent {
+            // 覆盖层控制器按**组合**持有（不是进程级单例）：随 Activity 重建换新，
+            // 预览/测试/多窗口互不串；控制器缺失时弹窗自动回退窗口实现（见 OverlayDialog.kt）
+            val overlayDialogs = remember { OverlayDialogController() }
+            androidx.compose.runtime.CompositionLocalProvider(
+                LocalOverlayDialogs provides overlayDialogs,
+            ) {
+                MdJiabanApp()
+            }
+        }
     }
 }
 

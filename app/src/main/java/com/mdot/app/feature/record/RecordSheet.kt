@@ -499,26 +499,28 @@ fun RecordSheet(
 
                         Spacer(Modifier.height(Spacing.m))
 
-                        // ---- 操作区（两态共用；编辑态展开时含删除） ----
+                        // ---- 操作区（两态共用；**编辑态常驻**删除，新增态无） ----
                         // 样式对齐已发布版（2026-09-25 用户要求）：取消 weight(1f)、
                         // 保存 weight(1.6f) 默认 contentPadding，删除 idle = M3 OutlinedButton
                         // 观感（描边胶囊 + error 文字，经 InlineConfirmStyle.Outlined）——
                         // 仅点击交互换成原地确认（硬规则 11，不回 ConfirmDialog）。
-                        // 取消 contentPadding 横向收紧只为压低最小宽：删除展开「取消/确认删除」
-                        // 询问态变宽后，取消/保存按 1:1.6 分余量会被挤窄，360dp 窄屏下
-                        // 不收紧会挤到「取消」两字换行；按钮拉伸显示时文字居中，与已发布版无差。
+                        // 取消 contentPadding 横向收紧只为压低最小宽：删除钮**展开「取消/确认删除」
+                        // 询问态**比收起态宽，收起态常驻后取消/保存按 1:1.6 分余量会被挤窄，
+                        // 360dp 窄屏下不收紧会挤到「取消」两字换行；按钮拉伸显示时文字居中，与已发布版无差。
                         // 间距不走 spacedBy：删除钮与取消之间的间距放在 AnimatedVisibility
-                        // 内容内部（随收合一起归零）——否则收合完成后子项移除、spacedBy 间隙
+                        // 内容内部（随退场一起归零）——否则退场完成后子项移除、spacedBy 间隙
                         // 消失，取消/保存会再跳一截（用户反馈的迟滞位移）
                         Row(
                             Modifier.fillMaxWidth().padding(bottom = Spacing.l),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            // 删除钮随面板展开/收起同拍进出（水平展开/收合 + 淡入淡出，
-                            // 与上方面板同一 motionScheme 弹簧）：出现/消失都不再瞬时跳变
+                            // 删除：**编辑态即常驻**，不再随完整面板的展开/收起进出
+                            // （用户 2026-10-07：「不展开就有」）。原先挂在 `visible = expanded`
+                            // 上 ⇒ 收起态下删除入口整个消失，用户看不到自己能删这条记录。
+                            // 进出（编辑态 ⇄ 新增态）仍走水平展开/收合 + 淡入淡出，避免瞬时跳变。
                             if (state.editing) {
                                 AnimatedVisibility(
-                                    visible = expanded,
+                                    visible = true,
                                     enter = expandHorizontally(
                                         animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
                                         expandFrom = Alignment.Start,

@@ -50,21 +50,36 @@ import androidx.compose.runtime.mutableStateListOf
  * ⚠️ 卡片是**简化版**（M3 观感：标题/正文 + 右对齐按钮行），未复刻 M3 AlertDialog 的逐像素样式；
  * 本原型要验证的是**动画/层级**，不是像素。
  */
-object OverlayDialogs {
+@androidx.compose.runtime.Stable
+class OverlayDialogController {
     /**
      * 覆盖层**栈**（后进先出）：弹窗里再开弹窗（如"删除确认"叠在某个弹窗上）时，
      * 只渲染栈顶；栈顶关闭后下面那层自动回到可见。
      * ⚠️ 不能用单槽：第二个弹窗注册会覆盖第一个，它 `onDispose` 时会把第一个一起清空（弹窗凭空消失）。
      */
-    private val stack = mutableStateListOf<OverlayEntry>()
+    internal val stack = mutableStateListOf<OverlayEntry>()
 
-    /** 栈顶（即当前显示的覆盖层） */
+    /** 栈顶（即当前显示的覆盖层）；`internal` —— `OverlayEntry` 本身是 internal */
     internal val current: OverlayEntry? get() = stack.lastOrNull()
 
     internal fun push(entry: OverlayEntry) { stack.add(entry) }
 
-    internal fun remove(entry: OverlayEntry) { stack.remove(entry) }
+    // ⚠️ 必须**按身份**删（`===`）：`OverlayEntry` 是 data class、`SnapshotStateList.remove` 走 `equals`——
+    // 两个内容相同的弹窗（例如两处一模一样的确认框）会被判成同一条，删一个会连另一个一起删掉
+    // （单测 `OverlayDialogControllerTest` 抓到的真实 bug，同族于"单槽覆盖"那次）。
+    internal fun remove(entry: OverlayEntry) { stack.removeAll { it === entry } }
 }
+
+/**
+ * 覆盖层控制器的**组合级**持有者 —— 由 UI 宿主（`MainActivity` 的 `setContent`）`remember` 后下发。
+ *
+ * 为什么不是进程级单例（`object` / Hilt `@Singleton`）：那是**进程作用域**，而覆盖层属于**一次 UI 会话** ——
+ * 单例会让 `@Preview`、Robolectric 测试、多窗口/分屏里的多个组合**共用同一个栈**（互相串）。
+ * 组合级持有则随 Activity 重建一起换新，语义正确。
+ *
+ * `null` = 当前组合没有宿主（预览/测试，或弹窗被组合在 App 之外）⇒ 调用方**回退到原来的窗口实现**。
+ */
+val LocalOverlayDialogs = androidx.compose.runtime.staticCompositionLocalOf<OverlayDialogController?> { null }
 
 internal data class OverlayEntry(
     val onDismiss: () -> Unit,
@@ -73,15 +88,27 @@ internal data class OverlayEntry(
 
 /** 覆盖层宿主：挂在 AppRoot 根 Box 的**最后**（压在底栏之上）。无内容时零开销。 */
 @Composable
-fun OverlayDialogLayer() {
-    val entry = OverlayDialogs.current ?: return
+fun OverlayDialogLayer(controller: OverlayDialogController) {
+    // **退场动画**（2026-09-30 补）：调用方摘掉 entry（`DisposableEffect` 的 onDispose）后，
+    // 本层并不立刻消失，而是把**最后那条**继续渲染到退场播完（同一条 spatial 曲线反向播）——
+    // 原实现是瞬间消失，而窗口版对话框一直有淡出。
+    val entry = controller.current
+    var rendered by remember { mutableStateOf<OverlayEntry?>(null) }
     val progress = remember { Animatable(0f) }
     val spec = sheetSpatialSpec<Float>()
     LaunchedEffect(entry) {
-        progress.snapTo(0f)
-        progress.animateTo(1f, animationSpec = spec)
+        if (entry != null) {
+            rendered = entry
+            progress.snapTo(0f)
+            progress.animateTo(1f, animationSpec = spec)
+        } else if (rendered != null) {
+            progress.animateTo(0f, animationSpec = spec)
+            rendered = null
+        }
     }
-    BackHandler(enabled = true) { entry.onDismiss() }
+    val shown = rendered ?: return
+    // 退场期间 entry 已为 null ⇒ 不再拦截返回；遮罩也不再消费点击（事件直接落到页面，避免"看不见的挡板"吞点击）
+    BackHandler(enabled = entry != null) { entry?.onDismiss() }
     Box(Modifier.fillMaxSize()) {
         // 遮罩本体**透明**：压暗/模糊/缩小由宿主的 SheetBackdropLayer 负责（与底部弹层同一约定，
         // 见 RecordSheet 里那句"遮罩本体已透明"）——此处只保留「挡板」职责：消费点击、拦截穿透。
@@ -89,7 +116,9 @@ fun OverlayDialogLayer() {
         Box(
             Modifier
                 .fillMaxSize()
-                .pointerInput(entry) { detectTapGestures { entry.onDismiss() } },
+                .pointerInput(entry) {
+                    if (entry != null) detectTapGestures { entry.onDismiss() }
+                },
         )
         Box(
             Modifier
@@ -101,7 +130,7 @@ fun OverlayDialogLayer() {
                     alpha = p
                 },
             contentAlignment = Alignment.Center,
-        ) { entry.content() }
+        ) { shown.content() }
     }
 }
 

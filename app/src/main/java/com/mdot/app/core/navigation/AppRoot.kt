@@ -120,13 +120,13 @@ import com.mdot.app.feature.site.SiteSettlementScreen
 import com.mdot.app.feature.site.SiteRecordScreen
 import com.mdot.app.core.designsystem.component.JiabanFab
 import com.mdot.app.core.designsystem.component.OverlayDialogLayer
-import com.mdot.app.core.designsystem.component.OverlayDialogs
 import com.mdot.app.domain.model.SheetBackdropMode
 import com.mdot.app.core.designsystem.component.LocalSheetBackdropMode
 import com.mdot.app.core.designsystem.sheetSpatialSpec
 import com.mdot.app.core.designsystem.SheetBackdrop
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.blur
+import com.mdot.app.core.designsystem.component.LocalOverlayDialogs
 
 /** 内容底部避让底栏（03 文档 §4.1：滚动内容从底栏下方穿过）；
  *  无底栏形态（showBottomBar=false）只避让系统导航栏，避免底部大片空隙 */
@@ -343,6 +343,8 @@ private fun AppRootContent(
     val currentBase = currentRoute?.substringBefore('?')
     // 底栏可见性 = 当前页面确实配置在用户的底栏槽位里；
     // 池里但未配置的页面（工资/导出/同步）走无底栏形态，顶栏带返回
+    // 覆盖层控制器：由 MainActivity 的 setContent 下发（组合级持有，非进程单例）
+    val overlayDialogs = LocalOverlayDialogs.current
     val slots = bottomBar.slots.toSet()
     val orderedSlots = bottomBar.slots
     val showBar = currentBase != null && currentBase in slots
@@ -353,7 +355,7 @@ private fun AppRootContent(
         // 背景层：弹层出现时整屏内容模糊 + 缩小成圆角卡片（弹层自身在最上层、不受影响）
         // 覆盖层（页内模态弹窗）也用**同一条背景层**：弹窗本体画在层外 ⇒ 只糊「背后的页面」，
         // 与底部弹层完全同款（页内模态不能再自建一套模糊管线，见 OverlayDialog.kt）
-        SheetBackdropLayer(visible = recordSheetVisible.targetState || OverlayDialogs.current != null) {
+        SheetBackdropLayer(visible = recordSheetVisible.targetState || overlayDialogs?.current != null) {
             // 全画面源（对话框背景效果采样用）：包住内容+顶栏+底栏+FAB——⚠️ 玻璃消费方
             // （底栏/圆钮）画的是**另一个** NavHost 源的层，两源不同 RenderNode 无自引用环
             // （docs/11 062 禁的是「效果方画自己所在的源」）。按需录制（BackdropSourceDemand）。
@@ -894,7 +896,7 @@ private fun AppRootContent(
             // （用户 2026-09-30 三次反馈的"背景一片空白"根因；它在 progress=0 时也照画，与弹窗无关）。
             // 故这里只做「模糊 + 压暗」，不垫底：模糊在链首（先糊再压暗），压暗用 drawWithContent 叠加。
             val sheetUnderDialog by androidx.compose.animation.core.animateFloatAsState(
-                targetValue = if (OverlayDialogs.current != null) 1f else 0f,
+                targetValue = if (overlayDialogs?.current != null) 1f else 0f,
                 animationSpec = com.mdot.app.core.designsystem.sheetSpatialSpec<Float>(),
                 label = "sheetUnderDialog",
             )
@@ -919,7 +921,7 @@ private fun AppRootContent(
     // ① 要在 SheetBackdropLayer **之外**（否则会被连带着模糊/压暗/缩放）；
     // ② 要在 RecordSheet / 全局提示窗**之后**（否则"从弹层里打开的日期选择"会被弹层盖住）。
     // 两条都踩过坑，见 OverlayDialog.kt 与 docs/11 071。
-    OverlayDialogLayer()
+    if (overlayDialogs != null) OverlayDialogLayer(overlayDialogs)
     }
 }
 
