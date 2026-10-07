@@ -1,16 +1,16 @@
 {
-  "versionName": "0.7.8.1",
-  "versionCode": 61,
-  "tag": "v0.7.8.1",
-  "releaseNotes": "## 更新内容\n\n**修复**\n\n- 修复部分机型（Android 16 / 澎湃 OS）上**打开弹窗时背景会\"往下弹一下再回来\"的抖动** ——\n  全 App 弹窗改为**页内模态**实现（不再使用系统对话框窗口），从结构上消除了这类机型差异\n- 修复**只打开记加班弹窗时，背后页面变成一片空白**（不再模糊）的问题\n- 修复**弹窗被弹层盖住**（从记加班弹层里点日期时，日期选择显示在弹层下面）\n- 修复**弹窗里再开弹窗**（如删除确认）时的上下层关系\n- 修复「模糊缩小」档下弹层下缘被裁掉、露出后面页面\n\n**界面**\n\n- 弹窗观感保持不变：背景照「弹层背景」设置模糊 / 压暗，弹窗卡片按所选主题引擎（MD3 / MIUIX）渲染\n- 弹窗里的日期选择、确认框等与之前完全一样的用法\n\n\n系统要求：Android 10（API 29）及以上。",
+  "versionName": "0.7.8.2",
+  "versionCode": 62,
+  "tag": "v0.7.8.2",
+  "releaseNotes": "## 更新内容\n\n**修复**\n\n- 修复**记月页会丢数据**：已记录的金额在「增加项目」后被清 0，且自己新增的项目在改动其它项目时会消失\n- 修复连续添加多个项目时可能互相覆盖的问题\n- 修复记加班弹层的「删除」按钮要展开面板才看得见 —— 现在打开已记录的加班时即可直接删除\n- 修复弹窗关闭时**瞬间消失**、没有淡出动画\n- 修复弹窗状态在多窗口 / 应用预览下可能互相串扰\n\n\n系统要求：Android 10（API 29）及以上。",
   "apkUrl": {
-    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.7.8.1/MDOT-RELEASE-0.7.8.1-v8a.apk",
-    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.7.8.1/MDOT-RELEASE-0.7.8.1-v7a.apk",
-    "universal": "https://github.com/3546475/mdot/releases/download/v0.7.8.1/MDOT-RELEASE-0.7.8.1-dual.apk"
+    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.7.8.2/MDOT-RELEASE-0.7.8.2-v8a.apk",
+    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.7.8.2/MDOT-RELEASE-0.7.8.2-v7a.apk",
+    "universal": "https://github.com/3546475/mdot/releases/download/v0.7.8.2/MDOT-RELEASE-0.7.8.2-dual.apk"
   },
   "apkSha256": {
-    "arm64-v8a": "b07f19288bb067437d713a00cbf9e04092dde94399ac42df577632a2a2d304f1",
-    "armeabi-v7a": "6e0bcf64c4ff4a34fc435322248fdf7e5598873aeafd9e9e7f0e7f4bc4f6e8c4",
-    "universal": "a55982c70f9738a40eab180aed88a9aa22e2b3adf03108cd1893956c9861e1fc"
+    "arm64-v8a": "a01230229bcf122369e74101277e043f880f558be3c8848020879e0ed7b97f30",
+    "armeabi-v7a": "afa658c4b11ca96ccd0afacbb289fcda2009cb262abdf061ad3cd439271be203",
+    "universal": "c5a838d342448c83efc8228fa6f52285dc467cdf74542af0a7e856a1bdceced4"
   }
 }
