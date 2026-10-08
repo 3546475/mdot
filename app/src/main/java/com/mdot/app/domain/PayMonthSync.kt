@@ -32,6 +32,11 @@ internal fun applyRecordSync(
     compMinutes: Int = 0,
     /** 社保/公积金自动回填载荷（比例 0 = 不算，行保持原值） */
     insurance: InsuranceFill = InsuranceFill(),
+    /**
+     * 本月的四个天数计数，供「按日计算」的行与全勤奖自动推导（v0.7.8.3）。
+     * 默认全 0 ⇒ 这些行算出 0 元（而不是崩或沿用旧值），保持旧调用点行为不变。
+     */
+    dayCounts: PayMonthDayCounts = PayMonthDayCounts(),
 ): PayMonthSheet {
     fun set(
         list: List<PayMonthItem>,
@@ -57,7 +62,7 @@ internal fun applyRecordSync(
     }
 
     val basic = if (fillBase) set(sheet.basic, PayMonthSheet.BASE_ROW_ID, out.baseIncludedCents) else sheet.basic
-    return sheet.copy(
+    val engineFilled = sheet.copy(
         // 加班工资 ← 引擎；「调休折现」← 转调休分钟按同一套口径折算（自动，不用手填）
         basic = set(
             set(basic, 2L, out.otPayCents),
@@ -93,6 +98,45 @@ internal fun applyRecordSync(
                 )
             },
     )
+    // ---- 按日计算的行 + 全勤奖自动发放（v0.7.8.3）：**四组都要过**，
+    // 且必须在上面那批引擎行回填之后（否则会覆盖掉它们的来源戳）----
+    return engineFilled.copy(
+        basic = applyAutoRows(engineFilled.basic, dayCounts, syncedAt),
+        subsidy = applyAutoRows(engineFilled.subsidy, dayCounts, syncedAt),
+        deduction = applyAutoRows(engineFilled.deduction, dayCounts, syncedAt),
+        other = applyAutoRows(engineFilled.other, dayCounts, syncedAt),
+    )
+}
+
+/**
+ * 按「引擎管钱的行」重算金额（纯函数）：
+ * - **按日行**：`日单价 × 天数`（天数按该行自己的口径与"是否扣请假"），并把天数/单价记进推导依据
+ */
+private fun applyAutoRows(
+    rows: List<PayMonthItem>,
+    counts: PayMonthDayCounts,
+    syncedAt: String,
+): List<PayMonthItem> = rows.map { item ->
+    when {
+        item.isDailyComputed -> {
+            val days = counts.days(item.dayBasis, item.dayDeductLeave)
+            val cents = PayMonthDaily.dailyCents(item.dayRateCents, days)
+            item.copy(
+                amountCents = cents,
+                source = PayMonthSource.SYNCED,
+                engineCents = cents,
+                syncedAt = syncedAt,
+                derivationDays = days,
+                derivationUnitCents = item.dayRateCents,
+            )
+        }
+
+        // ⚠️ 全勤奖**故意不在这里自动推导**（2026-10-08 用户定：从自动降为手动填）。
+        // 曾做过"满勤发、缺勤归零"，但全勤的真实判定条件远超 App 能拿到的数据
+        // （迟到/早退/漏打卡都要上下班时刻，App 只记时长；且年假/调休该不该算缺勤各公司不一），
+        // 硬判只会给出用户不认可的结论。故它现在就是一行普通手填项。
+        else -> item
+    }
 }
 
 /**
@@ -137,8 +181,9 @@ internal fun livePreviewSheet(
     compCashCents: Long = 0,
     compMinutes: Int = 0,
     insurance: InsuranceFill = InsuranceFill(),
+    dayCounts: PayMonthDayCounts = PayMonthDayCounts(),
 ): PayMonthSheet {
-    val synced = applyRecordSync(sheet, out, fillBase, syncedAt, compCashCents, compMinutes, insurance)
+    val synced = applyRecordSync(sheet, out, fillBase, syncedAt, compCashCents, compMinutes, insurance, dayCounts)
     return synced.copy(
         basic = liveMerged(sheet.basic, synced.basic),
         subsidy = liveMerged(sheet.subsidy, synced.subsidy),
@@ -177,6 +222,10 @@ private fun liveMerged(old: List<PayMonthItem>, new: List<PayMonthItem>): List<P
  * 该行金额是不是**用户自己的**：`EDITED`（同步后手改）或「无引擎戳且金额非 0」（纯手填）。
  * 实时预览对这种行保留用户值、不被引擎当前值覆盖；金额为 0 且从未同步的行视为「待引擎填」，
  * 正是实时预览要补上的部分。
+ *
+ * ⚠️ **引擎管钱的行（[PayMonthItem.isAutoManaged]：按日行与全勤奖）一律不算"用户自己的"**。
+ * 存盘里它们首次同步前 amountCents 非 0 且无引擎戳，若被判成用户所有，
+ * 实时预览就会永远保留旧值 —— 按日补贴不自动算、全勤奖永远照发，自动推导形同虚设。
  */
 internal fun PayMonthItem.isUserOwned(): Boolean =
-    source == PayMonthSource.EDITED || (engineCents == null && amountCents != 0L)
+    !isAutoManaged && (source == PayMonthSource.EDITED || (engineCents == null && amountCents != 0L))

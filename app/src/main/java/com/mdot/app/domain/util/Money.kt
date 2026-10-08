@@ -35,6 +35,17 @@ object Money {
             String.format(Locale.US, "%.2f", bp / 100.0).trimEnd('0').trimEnd('.')
         }
 
+    /**
+     * 天数 → 文本（记月「按日计算」的推导依据用）：22 → "22"，21.5 → "21.5"，21.25 → "21.25"。
+     *
+     * 半天请假是常态（用户 2026-10-08 定「算 0.5 天」），所以**必须保留 .5**；
+     * 但整数天不该显示成 "22.0"（像精度溢出的机器话）。最多两位小数，够表达 1/4 天。
+     */
+    fun dayCountText(days: Double): String = when {
+        days == kotlin.math.floor(days) -> days.toLong().toString()
+        else -> String.format(Locale.US, "%.2f", days).trimEnd('0').trimEnd('.')
+    }
+
     /** 元字符串 → 分；非法输入返回 null。支持 "5000" / "5000.5" / "5,000.50"；负数拒绝（金额域非负，13 文档 B4-04） */
     fun parseYuanToCents(text: String): Long? {
         val cleaned = text.trim().replace(",", "")

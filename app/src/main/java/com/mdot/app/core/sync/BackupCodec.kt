@@ -14,6 +14,9 @@ import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.domain.model.AppearanceConfig
 import com.mdot.app.domain.model.BottomBarConfig
 import com.mdot.app.domain.model.HomeCardsConfig
+import com.mdot.app.domain.model.PayMonthCustomPresets
+import com.mdot.app.domain.model.PayMonthSheet
+import com.mdot.app.domain.model.PayMonthTemplates
 import com.mdot.app.domain.model.SalaryConfig
 import com.mdot.app.domain.model.WorkSystem
 import kotlinx.coroutines.flow.first
@@ -152,6 +155,9 @@ class BackupCodec @Inject constructor(
             appearance = settings.appearanceFlow.first(),
             bottomBar = settings.bottomBarFlow.first(),
             homeCards = settings.homeCardsFlow.first(),
+            payMonthSheets = settings.allPayMonths(),
+            payMonthTemplates = settings.payMonthTemplatesFlow.first(),
+            payMonthCustomPresets = settings.payMonthCustomPresetsFlow.first(),
         ),
     )
 
@@ -341,6 +347,14 @@ class BackupCodec @Inject constructor(
         settings.setBottomBar(st.bottomBar.migrated())
         // 首页卡片：旧备份无此键（null）→ 保留本机配置不覆盖
         st.homeCards?.let { settings.setHomeCards(it.migrated()) }
+        // 记月工资单与行模板：空 = 旧备份包不含记月 → **保留本机不动**。
+        // ⚠️ 不能拿空 map 去覆盖：那会把用户现有的单子全清空（"恢复旧备份 = 丢记月数据"）。
+        if (st.payMonthSheets.isNotEmpty()) settings.replaceAllPayMonths(st.payMonthSheets)
+        if (st.payMonthTemplates.rows.isNotEmpty()) settings.setPayMonthTemplates(st.payMonthTemplates)
+        // 自定义添加预设同理：空 = 旧包没有这项，不是"清空预设"
+        if (st.payMonthCustomPresets.byGroup.isNotEmpty()) {
+            settings.setPayMonthCustomPresets(st.payMonthCustomPresets)
+        }
         settings.touch()
     }
 
@@ -612,4 +626,17 @@ data class SettingsDto(
     val bottomBar: BottomBarConfig = BottomBarConfig(),
     /** 首页卡片配置（v0.6.0）；旧备份缺省 null=未配置，恢复时保留本机 */
     val homeCards: HomeCardsConfig? = null,
+    /**
+     * 记月工资单（v0.7.8.3），键 = `yyyy-MM`（与 DataStore 里的键名一致，可直接回灌）。
+     *
+     * 2026-10-08 补：记月是用户**逐行手工维护**的数据，补进备份前换手机/恢复会整份丢失。
+     * 空 map = 旧备份包（那时不含记月）⇒ 恢复时**保留本机不动**，不拿空表覆盖用户的单子。
+     * 不 bump `formatVersion`：新字段带默认值，旧包解码自动降级（AGENTS.md 发布流程的版本号只在
+     * public-main 改，这里动 formatVersion 会让旧版 App 拒收新包，得不偿失）。
+     */
+    val payMonthSheets: Map<String, PayMonthSheet> = emptyMap(),
+    /** 记月行模板（用户新增的行 + 按日单价），换手机后这些行不丢 */
+    val payMonthTemplates: PayMonthTemplates = PayMonthTemplates(),
+    /** 用户自建的添加预设（按分组）；空 = 旧包没有这项 */
+    val payMonthCustomPresets: PayMonthCustomPresets = PayMonthCustomPresets(),
 )

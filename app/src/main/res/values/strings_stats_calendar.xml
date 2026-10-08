@@ -33,7 +33,15 @@
     <string name="paymonth_add_subsidy">添加补贴</string>
     <string name="paymonth_add_other">添加其他项</string>
     <string name="paymonth_add_count">添加 %1$d 项</string>
-    <string name="paymonth_add_multi_hint">可多选常用项一次添加；金额留空则为 0，之后逐条改</string>
+    <string name="paymonth_add_multi_hint">可多选一次添加多项；金额添加后在列表里逐条填</string>
+    <!-- 「＋」预设管理：增删同处（用户 2026-10-09 定） -->
+    <string name="paymonth_add_new_preset">＋ 预设管理</string>
+    <string name="paymonth_manage_preset_title">预设管理</string>
+    <string name="paymonth_manage_preset_hint">建好后会一直在添加列表里（下个月也在）。删除只是从列表移除，不动已录入的项目</string>
+    <string name="paymonth_manage_preset_confirm">删除</string>
+    <string name="paymonth_add_preset_action">添加</string>
+    <string name="paymonth_done">完成</string>
+    <string name="paymonth_add_custom_label">预设名称</string>
     <string name="paymonth_add_deduction">添加扣款</string>
     <string name="paymonth_add_title">添加条目</string>
     <string name="paymonth_edit_title">编辑条目</string>
@@ -45,6 +53,20 @@
     <string name="paymonth_import_prev">导入上月</string>
     <string name="paymonth_import_confirm_action">确认覆盖</string>
     <string name="paymonth_undo">撤销</string>
+    <!-- v0.7.8.3 记月「按日计算」：行级属性（用户 2026-10-08 定：这是添加的某一行的属性） -->
+    <string name="paymonth_daily_title">按日计算</string>
+    <string name="paymonth_daily_unit_label">日单价（元/天）</string>
+    <string name="paymonth_daily_basis_label">天数按哪种口径算</string>
+    <string name="paymonth_daily_basis_standard">应出勤日</string>
+    <string name="paymonth_daily_basis_record">实际记录日</string>
+    <string name="paymonth_daily_basis_calendar">周期自然日</string>
+    <string name="paymonth_daily_deduct_leave">请假扣减天数</string>
+    <string name="paymonth_daily_hint_record">只数有加班记录的天，漏记的日期不计入</string>
+    <string name="paymonth_daily_hint_calendar">按周期天数固定算，不随请假变化</string>
+    <string name="paymonth_daily_hint_standard">按工作日设定推算，不受记不记加班影响</string>
+    <!-- 行上的推导依据：21.5 天 × ¥50 -->
+    <string name="paymonth_daily_derivation">%1$s 天 × %2$s</string>
+    <string name="paymonth_daily_amount_locked">金额由「日单价 × 天数」自动算，改上面的日单价即可</string>
     <!-- v0.7.4 记月：实发汇总卡 + 金额来源标记 + 调休折现算法（docs/20 P0-2/P0-3） -->
     <string name="paymonth_net_title">实发工资</string>
     <string name="paymonth_card_toggle_cd">切换汇总卡形态（完整／精简）</string>
@@ -89,7 +111,6 @@
         <item>餐补</item>
         <item>住房补贴</item>
         <item>交通补贴</item>
-        <item>全勤奖</item>
     </string-array>
     <string-array name="paymonth_basic_presets">
         <item>绩效奖金</item>

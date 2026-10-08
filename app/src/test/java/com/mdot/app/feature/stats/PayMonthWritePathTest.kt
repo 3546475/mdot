@@ -281,4 +281,48 @@ class PayMonthWritePathTest {
                 it.subsidy.any { s -> s.name == "夜班补贴" }
         }
     }
+
+    // ---- 添加条目（2026-10-09 改为"只选条目、不带金额"）----
+
+    @Test
+    fun `添加不带金额 - 新增行金额为 0 等用户逐行填`() = runBlocking {
+        val vm = newVm()
+
+        vm.addItems(PayGroup.SUBSIDY, listOf("餐补", "交通补贴"))
+        awaitStored("两行都应落盘") { it.subsidy.count { s -> !s.builtin } == 2 }
+
+        stored().subsidy.filter { !it.builtin }.forEach {
+            assertEquals("添加时不该带金额（弹窗已不收集金额）", 0L, it.amountCents)
+        }
+    }
+
+    @Test
+    fun `添加与已有行同名时不加出重复行`() = runBlocking {
+        val vm = newVm()
+
+        // 「全勤奖」是补贴组的出厂固定行，而预设里一度也有它 —— 曾会再加一行同名的出来
+        vm.addItems(PayGroup.SUBSIDY, listOf("全勤奖"))
+        delay(200)
+
+        assertEquals(
+            "与已有行同名必须跳过，否则会加出重复的「全勤奖」",
+            1, stored().subsidy.count { it.name == "全勤奖" },
+        )
+
+        // 自己先加一行，再用同名加一次，同样不该重复
+        vm.addItems(PayGroup.SUBSIDY, listOf("餐补"))
+        awaitStored("餐补应落盘") { it.subsidy.any { s -> s.name == "餐补" } }
+        vm.addItems(PayGroup.SUBSIDY, listOf("餐补"))
+        delay(200)
+        assertEquals("重复添加同名项应被忽略", 1, stored().subsidy.count { it.name == "餐补" })
+    }
+
+    @Test
+    fun `添加多行时 传入名单内部重复也只加一行`() = runBlocking {
+        val vm = newVm()
+
+        vm.addItems(PayGroup.SUBSIDY, listOf("餐补", "餐补", "  ", "夜班补贴"))
+        awaitStored("应只加两行") { it.subsidy.count { s -> !s.builtin } == 2 }
+        assertEquals(1, stored().subsidy.count { it.name == "餐补" })
+    }
 }

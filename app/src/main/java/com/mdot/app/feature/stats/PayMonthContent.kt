@@ -60,6 +60,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -85,6 +86,7 @@ import com.mdot.app.core.designsystem.HeroAmountTier
 import com.mdot.app.core.designsystem.HeroTile
 import com.mdot.app.core.designsystem.heroAmountStyle
 import com.mdot.app.core.designsystem.IconSpec
+import kotlinx.coroutines.launch
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.AnimatedMoneyText
@@ -96,11 +98,14 @@ import com.mdot.app.domain.PayrollCalculator
 import com.mdot.app.domain.model.IncomeSliceKind
 import com.mdot.app.domain.model.InsuranceKind
 import com.mdot.app.domain.model.PayGroup
+import com.mdot.app.domain.PayMonthDayBasis
 import com.mdot.app.domain.model.PayMonthItem
 import com.mdot.app.domain.model.PayMonthSheet
+import com.mdot.app.domain.model.rowsOf
 import com.mdot.app.domain.model.insuranceKindOf
 import com.mdot.app.domain.model.RateTier
 import com.mdot.app.domain.model.reconciliations
+import com.mdot.app.core.designsystem.ButtonSpec
 import com.mdot.app.domain.model.PayMonthSource
 import com.mdot.app.domain.model.Reconciliation
 import com.mdot.app.domain.util.Money
@@ -110,6 +115,7 @@ import kotlin.math.roundToInt
 import java.time.YearMonth
 import com.mdot.app.core.designsystem.component.JiabanButton
 import com.mdot.app.core.designsystem.component.JiabanButtonRole
+import com.mdot.app.core.designsystem.component.JiabanSwitch
 import com.mdot.app.core.designsystem.component.JiabanIconButton
 import com.mdot.app.core.designsystem.component.FloatingLabelTextField
 import com.mdot.app.core.designsystem.emphasisCardSurface
@@ -136,6 +142,7 @@ fun PayMonthContent(
     // 展示一律读**实时预览**单据（vm.displaySheet）：引擎行走当前考勤/薪资实时值、手改/手填行保留，
     // 随记随更新——与首页数据区「实发工资」同款推导（2026-09-28 用户要求，「同步本月考勤」按钮已移除）
     val sheet by vm.displaySheet.collectAsStateWithLifecycle()
+    val customPresets by vm.customPresets.collectAsStateWithLifecycle()
     val attendance by vm.attendance.collectAsStateWithLifecycle()
     val collapsedGroups by vm.collapsed.collectAsStateWithLifecycle()
     val prevSheet by vm.prevSheet.collectAsStateWithLifecycle()
@@ -318,15 +325,22 @@ fun PayMonthContent(
         )
     }
     adding?.let { group ->
+        val builtin = when (group) {
+            PayGroup.BASIC -> stringArrayResource(R.array.paymonth_basic_presets).toList()
+            PayGroup.SUBSIDY -> stringArrayResource(R.array.paymonth_subsidy_presets).toList()
+            PayGroup.DEDUCTION -> stringArrayResource(R.array.paymonth_deduction_presets).toList()
+            PayGroup.OTHER -> stringArrayResource(R.array.paymonth_other_presets).toList()
+        }
         AddItemDialog(
-            presets = when (group) {
-                PayGroup.BASIC -> stringArrayResource(R.array.paymonth_basic_presets).toList()
-                PayGroup.SUBSIDY -> stringArrayResource(R.array.paymonth_subsidy_presets).toList()
-                PayGroup.DEDUCTION -> stringArrayResource(R.array.paymonth_deduction_presets).toList()
-                PayGroup.OTHER -> stringArrayResource(R.array.paymonth_other_presets).toList()
-            },
-            onSave = { names, cents ->
-                vm.addItems(group, names, cents)
+            // 写死的常用项 + 用户自建（自建在后，是用户自己的习惯清单）。
+            // ⚠️ distinct 不能省：自建预设若与内置项重名（如自己又建一个「餐补」）会出两个一模一样的 chip
+            presets = (builtin + customPresets.of(group)).distinct(),
+            existingNames = sheet.rowsOf(group).mapTo(HashSet()) { it.name },
+            customPresetNames = customPresets.of(group),
+            onCreatePreset = { vm.addCustomPreset(group, it) },
+            onDeletePreset = { vm.removeCustomPreset(group, it) },
+            onSave = { names ->
+                vm.addItems(group, names)
                 adding = null
             },
             onDismiss = { adding = null },
@@ -1013,6 +1027,13 @@ private fun PayGroupCard(
                             item.source?.let { src ->
                                 Spacer(Modifier.height(Spacing.xs))
                                 val derivation = when {
+                                    // 按日计算：最具体的依据，优先展示（「21.5 天 × ¥50」）
+                                    item.derivationDays != null && item.derivationUnitCents != null -> stringResource(
+                                        R.string.paymonth_daily_derivation,
+                                        // 天数去掉无意义的小数尾巴：整数显示 21，半点显示 21.5
+                                        Money.dayCountText(item.derivationDays),
+                                        Money.yuanTrimText(item.derivationUnitCents),
+                                    )
                                     item.derivationMinutes != null -> stringResource(
                                         R.string.paymonth_derivation_comp,
                                         TimeUtils.prettyDuration(item.derivationMinutes),
@@ -1087,6 +1108,28 @@ private val SOCIAL_RATE_PRESETS = listOf(0, 800, 1020, 1050)
 /** 公积金个人比例预设（基点）：法定区间 5%–12%，取常见档 */
 private val FUND_RATE_PRESETS = listOf(0, 500, 700, 800, 1000, 1200)
 
+/** 「按日计算」天数口径的展示顺序（应出勤 → 记录 → 自然日，从最推荐到最粗） */
+private val DAY_BASIS_ORDER = listOf(
+    PayMonthDayBasis.STANDARD,
+    PayMonthDayBasis.RECORD,
+    PayMonthDayBasis.CALENDAR,
+)
+
+/** 天数口径的文案（选项名 + 一句说明它怎么算、坑在哪） */
+private val PayMonthDayBasis.labelRes: Int
+    get() = when (this) {
+        PayMonthDayBasis.STANDARD -> R.string.paymonth_daily_basis_standard
+        PayMonthDayBasis.RECORD -> R.string.paymonth_daily_basis_record
+        PayMonthDayBasis.CALENDAR -> R.string.paymonth_daily_basis_calendar
+    }
+
+private val PayMonthDayBasis.hintRes: Int
+    get() = when (this) {
+        PayMonthDayBasis.STANDARD -> R.string.paymonth_daily_hint_standard
+        PayMonthDayBasis.RECORD -> R.string.paymonth_daily_hint_record
+        PayMonthDayBasis.CALENDAR -> R.string.paymonth_daily_hint_calendar
+    }
+
 /**
  * 社保/公积金行的弹窗附加设置（docs/20：**设置放进它自己那一行的弹窗**——
  * 工资设定页签内容太多，那边不再放这张卡）。比例用预设选项、基数默认跟随底薪。
@@ -1128,6 +1171,14 @@ private fun EditItemDialog(
             if (insurance != null && insurance.baseCents > 0) Money.yuanTrimText(insurance.baseCents) else ""
         )
     }
+    // ---- 「按日计算」态（v0.7.8.3：行级属性，任何行都能开）----
+    var dailyOn by remember { mutableStateOf(item.isDailyComputed) }
+    var dailyUnit by remember {
+        mutableStateOf(if (item.dayRateCents > 0) Money.yuanTrimText(item.dayRateCents) else "")
+    }
+    var dailyBasis by remember { mutableStateOf(item.dayBasis) }
+    var dailyDeductLeave by remember { mutableStateOf(item.dayDeductLeave) }
+    val dailyUnitCents = Money.parseYuanToCents(dailyUnit)
     fun effRate(): Int =
         if (rateCustom) ((rateText.toDoubleOrNull() ?: 0.0) * 100).toInt().coerceIn(0, 10_000) else rateBp
 
@@ -1151,7 +1202,82 @@ private fun EditItemDialog(
                     onValueChange = { amount = it },
                     label = stringResource(R.string.paymonth_amount_label),
                     isError = cents == null,
+                    // 按日计算时金额是算出来的，改它没有意义 —— 置灰并提示改日单价
+                    enabled = !dailyOn,
                 )
+                if (dailyOn) {
+                    Spacer(Modifier.height(Spacing.xs))
+                    Text(
+                        stringResource(R.string.paymonth_daily_amount_locked),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                // ---- 按日计算（行级属性）：开关 + 日单价 + 天数口径 + 请假开关 ----
+                // 只在**允许**按日的行上显示——出厂固定行里只有「其它补贴」允许
+                // （其余出厂项要么有确定算法、要么本身是配置项，见 supportsDailyRate 的说明）
+                if (item.supportsDailyRate) {
+                    Spacer(Modifier.height(Spacing.m))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                stringResource(R.string.paymonth_daily_title),
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
+                        JiabanSwitch(checked = dailyOn, onCheckedChange = { dailyOn = it })
+                    }
+                    if (dailyOn) {
+                        Spacer(Modifier.height(Spacing.s))
+                        FloatingLabelTextField(
+                            value = dailyUnit,
+                            onValueChange = { dailyUnit = it },
+                            label = stringResource(R.string.paymonth_daily_unit_label),
+                            isError = dailyUnitCents == null,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(Spacing.m))
+                        Text(
+                            stringResource(R.string.paymonth_daily_basis_label),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(Spacing.xs))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        ) {
+                            DAY_BASIS_ORDER.forEach { basis ->
+                                FilterChip(
+                                    colors = jiabanFilterChipColors(),
+                                    selected = dailyBasis == basis,
+                                    onClick = { dailyBasis = basis },
+                                    label = { Text(stringResource(basis.labelRes)) },
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(Spacing.xs))
+                        Text(
+                            stringResource(dailyBasis.hintRes),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(Spacing.s))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    stringResource(R.string.paymonth_daily_deduct_leave),
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                            }
+                            JiabanSwitch(
+                                checked = dailyDeductLeave,
+                                onCheckedChange = { dailyDeductLeave = it },
+                            )
+                        }
+                    }
+                }
 
                 // ---- 社保 / 公积金的「比例 + 基数」就设在它自己的行弹窗里 ----
                 insurance?.let { ins ->
@@ -1281,7 +1407,14 @@ private fun EditItemDialog(
                 text = stringResource(R.string.paymonth_save),
                 onClick = {
                     onSave(
-                        item.copy(name = if (item.builtin) item.name else name.trim(), amountCents = cents ?: 0),
+                        item.copy(
+                            name = if (item.builtin) item.name else name.trim(),
+                            amountCents = cents ?: 0,
+                            // 按日配置随行一起存；不允许按日的行强制清零（避免残留配置被引擎继续算）
+                            dayRateCents = if (dailyOn && item.supportsDailyRate) (dailyUnitCents ?: 0L) else 0L,
+                            dayBasis = dailyBasis,
+                            dayDeductLeave = dailyDeductLeave,
+                        ),
                         effRate(),
                         if (baseFollows) 0L else (Money.parseYuanToCents(baseText) ?: 0L),
                     )
@@ -1311,56 +1444,73 @@ private fun EditItemDialog(
 }
 
 /**
- * 添加条目：**预选项多选一次添加**（docs/20 P2-3），或手填一条自定义。
+ * 添加条目：**只选"加哪些项"**（预设多选 + 自定义名称），**不在这里填金额**。
  *
- * 选项优先（硬规则 12）：常用工资项都在预设里点一下；只在预设没有时才敲名称。
+ * 选项优先（硬规则 12）：常用工资项都在预设里点一下；预设没有时才敲名称。
+ *
+ * 2026-10-09 改（用户反馈"逻辑不顺畅"）：
+ * - **去掉金额输入框**：原先勾多项共用同一个金额（勾 3 项填 500 → 三行各 500），
+ *   提示文案只能写"金额留空则为 0，之后逐条改"——把逐条定价做成批量操作再让用户返工。
+ *   现在金额一律 0，用户到列表里点行填（那里本来就有行弹窗）；按日计算的行更不该在添加时填金额。
+ * - **预设与自定义不再互斥**：以前敲名称会**静默清空**已选预设（反之亦然），
+ *   用户先挑几项、再想补一个自定义名，前面的选择无声消失。现在两者可以同时用。
+ * - **已存在的项置灰**：预设里可能与出厂固定行同名（如补贴组的「全勤奖」），
+ *   点了会加出重复行；现在已有的直接禁用。
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AddItemDialog(
     presets: List<String>,
-    onSave: (List<String>, Long) -> Unit,
+    /** 本组**已有**的行名（预设命中即禁用，避免加出重复行） */
+    existingNames: Set<String>,
+    /** 本组**自建**的预设名（预设管理面板里可删的就是这些） */
+    customPresetNames: List<String>,
+    /** 新建一条自定义预设（持久化）；返回 true 表示真的写入了（可自动勾选） */
+    onCreatePreset: suspend (String) -> Boolean,
+    /** 删掉一条自定义预设（只从候选清单移除，不动已录入的行） */
+    onDeletePreset: suspend (String) -> Boolean,
+    onSave: (List<String>) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var custom by remember { mutableStateOf("") }
     var picked by remember { mutableStateOf(setOf<String>()) }
-    var amount by remember { mutableStateOf("") }
-    val cents = if (amount.isBlank()) 0L else Money.parseYuanToCents(amount)
-    val names = if (picked.isNotEmpty()) picked.toList() else listOf(custom.trim()).filter { it.isNotEmpty() }
+    // 只在点「+」时才出现的建预设弹窗（叠在覆盖层栈上）
+    var naming by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val names = picked.toList()
     JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.paymonth_add_title)) },
         text = {
             Column {
-                FloatingLabelTextField(
-                    value = custom,
-                    onValueChange = { custom = it; if (it.isNotBlank()) picked = emptySet() },
-                    label = stringResource(R.string.paymonth_name_label),
-                )
-                Spacer(Modifier.height(Spacing.s))
-                FloatingLabelTextField(
-                    value = amount,
-                    onValueChange = { amount = it },
-                    label = stringResource(R.string.paymonth_amount_label),
-                    isError = amount.isNotBlank() && cents == null,
-                )
-                Spacer(Modifier.height(Spacing.s))
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.s),
                     verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                 ) {
                     presets.forEach { preset ->
+                        val alreadyThere = preset in existingNames
                         val on = preset in picked
                         FilterChip(
-                                                        colors = jiabanFilterChipColors(),
+                            colors = jiabanFilterChipColors(),
+                            // 已有同名行 → 不可选（置灰），否则会加出重复项
+                            enabled = !alreadyThere,
                             selected = on,
-                            onClick = {
-                                picked = if (on) picked - preset else picked + preset
-                                if (!on) custom = ""
-                            },
+                            onClick = { picked = if (on) picked - preset else picked + preset },
                             label = { Text(preset, style = MaterialTheme.typography.labelSmall) },
                         )
                     }
+                    // 「+」：自建一条预设并持久化——建一次，以后每个月点一下就出来。
+                    // （原来是就地敲一个名称，但那只是个一次性行名，用户下次还得重敲）
+                    FilterChip(
+                        colors = jiabanFilterChipColors(),
+                        selected = false,
+                        onClick = { naming = true },
+                        label = {
+                            Text(
+                                stringResource(R.string.paymonth_add_new_preset),
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        },
+                    )
                 }
                 Spacer(Modifier.height(Spacing.xs))
                 Text(
@@ -1374,14 +1524,119 @@ private fun AddItemDialog(
             JiabanButton(
                 text = if (names.size > 1) stringResource(R.string.paymonth_add_count, names.size)
                     else stringResource(R.string.paymonth_save),
-                onClick = { onSave(names, cents ?: 0L) },
+                onClick = { onSave(names) },
                 role = JiabanButtonRole.GHOST,
-                enabled = names.isNotEmpty() && cents != null,
+                enabled = names.isNotEmpty(),
             )
         },
         dismissButton = {
             JiabanButton(
                 text = stringResource(R.string.paymonth_cancel),
+                onClick = onDismiss,
+                role = JiabanButtonRole.GHOST,
+            )
+        },
+    )
+    if (naming) {
+        ManagePresetsDialog(
+            /** 本组自建的预设（可删的就是这些；内置项写死在 string-array 里，不在此列） */
+            custom = customPresetNames,
+            onCreate = { name ->
+                scope.launch {
+                    // 写入成功才勾选（同名/空名会被拒）
+                    if (onCreatePreset(name)) picked = picked + name.trim()
+                }
+            },
+            onDelete = { name -> scope.launch { onDeletePreset(name) } },
+            onDismiss = { naming = false },
+        )
+    }
+}
+
+/**
+ * 预设管理：**增与删放在同一处**（用户 2026-10-09 定：新增的预设原先没有删除入口）。
+ *
+ * 为什么不做成"chip 上挂个 ✕"或"长按删"：
+ * - chip 上的 ✕ 紧挨点选区域 → 易误删，且自建项一多 chip 行会很吵；
+ * - 长按在本项目已被否过一次（记月汇总卡曾用长按切换，用户反馈"不知道能长按"）。
+ *
+ * 删除走 [InlineConfirmButton] 的 Compact 式样（硬规则 11：原地确认、不弹二次确认框），
+ * 与「班次管理」页删自定义班次同款。因为删完这一行就消失了，**只能"只确认"**（onUndo = null）。
+ */
+@Composable
+private fun ManagePresetsDialog(
+    custom: List<String>,
+    onCreate: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    JiabanAlertDialog(
+        containerColor = dialogContainerColor(),
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.paymonth_manage_preset_title)) },
+        text = {
+            Column {
+                // ---- 新建 ----
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // ⚠️ 不要给这个字段强压高度：M3 的 OutlinedTextField 内部按 56dp 排版，
+                    // 压到 40dp 会把占位文字**垂直裁掉**（实测踩过两次）。这里旁边是按钮不是 chip，
+                    // 没有"要和 chip 同量纲"的问题，用自然高度即可。
+                    FloatingLabelTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = "",
+                        placeholder = stringResource(R.string.paymonth_add_custom_label),
+                        textStyle = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(Spacing.s))
+                    JiabanButton(
+                        text = stringResource(R.string.paymonth_add_preset_action),
+                        onClick = {
+                            onCreate(name)
+                            name = ""
+                        },
+                        role = JiabanButtonRole.GHOST,
+                        enabled = name.isNotBlank(),
+                    )
+                }
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    stringResource(R.string.paymonth_manage_preset_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                // ---- 已建的（本组）----
+                if (custom.isNotEmpty()) {
+                    Spacer(Modifier.height(Spacing.m))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    custom.forEach { preset ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
+                        ) {
+                            Text(
+                                preset,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f),
+                            )
+                            InlineConfirmButton(
+                                idleText = stringResource(R.string.paymonth_delete),
+                                confirmText = stringResource(R.string.paymonth_manage_preset_confirm),
+                                cancelText = stringResource(R.string.paymonth_cancel),
+                                undoText = stringResource(R.string.paymonth_undo),
+                                onConfirm = { onDelete(preset) },
+                                style = InlineConfirmStyle.Compact,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            JiabanButton(
+                text = stringResource(R.string.paymonth_done),
                 onClick = onDismiss,
                 role = JiabanButtonRole.GHOST,
             )

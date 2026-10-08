@@ -152,6 +152,23 @@ class HomeViewModel @Inject constructor(
         // 工地制度无 PayrollCalculator 引擎值（记月页同样隐藏同步按钮），保持存盘单据原值。
         val isSite = salary.workSystem == com.mdot.app.domain.model.WorkSystem.SITE
         val sheetBase = payMonth ?: PayMonthSheet.default()
+        val monthPeriod = CycleCalculator.naturalMonth(today.toYearMonth())
+        // 天数计数与记月页**同一处推导**（domain/PayMonthDaily.counts）：各写一套必然漂移，
+        // 首页 hero 的实发就会与记月页汇总卡对不上账
+        val monthDayCounts = run {
+            val (holidays, makeups) = holidayRepo.holidaySetsInRange(monthPeriod.from, monthPeriod.to)
+            com.mdot.app.domain.PayMonthDaily.counts(
+                from = monthPeriod.from,
+                to = monthPeriod.to,
+                workdays = workdays,
+                holidays = holidays,
+                makeupDays = makeups,
+                recordDates = monthRecords
+                    .filter { it.type == com.mdot.app.domain.model.RecordType.OT }
+                    .map { it.date },
+                leaveMinutes = monthOut.leaveMinutes,
+            )
+        }
         val liveSheet = if (isSite) sheetBase else livePreviewSheet(
             sheetBase,
             monthOut,
@@ -160,6 +177,7 @@ class HomeViewModel @Inject constructor(
             compCashCents = PayrollCalculator.compCashCents(salary, monthOut),
             compMinutes = PayrollCalculator.compFromOtMinutes(monthOut),
             insurance = InsuranceFill.of(salary),
+            dayCounts = monthDayCounts,
         )
         val cards = homeCards.enabledCards
         HomeUiState(

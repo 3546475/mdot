@@ -7,6 +7,8 @@ import com.mdot.app.core.holiday.HolidayRepository
 import com.mdot.app.core.repository.RecordRepository
 import com.mdot.app.domain.CycleCalculator
 import com.mdot.app.domain.InsuranceFill
+import com.mdot.app.domain.PayMonthDaily
+import com.mdot.app.domain.PayMonthDayCounts
 import com.mdot.app.domain.PayrollCalculator
 import com.mdot.app.domain.livePreviewSheet
 import com.mdot.app.domain.model.DEFAULT_COLLAPSED_GROUPS
@@ -14,10 +16,14 @@ import com.mdot.app.domain.model.PayGroup
 import com.mdot.app.domain.model.PayMonthItem
 import com.mdot.app.domain.model.PayMonthSheet
 import com.mdot.app.domain.model.PayMonthSource
+import com.mdot.app.domain.model.PayMonthCustomPresets
+import com.mdot.app.domain.model.PayMonthTemplates
+import com.mdot.app.domain.model.RecordType
 import com.mdot.app.domain.model.SalaryConfig
 import com.mdot.app.domain.model.WorkSystem
 import com.mdot.app.domain.model.nextUserRowId
 import com.mdot.app.domain.model.reconciliations
+import com.mdot.app.domain.model.withTemplateRows
 import com.mdot.app.domain.toCalcLite
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -134,13 +140,62 @@ class PayMonthViewModel @Inject constructor(
         message.value = null
     }
 
-    /** 某月存盘单据（读取侧出厂行已由 SettingsDataSource 补齐） */
+    /**
+     * 行模板（跨月持久化）：用户新增的行及其按日计算配置。
+     * 新月份无存盘单据时按它铺底（见 [storedFlow]）；写盘时由 [mutate] 同步刷新。
+     */
+    val templates: StateFlow<PayMonthTemplates> = settings.payMonthTemplatesFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PayMonthTemplates())
+
+    /**
+     * 用户自建的**添加预设**（按分组持久化）：添加弹窗里除写死的常用项外，还列出这些。
+     * 与 [templates] 分工不同——那个管"单据里的行"，这个只管"弹窗里的候选"。
+     */
+    val customPresets: StateFlow<PayMonthCustomPresets> = settings.payMonthCustomPresetsFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PayMonthCustomPresets())
+
+    /**
+     * 新建一条自定义预设（持久化，跨月不丢）。
+     * @return 实际写入返回 true；空名或同名（已存在）返回 false，调用方据此决定要不要自动勾选。
+     */
+    suspend fun addCustomPreset(group: PayGroup, name: String): Boolean {
+        val current = settings.payMonthCustomPresetsFlow.first()
+        val next = current.plus(group, name) ?: return false
+        settings.setPayMonthCustomPresets(next)
+        return true
+    }
+
+    /**
+     * 删掉一条自定义预设（只从候选清单移除，**不动任何月份已录入的行**）。
+     * @return 真的删掉了返回 true；本来就没有返回 false。
+     */
+    suspend fun removeCustomPreset(group: PayGroup, name: String): Boolean {
+        val current = settings.payMonthCustomPresetsFlow.first()
+        val next = current.minus(group, name) ?: return false
+        settings.setPayMonthCustomPresets(next)
+        return true
+    }
+
+    /**
+     * 某月存盘单据（读取侧出厂行已由 SettingsDataSource 补齐）。
+     *
+     * 本月**尚无存盘单据**时按行模板铺底（用户新增的行 + 按日单价跨月继承）。
+     * ⚠️ 只在这一处铺、不放 SettingsDataSource 的读取侧：出厂行不可删所以那边补没问题，
+     * 但**用户行可以删**——读取侧补会让"刚删掉的行"立刻复活（"我明明删了它怎么又出现"）。
+     */
     private fun storedFlow(m: YearMonth): Flow<PayMonthSheet> =
-        settings.payMonthFlow(m.toString()).map { it ?: PayMonthSheet.default() }
+        combine(settings.payMonthFlow(m.toString()), templates) { stored, tpl ->
+            stored ?: PayMonthSheet.default().withTemplateRows(tpl)
+        }
 
     /** 某月的实时预览单据（只算不写盘；与首页同款）。工地无引擎值 → 原样返回存盘单据 */
     private fun previewFlow(m: YearMonth): Flow<PayMonthSheet> =
-        combine(storedFlow(m), calcFlow(m), settings.salaryFlow) { stored, out, salary ->
+        combine(
+            storedFlow(m),
+            calcFlow(m),
+            settings.salaryFlow,
+            dayCountsFlow(m),
+        ) { stored, out, salary, counts ->
             if (out == null) stored else livePreviewSheet(
                 stored,
                 out,
@@ -149,8 +204,34 @@ class PayMonthViewModel @Inject constructor(
                 compCashCents = PayrollCalculator.compCashCents(salary, out),
                 compMinutes = PayrollCalculator.compFromOtMinutes(out),
                 insurance = InsuranceFill.of(salary),
+                // 请假分钟取**引擎**的数（单一出处），不在这里重数一遍
+                dayCounts = counts.copy(leaveMinutes = out.leaveMinutes),
             )
         }
+
+    /**
+     * 区间内的天数计数（供「按日计算」的行与全勤奖自动推导）。
+     * 推导本体在 domain（[PayMonthDaily.counts]），首页数据区用同一个函数，两处不会漂。
+     */
+    private fun dayCountsFlow(m: YearMonth): Flow<PayMonthDayCounts> {
+        val from = m.atDay(1)
+        val to = m.atEndOfMonth()
+        return combine(
+            settings.workdaysFlow,
+            recordRepo.observeRange(from, to),
+        ) { workdays, records ->
+            val (holidays, makeups) = holidayRepo.holidaySetsInRange(from, to)
+            PayMonthDaily.counts(
+                from = from,
+                to = to,
+                workdays = workdays,
+                holidays = holidays,
+                makeupDays = makeups,
+                recordDates = records.filter { it.type == RecordType.OT }.map { it.date },
+                leaveMinutes = 0,   // 由 previewFlow 用引擎值覆盖
+            )
+        }
+    }
 
     /** 某月工资计算结果（非工地；工地为 null）。保持冷流：预览/摘要按需组合订阅 */
     private fun calcFlow(m: YearMonth): Flow<PayrollCalculator.Output?> {
@@ -276,16 +357,27 @@ class PayMonthViewModel @Inject constructor(
         }
     }
 
-    /** 新增条目（名称必填，金额可为 0） */
-    fun addItem(group: PayGroup, name: String, cents: Long) = addItems(group, listOf(name), cents)
-
-    /** 批量新增（预选项多选一次添加，docs/20 P2-3）：名称去重去空，id 依次递增。
-     *  id 从 `USER_ROW_ID_BASE` 起（避开出厂固定行号段，否则扣款组会撞上社保/公积金的 id） */
-    fun addItems(group: PayGroup, names: List<String>, cents: Long) = mutate(group) { list ->
+    /**
+     * 新增条目（名称必填；[cents] 默认 0）。
+     *
+     * 2026-10-09 改：添加弹窗**不再收集金额**（勾多项共用同一个金额会被串成同额，
+     * 提示文案只能写"之后逐条改"——把逐条定价做成批量操作再让用户返工），
+     * 故 UI 走默认 0，金额由用户到列表里逐行填；[cents] 保留给需要直接造行的调用方（测试）。
+     */
+    fun addItems(group: PayGroup, names: List<String>, cents: Long = 0L) = mutate(group) { list ->
+        val existing = list.mapTo(HashSet()) { it.name }
         var next = list.nextUserRowId()
-        list + names.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        list + names.map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            // ⚠️ 必须与**已有行**去重（不是只在传入名单内去重就够）：预设里可能与出厂固定行同名，
+            // 曾因此把补贴组的「全勤奖」再加一行出来。
+            .filterNot { it in existing }
             .map { name -> PayMonthItem(next++, name, cents) }
     }
+
+    /** 新增单条（[cents] 默认 0；UI 走默认值，金额由用户到列表里逐行填） */
+    fun addItem(group: PayGroup, name: String, cents: Long = 0L) = addItems(group, listOf(name), cents)
 
     /**
      * 分组折叠状态（持久化；开关只影响显隐，不动数据）。
@@ -354,8 +446,15 @@ class PayMonthViewModel @Inject constructor(
      * **连加两行都拿到 id 1000**（互相撞车，`saveItem`/`removeItem` 按 id 匹配会改错删错行）。
      */
     private suspend fun freshSheet(month: YearMonth): PayMonthSheet =
-        settings.payMonthFlow(month.toString()).first() ?: PayMonthSheet.default()
+        settings.payMonthFlow(month.toString()).first()
+            ?: PayMonthSheet.default().withTemplateRows(settings.payMonthTemplatesFlow.first())
 
+    /**
+     * 所有增/删/改的**唯一写入口**：在月锁内现取底稿、改、落盘，并**同步刷新行模板**。
+     *
+     * ⚠️ 模板必须在这里同步、而不是分散到各调用点：漏一处就会出现
+     * "这行加了但下个月不出现"或"删了但下个月又冒出来"——正是本次要消灭的两类毛病。
+     */
     private fun mutate(group: PayGroup, block: (List<PayMonthItem>) -> List<PayMonthItem>) {
         viewModelScope.launch {
             // 月份锁内取一次：读盘与写盘必须是同一个 key，否则翻月瞬间会跨月写
@@ -369,6 +468,8 @@ class PayMonthViewModel @Inject constructor(
                     PayGroup.OTHER -> cur.copy(other = block(cur.other))
                 }
                 settings.setPayMonth(m.toString(), next)
+                // 模板由**改动后的单据**重算（不增量打补丁）：删除/改名/改按日配置都会如实反映
+                settings.setPayMonthTemplates(PayMonthTemplates().of(next))
             }
         }
     }

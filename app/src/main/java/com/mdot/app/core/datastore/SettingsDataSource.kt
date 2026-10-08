@@ -11,7 +11,9 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.mdot.app.domain.model.AppearanceConfig
 import com.mdot.app.domain.model.BottomBarConfig
 import com.mdot.app.domain.model.HomeCardsConfig
+import com.mdot.app.domain.model.PayMonthCustomPresets
 import com.mdot.app.domain.model.PayMonthSheet
+import com.mdot.app.domain.model.PayMonthTemplates
 import com.mdot.app.domain.model.SalaryConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -68,6 +70,37 @@ class SettingsDataSource @Inject constructor(
     suspend fun setPayMonthCollapsed(groups: Set<String>) =
         dataStore.edit { it[PAY_MONTH_COLLAPSED] = groups }
 
+    /**
+     * **行模板**（v0.7.8.3）：用户新增的补贴/扣款行及其**按日计算配置**（日单价、天数口径、是否扣请假）。
+     *
+     * 为什么需要：工资单按月存，新月份底稿只有出厂行，用户自己加的行**下个月就没了**
+     * （2026-10-08 用户问"这个月添加的非默认项目下个月还会有吗"）。
+     * 模板**只记行与配置、不记金额** —— 单价跨月继承，金额每月按当月数据重算。
+     *
+     * 用途见 [com.mdot.app.domain.model.withTemplateRows]：只在某月**尚无存盘单据**时套一次，
+     * 不放读取侧（否则删掉的行会被复活）。
+     */
+    val payMonthTemplatesFlow: Flow<PayMonthTemplates> =
+        dataStore.data.map { prefs ->
+            prefs[PAY_MONTH_TEMPLATES]?.let { text ->
+                runCatching { json.decodeFromString<PayMonthTemplates>(text) }.getOrNull()
+            } ?: PayMonthTemplates()
+        }
+
+    suspend fun setPayMonthTemplates(templates: PayMonthTemplates) =
+        dataStore.edit { it[PAY_MONTH_TEMPLATES] = json.encodeToString(templates) }
+
+    /** 用户自建的**添加预设**（按分组；与单据/模板无关，只管弹窗里的候选清单） */
+    val payMonthCustomPresetsFlow: Flow<PayMonthCustomPresets> =
+        dataStore.data.map { prefs ->
+            prefs[PAY_MONTH_CUSTOM_PRESETS]?.let { text ->
+                runCatching { json.decodeFromString<PayMonthCustomPresets>(text) }.getOrNull()
+            } ?: PayMonthCustomPresets()
+        }
+
+    suspend fun setPayMonthCustomPresets(presets: PayMonthCustomPresets) =
+        dataStore.edit { it[PAY_MONTH_CUSTOM_PRESETS] = json.encodeToString(presets) }
+
     /** 某年 12 个月的记月单据（只回已写入的月份；键 = 月份 1–12）。个税页按年累计用 */
     fun payMonthsFlow(year: Int): Flow<Map<Int, PayMonthSheet>> = dataStore.data.map { prefs ->
         buildMap {
@@ -79,7 +112,48 @@ class SettingsDataSource @Inject constructor(
         }
     }
 
+    /**
+     * 全部月份的记月单据（键 = `yyyy-MM`），备份导出用。
+     *
+     * 记月工资单是用户**手工维护**的数据（记月页逐行填的），2026-10-08 补进备份前
+     * 换手机/恢复后会整份丢失。键名与 [payMonthFlow] 的写入侧一致，故可直接回灌。
+     */
+    suspend fun allPayMonths(): Map<String, PayMonthSheet> {
+        val prefs = dataStore.data.first()
+        return buildMap {
+            for ((k, v) in prefs.asMap()) {
+                if (k.name.startsWith("paymonth_") && k.name != PAY_MONTH_COLLAPSED.name &&
+                    k.name != PAY_MONTH_TEMPLATES.name && v is String
+                ) {
+                    runCatching { json.decodeFromString<PayMonthSheet>(v) }.getOrNull()?.let { put(k.name, it) }
+                }
+            }
+        }
+    }
+
+    /**
+     * 用 [sheets] **整体覆盖**本机记月单据（键 = `yyyy-MM`）。
+     *
+     * 整体覆盖而非合并：备份恢复的语义本来就是"回到备份那一刻的状态"，
+     * 合并会让本机多出来的月份残留、恢复后数据新旧混杂（records 那边也是整库覆盖）。
+     */
+    suspend fun replaceAllPayMonths(sheets: Map<String, PayMonthSheet>) {
+        dataStore.edit { prefs ->
+            val stale = prefs.asMap().keys
+                .map { it.name }
+                .filter { it.startsWith("paymonth_") && it != PAY_MONTH_COLLAPSED.name && it != PAY_MONTH_TEMPLATES.name }
+            stale.forEach { prefs.remove(stringPreferencesKey(it)) }
+            sheets.forEach { (monthKey, sheet) ->
+                prefs[stringPreferencesKey(monthKey)] = json.encodeToString(sheet)
+            }
+        }
+    }
+
     private val PAY_MONTH_COLLAPSED = stringSetPreferencesKey("paymonth_collapsed")
+
+    /** 行模板键（v0.7.8.3） */
+    private val PAY_MONTH_TEMPLATES = stringPreferencesKey("paymonth_templates")
+    private val PAY_MONTH_CUSTOM_PRESETS = stringPreferencesKey("paymonth_custom_presets")
 
     // ---- 考勤周期 ----
     // 起始日仅 1–29（30/31 已从 UI 移除）；存量值 30/31 读取时收敛到 29
