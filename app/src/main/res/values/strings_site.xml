@@ -13,8 +13,6 @@
     <string name="site_home_works_label_hour">本期待结工时</string>
     <!-- 首页待结卡区间行 -->
     <string name="site_pending_range">待结区间 %1$s</string>
-    <!-- 统计页区间胶囊（工地口径，21 文档 M7） -->
-    <string name="site_range_period">区间 %1$s</string>
     <!-- 记工页保存后流水预览（21 文档 B5） -->
     <string name="site_save_recent_title">刚记下 · 本项目最近流水</string>
     <string name="site_save_recent_all">查看全部明细</string>

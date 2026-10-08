@@ -1,5 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- 共用时间段切换器 MonthStepper（记月页 + 明细页；文案是「上一期/下一期」而非「上个月」，
+         因为明细页的一期是考勤周期、可能与自然月不等长） -->
+    <string name="month_stepper_prev">上一期</string>
+    <string name="month_stepper_next">下一期</string>
+    <string name="month_stepper_pick_cd">按月跳转</string>
+    <string name="month_stepper_back_to_current">回本月</string>
+    <!-- 统计页·区间选择弹窗（标题与工地/明细共用 range_pick_title） -->
+    <string name="stats_range_custom_hint">自定义区间按所选天数整段前后平移</string>
+    <string name="stats_range_custom_invalid">起始日不能晚于结束日</string>
+    <string name="stats_range_back_to_current">回本期</string>
+    <!-- 胶囊两侧箭头的无障碍描述：按维度说人话（读屏用户听到"上一期"才知道一次走多远） -->
+    <string name="stats_step_prev_month">上一个月</string>
+    <string name="stats_step_next_month">下一个月</string>
+    <string name="stats_step_prev_year">上一年</string>
+    <string name="stats_step_next_year">下一年</string>
+    <!-- 自定义整段平移（前/后各移一个区间长度） -->
+    <string name="stats_step_prev_span">前移一个区间</string>
+    <string name="stats_step_next_span">后移一个区间</string>
     <string name="stats_title">统计</string>
     <string name="stats_tab_month">记月</string>
     <string name="stats_tab_detail">明细</string>

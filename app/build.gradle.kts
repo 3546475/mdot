@@ -1,4 +1,4 @@
-﻿import java.net.URI
+import java.net.URI
 import java.util.Properties
 
 // 签名信息（keystore/keystore.properties，不入库；缺失时 release 不签名）
@@ -32,8 +32,8 @@ android {
         applicationId = "com.mdot.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 62
-        versionName = "0.7.8.2"
+        versionCode = 63
+        versionName = "0.7.8.3"
     }
 
     signingConfigs {

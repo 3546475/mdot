@@ -225,48 +225,34 @@ private fun ModeChip(text: String, onClick: () -> Unit) {
     )
 }
 
-/** 月份粒度：**点一下即生效并关闭**；月份格子与日期格子同一套视觉 */
+/**
+ * 月份粒度：**点一下即生效并关闭**；月份格子与日期格子同一套视觉。
+ *
+ * @param maxMonth 可选月份上限（含），null = 不封顶（默认，记月页/个税页需能看未来月做预算）。
+ *   需要「不越今天」时由调用方传 `YearMonth.now()`——**注意上限是「哪个越界点」而不是布尔**：
+ *   明细页曾用布尔 `disableFutureMonths`（内部按"今天"判定）而细节与调用方预期不符，见 docs/11 074。
+ */
 @Composable
 fun MonthPickDialog(
     title: String,
     selected: YearMonth,
     onPick: (YearMonth) -> Unit,
     onDismiss: () -> Unit,
+    maxMonth: YearMonth? = null,
 ) {
     val thisMonth = YearMonth.now()
-    var year by remember { mutableStateOf(selected.year) }
 
     JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column {
-                MonthNavBar(
-                    month = YearMonth.of(year, selected.monthValue),
-                    onPrev = { year -= 1 },
-                    onNext = { year += 1 },
-                    titleText = stringResource(R.string.ds_year_title, year),
-                    shortcut = if (selected != thisMonth) {
-                        { ShortcutChip(stringResource(R.string.ds_back_this_month)) { onPick(thisMonth) } }
-                    } else {
-                        null
-                    },
-                )
-                Spacer(Modifier.height(Spacing.s))
-                (1..12).chunked(3).forEach { row ->
-                    Row(Modifier.fillMaxWidth()) {
-                        row.forEach { m ->
-                            MonthCell(
-                                text = stringResource(R.string.ds_month_short, m),
-                                selected = year == selected.year && m == selected.monthValue,
-                                modifier = Modifier.weight(1f),
-                                onClick = { onPick(YearMonth.of(year, m)) },
-                            )
-                        }
-                        repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
-                    }
-                }
-            }
+            MonthPickContent(
+                selected = selected,
+                onPick = onPick,
+                maxMonth = maxMonth,
+                // 月份粒度下「回本月」一次点掉整件事，故直接关闭
+                onBackToCurrent = { onPick(thisMonth) },
+            )
         },
         confirmButton = {},
         dismissButton = {
@@ -279,15 +265,138 @@ fun MonthPickDialog(
     )
 }
 
+/**
+ * 月份网格主体（**弹窗内容**，不含外壳）：`[‹] 2026 年 [回本月] [›]` + 12 个月格。
+ *
+ * 抽出来是为了让**统计页的区间选择弹窗**复用同一套网格与导航（那里的弹窗还要额外放
+ * 「维度选择 + 自定义起止」，不能整个套一个月份弹窗）。
+ * 调用方自己决定 [onBackToCurrent] 的行为：月份粒度下是"选中本月并关闭"，
+ * 统计页那种常驻弹窗里则应"只选中不关闭"。
+ *
+ * @param maxMonth 可选月份上限（含），null = 不封顶
+ * @param onBackToCurrent null = 不显示「回本月」胶囊
+ */
+@Composable
+fun MonthPickContent(
+    selected: YearMonth,
+    onPick: (YearMonth) -> Unit,
+    maxMonth: YearMonth? = null,
+    onBackToCurrent: (() -> Unit)? = null,
+) {
+    val thisMonth = YearMonth.now()
+    var year by remember { mutableStateOf(selected.year) }
+
+    Column {
+        MonthNavBar(
+            month = YearMonth.of(year, selected.monthValue),
+            onPrev = { year -= 1 },
+            onNext = { year += 1 },
+            nextEnabled = maxMonth == null || year < maxMonth.year,
+            titleText = stringResource(R.string.ds_year_title, year),
+            shortcut = if (selected != thisMonth && onBackToCurrent != null) {
+                { ShortcutChip(stringResource(R.string.ds_back_this_month)) { onBackToCurrent() } }
+            } else {
+                null
+            },
+        )
+        Spacer(Modifier.height(Spacing.s))
+        (1..12).chunked(3).forEach { row ->
+            Row(Modifier.fillMaxWidth()) {
+                row.forEach { m ->
+                    val ym = YearMonth.of(year, m)
+                    val beyond = maxMonth != null && ym > maxMonth
+                    MonthCell(
+                        text = stringResource(R.string.ds_month_short, m),
+                        selected = year == selected.year && m == selected.monthValue,
+                        enabled = !beyond,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onPick(ym) },
+                    )
+                }
+                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+/**
+ * 年份网格主体（**弹窗内容**，不含外壳）：`[‹] 年份 [回今年] [›]` + 12 个年份胶囊。
+ * 与 [MonthPickContent] 同款骨架，供统计页「年」维度跳转用。
+ *
+ * @param years 可选年份范围（含端点）
+ * @param maxYear 可选年份上限（含），null = 不封顶
+ */
+@Composable
+fun YearPickContent(
+    selectedYear: Int,
+    years: IntRange,
+    onPick: (Int) -> Unit,
+    maxYear: Int? = null,
+    onBackToCurrent: (() -> Unit)? = null,
+) {
+    val thisYear = java.time.Year.now().value
+    var pageStart by remember(selectedYear) { mutableStateOf(pageStartOf(selectedYear, years)) }
+
+    Column {
+        MonthNavBar(
+            month = YearMonth.of(pageStart, 1),
+            onPrev = { pageStart -= YEARS_PER_PAGE },
+            onNext = { pageStart += YEARS_PER_PAGE },
+            nextEnabled = maxYear == null || pageStart + YEARS_PER_PAGE - 1 < maxYear,
+            titleText = stringResource(
+                R.string.ds_year_span,
+                pageStart,
+                pageStart + YEARS_PER_PAGE - 1,
+            ),
+            shortcut = if (selectedYear != thisYear && onBackToCurrent != null) {
+                { ShortcutChip(stringResource(R.string.ds_back_this_year)) { onBackToCurrent() } }
+            } else {
+                null
+            },
+        )
+        Spacer(Modifier.height(Spacing.s))
+        (0 until YEARS_PER_PAGE).chunked(3).forEach { row ->
+            Row(Modifier.fillMaxWidth()) {
+                row.forEach { i ->
+                    val y = pageStart + i
+                    val inRange = y in years
+                    val beyond = maxYear != null && y > maxYear
+                    MonthCell(
+                        text = stringResource(R.string.ds_year_short, y),
+                        selected = y == selectedYear,
+                        enabled = inRange && !beyond,
+                        modifier = Modifier.weight(1f),
+                        onClick = { onPick(y) },
+                    )
+                }
+                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+/** 年份网格每页年数（3 列 × 4 行，与月份网格同为 4 行高） */
+private const val YEARS_PER_PAGE = 12
+
+/** 让 [selectedYear] 落在当前页内的页首年份 */
+private fun pageStartOf(selectedYear: Int, years: IntRange): Int {
+    val span = YEARS_PER_PAGE
+    val base = years.first
+    val offset = ((selectedYear - base).coerceAtLeast(0) / span) * span
+    return base + offset
+}
+
+
 // ── 共用零件 ─────────────────────────────────────────────────────────────
 
-/** 月份导航：[‹] 标题 [回今天] [›]。标题可换成自定义文案（月份粒度显示年份） */
+/** 月份导航：[‹] 标题 [回今天] [›]。标题可换成自定义文案（月份粒度显示年份）；[nextEnabled]=false 封顶未来 */
 @Composable
 private fun MonthNavBar(
     month: YearMonth,
     onPrev: () -> Unit,
     onNext: () -> Unit,
     titleText: String = stringResource(R.string.ds_month_title, month.year, month.monthValue),
+    nextEnabled: Boolean = true,
     shortcut: (@Composable () -> Unit)? = null,
 ) {
     Row(
@@ -312,7 +421,7 @@ private fun MonthNavBar(
             it()
             Spacer(Modifier.width(Spacing.xs))
         }
-        IconButton(onClick = onNext) {
+        IconButton(onClick = onNext, enabled = nextEnabled) {
             Icon(
                 EngineIcons.chevron(),
                 contentDescription = stringResource(R.string.ds_next_month),
@@ -443,14 +552,20 @@ private fun DayCell(
     }
 }
 
-/** 月份格：与日期格同一套视觉（选中填充圆形底） */
+/** 月份格：与日期格同一套视觉（选中填充圆形底）；[enabled]=false 置灰不可点（封顶未来月） */
 @Composable
 private fun MonthCell(
     text: String,
     selected: Boolean,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
+    val ink = when {
+        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        selected -> MaterialTheme.colorScheme.onPrimary
+        else -> MaterialTheme.colorScheme.onSurface
+    }
     Box(
         modifier
             .padding(Spacing.xs / 2)
@@ -460,13 +575,13 @@ private fun MonthCell(
                 if (selected) MaterialTheme.colorScheme.primary
                 else androidx.compose.ui.graphics.Color.Transparent
             )
-            .clickable(onClick = onClick),
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text,
             style = MaterialTheme.typography.bodyMedium,
-            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+            color = ink,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         )
     }

@@ -5,7 +5,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,7 +28,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -81,6 +79,7 @@ import com.mdot.app.core.designsystem.component.WorkHeatmap
 import com.mdot.app.core.designsystem.component.SegmentBar
 import com.mdot.app.core.designsystem.component.modeValueText
 import com.mdot.app.core.designsystem.component.DayPickDialog
+import com.mdot.app.core.designsystem.component.MonthStepper
 import com.mdot.app.core.designsystem.component.JiabanTopBar
 import com.mdot.app.core.designsystem.component.TopBarHeight
 import com.mdot.app.core.navigation.primaryTabEdgeRelay
@@ -92,6 +91,8 @@ import com.mdot.app.core.repository.RecordRepository
 import com.mdot.app.domain.SitePayCalculator
 import com.mdot.app.domain.toCalcLite
 import com.mdot.app.domain.CycleCalculator
+import com.mdot.app.domain.StatsRangeKind
+import com.mdot.app.domain.StatsRanges
 import com.mdot.app.domain.PayrollCalculator
 import com.mdot.app.domain.model.AdvancePurpose
 import com.mdot.app.domain.model.RateTier
@@ -107,6 +108,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -124,6 +126,47 @@ enum class StatsDimension(val labelRes: Int) {
     /** 工地记工维度（21 文档 B2）：工地以项目为核心，无固定周期——本期待结 / 项目全周期 */
     SITE_PENDING(R.string.stats_dim_site_pending), SITE_SPAN(R.string.stats_dim_site_span),
 }
+
+/**
+ * 界面维度 → domain 的区间粒度。工地两个维度没有对应粒度（它走 `SiteRanges` 项目口径），
+ * 这里回落到 CYCLE 只是取出一个**不会被使用**的值——工地分支在 `flatMapLatest` 里先分叉，
+ * 从不读这个 range。别把 SITE_* 当成真的走考勤周期。
+ */
+val StatsDimension.rangeKind: StatsRangeKind
+    get() = when (this) {
+        StatsDimension.CYCLE -> StatsRangeKind.CYCLE
+        StatsDimension.MONTH -> StatsRangeKind.MONTH
+        StatsDimension.YEAR -> StatsRangeKind.YEAR
+        StatsDimension.CUSTOM -> StatsRangeKind.CUSTOM
+        StatsDimension.SITE_PENDING, StatsDimension.SITE_SPAN -> StatsRangeKind.CYCLE
+    }
+
+/**
+ * 区间胶囊**下方 Spacer** 的取值——统计/记月/明细三页共用同一个常量。
+ *
+ * 为什么不用 Spacing 令牌：上方的留白不是页面自己定的，而是宿主把页签条
+ * `SegmentBar`（42dp）塞进 `CenterAlignedTopAppBar`（固定 64dp）后多出来的余量（实测 64px），
+ * 三页完全一致、也不由这三页控制；令牌表里没有对应值，硬凑会漂。
+ * 所以显式记常量并三页共用：改一次三页同步。
+ *
+ * 取值依据：用户要求把胶囊上下留白收到上一版（约 86px）的 1/3，故取 10dp(≈28px)。
+ * 页面顶部已不再加 Spacer（页签条自带余量），上方因此固定在 64px。
+ * ⚠️ 比"距"时注意下方**总距** = 本 Spacer + 卡片自身上内边距(约 12dp)，
+ * 二者不同源，别把卡片内边距算进胶囊留白。
+ */
+val StatsRangeSpacing: androidx.compose.ui.unit.Dp
+    get() = 10.dp
+
+/** 非工地：自定义起止快照（两流合成一路——`combine` 的定长重载上限是 5 流） */
+private data class StatsCustomRange(val from: LocalDate?, val to: LocalDate?)
+
+/** 非工地：区间推导的输入快照（combine 五流解包，避免再嵌一层 Triple） */
+private data class StatsRangeParams(
+    val dim: StatsDimension,
+    val range: CycleCalculator.Period?,
+    val salaryWorkdays: Pair<com.mdot.app.domain.model.SalaryConfig, Set<java.time.DayOfWeek>>,
+    val offset: Int,
+)
 
 enum class PieMode(val labelRes: Int) { SHIFT(R.string.stats_pie_shift), LEAVE(R.string.stats_pie_leave) }
 
@@ -172,6 +215,12 @@ enum class SiteDetailKind {
 data class StatsUiState(
     val dimension: StatsDimension = StatsDimension.CYCLE,
     val rangeLabel: String = "",
+    /** 非工地：区间选择弹窗所需的现状快照（当前粒度 + 当前区间）；工地为 null */
+    val picker: StatsRangePicker? = null,
+    /** 相对当前区间的**步进次数**（0=当前区间，-1=前一条）；自定义时按区间天数整段平移 */
+    val rangeOffset: Int = 0,
+    /** 「往前还可以走几步」：0 ⇒ 前进箭头置灰（已贴到今天） */
+    val maxForwardSteps: Int = 0,
     val showMoney: Boolean = false,
     val workSystem: WorkSystem = WorkSystem.STANDARD,
     /** 汇总（非工地，PayrollCalculator） */
@@ -214,7 +263,8 @@ data class SiteDayStat(
 @HiltViewModel
 class StatsViewModel @Inject constructor(
     recordRepo: RecordRepository,
-    settings: SettingsDataSource,
+    // private val：onPickMonth 要在点击时**现取**锚点（cycleAnchorDayFlow.first()），不能只靠流订阅
+    private val settings: SettingsDataSource,
     private val holidayRepo: HolidayRepository,
     dataRevision: com.mdot.app.core.repository.DataRevision,
     private val siteRepo: com.mdot.app.core.repository.SiteRepository,
@@ -225,6 +275,58 @@ class StatsViewModel @Inject constructor(
     private val dimension = MutableStateFlow(StatsDimension.CYCLE)
     private val customFrom = MutableStateFlow<LocalDate?>(null)
     private val customTo = MutableStateFlow<LocalDate?>(null)
+
+    /** 统计页区间步进（0=当前区间）。换维度时清零，否则残留的 offset 会让新区间莫名偏移 */
+    private val rangeOffset = MutableStateFlow(0)
+
+    /** 自定义起止合一路（`combine` 定长重载上限 5 流，故与下面的循环步进合起来共 5 个输入） */
+    private val customRange = combine(customFrom, customTo) { f, t -> StatsCustomRange(f, t) }
+
+    /**
+     * 上一条区间（‹）；自定义按区间天数整段平移。
+     * 前进方向的上限由 [maxForwardSteps] 在 [stepForward] 拦住，故这里单调递减即安全。
+     */
+    fun stepBack() {
+        rangeOffset.value -= 1
+    }
+
+    /**
+     * 下一条区间（›）。上限由 [StatsRanges.maxForwardSteps] 定——
+     * 已贴到今天时不再前进（全 App「不越今天」口径），故这里只做「能不能走一步」的判定。
+     */
+    fun stepForward() {
+        if (rangeOffset.value >= 0) return          // 已在当前区间，不再前进
+        val st = uiState.value
+        if (st.maxForwardSteps <= 0) return         // 自定义整段平移的余量不足
+        rangeOffset.value += 1
+    }
+
+    /** 回到当前区间（「回本期」）。注意自定义的下限是用户选的起止，不受此影响 */
+    fun backToCurrentRange() {
+        rangeOffset.value = 0
+    }
+
+    /**
+     * 统计页区间弹窗：月份网格点选 → 换算成步进偏移。
+     * 换算逻辑住 domain（[CycleCalculator.cycleOffsetToMonth] / `ChronoUnit.MONTHS`），VM 只做分发。
+     * 考勤周期按**锚点月之差**反解（同明细页），故 anchor 26 时点「8 月」得到 8/26–9/25 那一期。
+     */
+    fun onPickMonth(month: java.time.YearMonth) {
+        viewModelScope.launch {
+            val anchor = settings.cycleAnchorDayFlow.first()
+            val base = CycleCalculator.cycleStartMonth(today, anchor)
+            rangeOffset.value = when (dimension.value) {
+                StatsDimension.YEAR ->
+                    (month.year - today.year).coerceAtMost(0)
+                else -> CycleCalculator.cycleOffsetToMonth(base, month)
+            }
+        }
+    }
+
+    /** 统计页区间弹窗：年份网格点选 → 步进偏移（年粒度，不越今天） */
+    fun onPickYear(year: Int) {
+        rangeOffset.value = (year - today.year).coerceAtMost(0)
+    }
 
     /** 饼图模式（非工地）：与数据流解耦，独立保存 */
     val pieMode = MutableStateFlow(PieMode.SHIFT)
@@ -242,26 +344,31 @@ class StatsViewModel @Inject constructor(
 
     val uiState: StateFlow<StatsUiState> = combine(
         dimension,
-        customFrom,
-        customTo,
+        customRange,
         // 云端恢复导入后 DataRevision bump → 强制本页全量重算
         combine(settings.cycleAnchorDayFlow, dataRevision.version) { anchor, _ -> anchor },
         combine(settings.salaryFlow, settings.workdaysFlow) { s, w -> s to w },
-    ) { dim, cf, ct, anchor, (salary, workdays) ->
-        val range = when (dim) {
-            StatsDimension.CYCLE -> CycleCalculator.periodContaining(today, anchor)
-            StatsDimension.MONTH -> CycleCalculator.naturalMonth(java.time.YearMonth.from(today))
-            StatsDimension.YEAR -> CycleCalculator.yearPeriod(today.year)
-            StatsDimension.CUSTOM -> {
-                val from = cf ?: today.withDayOfMonth(1)
-                val to = ct ?: today
-                if (from.isAfter(to)) null else CycleCalculator.Period(from, to)
-            }
-            // 工地维度（21 文档 B2）：区间在下方按项目口径解析（本期待结/项目全周期随结算滚动）
-            StatsDimension.SITE_PENDING, StatsDimension.SITE_SPAN -> null
-        }
-        Triple(dim, range, salary to workdays)
-    }.flatMapLatest { (dim, range, salaryWorkdays) ->
+        rangeOffset,
+    ) { dim, custom, anchor, (salary, workdays), offset ->
+        val base = StatsRanges.current(
+            kind = dim.rangeKind,
+            today = today,
+            anchorDay = anchor,
+            customFrom = custom.from,
+            customTo = custom.to,
+            fallback = CycleCalculator.periodContaining(today, anchor),
+        )
+        // 「‹ ›」步进：CYCLE=整周期、MONTH=整月、YEAR=整年、CUSTOM=按区间天数整段平移，
+        // 全部走 domain 纯函数（VM/UI 不碰日期算术）。走不到（跨越今天）时退回 base——
+        // 前进方向另有 maxForwardSteps 置灰兜底，故正常操作不会走到这个退化分支。
+        // ⚠️ 工地维度（effDim 归一后是 SITE_*）在下面 isSite 分支重新按项目口径解析，不使用本 range。
+        val stepped = if (offset == 0 || base == null) base else StatsRanges.step(
+            kind = dim.rangeKind, from = base, anchorDay = anchor, steps = offset, today = today,
+        )
+        // 弹窗的「当前区间」用步进后的 range —— 这样月份/年份网格的高亮跟着用户实际在看的那一期走；
+        // 反解基准（base）的计算在 onPickMonth 内部按 anchor 现算，不依赖这里。
+        StatsRangeParams(dim, stepped ?: base, salary to workdays, offset)
+    }.flatMapLatest { (dim, range, salaryWorkdays, offset) ->
         val (salary, workdays) = salaryWorkdays
         val isSite = salary.workSystem == WorkSystem.SITE
         // 维度归一（跨制度残留，21 文档 B2）：工地的固定周期维度回落「本期待结」，非工地的工地维度回落「考勤周期」
@@ -339,6 +446,9 @@ class StatsViewModel @Inject constructor(
                     siteDetails = details,
                     customFrom = customFrom.value,
                     customTo = customTo.value,
+                    // 工地：项目口径区间随结算滚动，没有「上一条/下一条」概念（‹ › 在 UI 侧隐藏）
+                    rangeOffset = 0,
+                    maxForwardSteps = 0,
                 )
             }
             }
@@ -398,6 +508,9 @@ class StatsViewModel @Inject constructor(
                 weekBars = buildWeekBars(heat),
                 customFrom = customFrom.value,
                 customTo = customTo.value,
+                picker = StatsRangePicker(kind = effDim.rangeKind, current = range),
+                rangeOffset = offset,
+                maxForwardSteps = StatsRanges.maxForwardSteps(effDim.rangeKind, range, today),
             )
             }
         }
@@ -426,19 +539,23 @@ class StatsViewModel @Inject constructor(
 
     fun onDimension(d: StatsDimension) {
         dimension.value = d
+        rangeOffset.value = 0   // 换维度必须清零，否则上一条区间的 offset 会让新区间莫名偏移
         if (d != StatsDimension.CUSTOM) {
             customFrom.value = null
             customTo.value = null
         }
     }
 
+    /** 自定义起止改动后，步进偏移同样清零（用户重新框了区间，就不该还挂着旧的平移量） */
     fun onCustomFrom(d: LocalDate) {
         customFrom.value = d
+        rangeOffset.value = 0
         if ((customTo.value ?: d).isBefore(d)) customTo.value = d
     }
 
     fun onCustomTo(d: LocalDate) {
         if (d.isAfter(LocalDate.now())) return
+        rangeOffset.value = 0
         customTo.value = d
         if ((customFrom.value ?: d).isAfter(d)) customFrom.value = d
     }
@@ -543,7 +660,9 @@ private fun StatsContent(
     showBottomBar: Boolean,
     onChartDay: (LocalDate) -> Unit,
 ) {
-    var picking by remember { mutableStateOf<String?>(null) } // "from" | "to"
+    // 方案 C：区间胶囊 → 本弹窗（选维度 / 跳月跳年 / 框自定义）
+    var showRangeDialog by remember { mutableStateOf(false) }
+    var showSiteRangeDialog by remember { mutableStateOf(false) } // 工地：胶囊 → 口径/自定义起止
     LazyColumn(
         Modifier
             .fillMaxSize()
@@ -552,100 +671,44 @@ private fun StatsContent(
             .padding(horizontal = Spacing.page),
         contentPadding = com.mdot.app.core.navigation.contentPaddingValues(showBottomBar = showBottomBar),
     ) {
-        // 维度行（21 文档 B2）：工地=与明细页共用的三药丸 SiteRangePills（同功能同样式）；
-        // 非工地=四筛选 chips（长标签横滚语义，保持现役样式）
+        // 维度行（21 文档 B2）：工地=与明细页共用的三药丸 SiteRangeChips（同功能同样式）；
+        // 非工地=方案 C——不再常驻四 chip，改由「区间胶囊 → 弹窗选维度」承担
         val isSite = state.workSystem == WorkSystem.SITE
         item {
-            Spacer(Modifier.height(Spacing.m))
+            // 顶部不加 Spacer：宿主页签条（SegmentBar 撑满 64dp 顶栏）下方已有天然留白，
+            // 再叠一层只会把胶囊推得太低。下方留白用 StatsRangeSpacing 与上方对齐（见该常量注释）。
 
-            // ---- 维度选择行 ----
             if (isSite) {
-                com.mdot.app.feature.detail.SiteRangeChips(
-                    selected = when (state.dimension) {
-                        StatsDimension.SITE_SPAN -> com.mdot.app.feature.detail.SiteDetailRangeMode.PROJECT_SPAN
-                        StatsDimension.CUSTOM -> com.mdot.app.feature.detail.SiteDetailRangeMode.CUSTOM
-                        else -> com.mdot.app.feature.detail.SiteDetailRangeMode.UNSETTLED
-                    },
-                    onSelect = { mode ->
-                        vm.onDimension(
-                            when (mode) {
-                                com.mdot.app.feature.detail.SiteDetailRangeMode.UNSETTLED -> StatsDimension.SITE_PENDING
-                                com.mdot.app.feature.detail.SiteDetailRangeMode.PROJECT_SPAN -> StatsDimension.SITE_SPAN
-                                com.mdot.app.feature.detail.SiteDetailRangeMode.CUSTOM -> StatsDimension.CUSTOM
-                            }
-                        )
-                    },
-                )
+                // 工地：**胶囊 = 唯一入口**，口径切换与自定义起止都收进弹窗
+                // （与明细页工地分支同款，共用 RangePill + SiteRangeDialog）
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    com.mdot.app.feature.detail.RangePill(
+                        label = state.rangeLabel,
+                        onClick = { showSiteRangeDialog = true },
+                    )
+                }
             } else {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.s),
-                ) {
-                    listOf(
-                        StatsDimension.CYCLE, StatsDimension.MONTH, StatsDimension.YEAR, StatsDimension.CUSTOM,
-                    ).forEach { dim ->
-                        FilterChip(
-                            colors = jiabanFilterChipColors(),
-                            selected = state.dimension == dim,
-                            onClick = { vm.onDimension(dim) },
-                            label = { Text(stringResource(dim.labelRes)) },
-                        )
-                    }
-                }
-            }
-            if (state.dimension == StatsDimension.CUSTOM) {
-                Spacer(Modifier.height(Spacing.s))
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
-                    OutlinedButton(onClick = { picking = "from" }) {
-                        Text(
-                            stringResource(
-                                R.string.stats_custom_from,
-                                state.customFrom?.let(TimeUtils::mdCn) ?: stringResource(R.string.stats_custom_from_default),
-                            )
-                        )
-                    }
-                    OutlinedButton(onClick = { picking = "to" }) {
-                        Text(
-                            stringResource(
-                                R.string.stats_custom_to,
-                                state.customTo?.let(TimeUtils::mdCn) ?: stringResource(R.string.stats_custom_to_default),
-                            )
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(Spacing.xs))
-            // 区间胶囊（与首页数据区日期同款样式；工地文案用「区间」，21 文档 M7）
-            val rangeText = state.rangeFrom?.let { f ->
-                state.rangeTo?.let { t ->
-                    val period = "${TimeUtils.mdCn(f)} – ${TimeUtils.mdCn(t)}"
-                    if (isSite) stringResource(R.string.site_range_period, period)
-                    else stringResource(R.string.home_cycle_period, period)
-                }
-            } ?: state.rangeLabel
-            Row(
-                modifier = Modifier
-                    .clip(engineShape(Radius.pill))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(horizontal = Spacing.m, vertical = Spacing.xs),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_ms_calendar_month), null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(IconSpec.inline),
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    rangeText,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                // 方案 C：胶囊 = 唯一入口（点开弹窗选维度/跳月/框自定义）；
+                // 工地不支持步进（区间随结算滚动），故只在非工地给 ‹ ›
+                MonthStepper(
+                    label = statsRangeLabel(state.dimension.rangeKind, state.picker?.current),
+                    onPrev = vm::stepBack,
+                    onNext = vm::stepForward,
+                    // 胶囊**始终可点**：弹窗里既能换维度、也能改自定义起止。
+                    // ⚠️ 别按维度把它置为不可点（曾让「自定义」维度下胶囊变成死路——
+                    // 页面已无常驻 chip 行，用户就再也换不回周期/月/年了，只能切页签绕）
+                    onOpenPicker = { showRangeDialog = true },
+                    nextEnabled = state.rangeOffset < 0 && state.maxForwardSteps > 0,
+                    onBackToCurrent = if (state.rangeOffset < 0) vm::backToCurrentRange else null,
+                    backToCurrentLabel = statsBackToCurrentLabel(state.dimension.rangeKind),
+                    prevContentDescription = statsStepDescription(forward = false, kind = state.dimension.rangeKind),
+                    nextContentDescription = statsStepDescription(forward = true, kind = state.dimension.rangeKind),
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
-
-            Spacer(Modifier.height(Spacing.m))
+            // 下方留白补到与上方（宿主页签条链路给的 126px）相等：三页统一用同一个值，
+            // 改这里请同步改记月页/明细页。实测对齐目标 = 42dp。
+            Spacer(Modifier.height(StatsRangeSpacing))
         }
 
         val hasData = if (isSite) {
@@ -721,21 +784,93 @@ private fun StatsContent(
         }
     }
 
-    picking?.let { which ->
-        DayPickDialog(
-            title = stringResource(
-                if (which == "from") R.string.ds_pick_start else R.string.ds_pick_end,
-            ),
-            initial = if (which == "from") state.customFrom ?: LocalDate.now().withDayOfMonth(1)
-            else state.customTo ?: LocalDate.now(),
-            onPick = { d ->
-                if (which == "from") vm.onCustomFrom(d) else vm.onCustomTo(d)
-                picking = null
+    // 方案 C 的区间选择弹窗（非工地）：维度 + 跳月/跳年 + 自定义起止都在它里面
+    if (showRangeDialog) {
+        StatsRangeDialog(
+            dimension = state.dimension,
+            picker = state.picker,
+            customFrom = state.customFrom,
+            customTo = state.customTo,
+            onDimension = vm::onDimension,
+            onPickMonth = vm::onPickMonth,
+            onPickYear = vm::onPickYear,
+            onCustomFrom = vm::onCustomFrom,
+            onCustomTo = vm::onCustomTo,
+            onDismiss = { showRangeDialog = false },
+        )
+    }
+
+    // 工地：区间口径弹窗（口径 chips + 自定义起止；与明细页共用 SiteRangeDialog）
+    if (showSiteRangeDialog) {
+        com.mdot.app.feature.detail.SiteRangeDialog(
+            mode = when (state.dimension) {
+                StatsDimension.SITE_SPAN -> com.mdot.app.feature.detail.SiteDetailRangeMode.PROJECT_SPAN
+                StatsDimension.CUSTOM -> com.mdot.app.feature.detail.SiteDetailRangeMode.CUSTOM
+                else -> com.mdot.app.feature.detail.SiteDetailRangeMode.UNSETTLED
             },
-            onDismiss = { picking = null },
+            customFrom = state.customFrom,
+            customTo = state.customTo,
+            onMode = { mode ->
+                vm.onDimension(
+                    when (mode) {
+                        com.mdot.app.feature.detail.SiteDetailRangeMode.UNSETTLED -> StatsDimension.SITE_PENDING
+                        com.mdot.app.feature.detail.SiteDetailRangeMode.PROJECT_SPAN -> StatsDimension.SITE_SPAN
+                        com.mdot.app.feature.detail.SiteDetailRangeMode.CUSTOM -> StatsDimension.CUSTOM
+                    }
+                )
+            },
+            onCustomFrom = vm::onCustomFrom,
+            onCustomTo = vm::onCustomTo,
+            onDismiss = { showSiteRangeDialog = false },
         )
     }
 }
+
+/**
+ * 统计页区间胶囊的文案：与明细页不同，这里**要带维度前缀**（"周期 …"/"自然月 …"/"年 …"）。
+ * 原先那行常驻 chip 承担的正是「现在是什么口径」的提示，收进弹窗后必须由文案补回来
+ * —— 这是方案 C 的固有代价，别为了好看把前缀去掉。
+ */
+@Composable
+private fun statsRangeLabel(kind: StatsRangeKind, period: CycleCalculator.Period?): String {
+    if (period == null) return ""
+    val prefix = stringResource(
+        when (kind) {
+            StatsRangeKind.CYCLE -> R.string.stats_dim_cycle
+            StatsRangeKind.MONTH -> R.string.stats_dim_month
+            StatsRangeKind.YEAR -> R.string.stats_dim_year
+            StatsRangeKind.CUSTOM -> R.string.stats_dim_custom
+        }
+    )
+    return if (kind == StatsRangeKind.YEAR) {
+        "$prefix ${period.from.year}"
+    } else {
+        "$prefix ${TimeUtils.mdCn(period.from)} – ${TimeUtils.mdCn(period.to)}"
+    }
+}
+
+/** 「回去」胶囊文案：按粒度说人话（周期叫「回本期」、年叫「回今年」、月才叫「回本月」） */
+@Composable
+private fun statsBackToCurrentLabel(kind: StatsRangeKind): String = when (kind) {
+    StatsRangeKind.MONTH -> stringResource(R.string.month_stepper_back_to_current)
+    StatsRangeKind.YEAR -> stringResource(R.string.ds_back_this_year)
+    else -> stringResource(R.string.stats_range_back_to_current)
+}
+
+/** 步进箭头的无障碍描述：按维度说人话（读屏用户听到「上一期」才知道一步走多远） */
+@Composable
+private fun statsStepDescription(forward: Boolean, kind: StatsRangeKind): String = stringResource(
+    when (kind) {
+        StatsRangeKind.CYCLE ->
+            if (forward) R.string.month_stepper_next else R.string.month_stepper_prev
+        StatsRangeKind.MONTH ->
+            if (forward) R.string.stats_step_next_month else R.string.stats_step_prev_month
+        StatsRangeKind.YEAR ->
+            if (forward) R.string.stats_step_next_year else R.string.stats_step_prev_year
+        StatsRangeKind.CUSTOM ->
+            if (forward) R.string.stats_step_next_span else R.string.stats_step_prev_span
+    }
+)
 
 /** 顶栏分段控件（样式对齐工地记工记录页顶栏胶囊）：统计、明细常驻；记月仅非工地制度显示（工地模式后续配专属页） */
 @Composable

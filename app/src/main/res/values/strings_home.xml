@@ -28,6 +28,8 @@
     <string name="detail_ot_leave_line">加班 %1$s 小时</string>
     <string name="detail_leave_deduct">请假扣款 %1$s</string>
     <string name="detail_empty">本周期暂无收入明细</string>
+    <!-- 明细页「切换展示时间」：点区间胶囊跳月 -->
+    <string name="detail_pick_month">选择月份</string>
     <!-- 首页卡片名（HomeCardRegistry，配置页与预览用） -->
     <string name="home_card_data">数据区</string>
     <string name="home_card_income">收入卡</string>

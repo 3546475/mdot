@@ -40,7 +40,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -91,6 +90,7 @@ import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.AnimatedMoneyText
 import com.mdot.app.core.designsystem.component.AnimatedNumberText
 import com.mdot.app.core.designsystem.component.MonthPickDialog
+import com.mdot.app.core.designsystem.component.MonthStepper
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.domain.PayrollCalculator
 import com.mdot.app.domain.model.IncomeSliceKind
@@ -142,8 +142,9 @@ fun PayMonthContent(
     val salary by vm.salary.collectAsStateWithLifecycle()
     var showRecon by remember { mutableStateOf(false) }
     var showMonthPicker by remember { mutableStateOf(false) }
-    // 汇总卡 A/B（2026-09-23 用户要求对比）：长按卡片头部在「完整 ⇄ 精简」间切；会话内保留
-    var compactCard by rememberSaveable { mutableStateOf(false) }
+    // 汇总卡 A/B（2026-09-23 用户要求对比）：点卡片头部在「完整 ⇄ 精简」间切；会话内保留
+    // 默认**精简（收起）**（2026-10-08 用户要求）：先进页面先看结论，需要构成/考勤摘要再点开
+    var compactCard by rememberSaveable { mutableStateOf(true) }
     var editing by remember { mutableStateOf<Pair<PayGroup, PayMonthItem>?>(null) }
     var adding by remember { mutableStateOf<PayGroup?>(null) }
     // T1-3：同步/导入结果 Snackbar（docs/15）：浅色悬浮胶囊（与关于页检查更新同范式）
@@ -168,59 +169,23 @@ fun PayMonthContent(
                 .widthIn(max = AdaptiveSpecs.contentMaxWidth)
                 .padding(horizontal = Spacing.page),
         ) {
-            Spacer(Modifier.height(Spacing.m))
+            // 上下留白统一取 Spacing.s（较小值）——与统计页/明细页的胶囊行完全同款，
+            // 三页签来回切时胶囊与下方卡片都不跳动。改这里请同步改那两页。
+            // 顶部不加 Spacer：宿主页签条（SegmentBar 撑满 64dp 顶栏）下方已有天然留白。
+            // 下方留白用 StatsRangeSpacing 与上方对齐（见该常量注释）。
 
-            // ---- 月份导航（标题可点 → 月份选择器；非本月时旁边给「回本月」）----
+            // ---- 月份导航（与明细页共用 MonthStepper：同功能必须同实现，禁止两页各画一套）----
             val isCurrentMonth = month == YearMonth.now()
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                JiabanIconButton(onClick = vm::prevMonth) {
-                    Icon(painterResource(R.drawable.ic_ms_keyboard_arrow_left), stringResource(R.string.paymonth_prev_cd))
-                }
-                Row(
-                    Modifier
-                        .widthIn(min = 120.dp)
-                        .clip(engineShape(Radius.pill))
-                        .clickable { showMonthPicker = true }
-                        .padding(horizontal = Spacing.s, vertical = Spacing.xs),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        stringResource(R.string.paymonth_month, month.year, month.monthValue),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(Modifier.width(Spacing.xs))
-                    Icon(
-                        painterResource(R.drawable.ic_ms_expand_more),
-                        contentDescription = stringResource(R.string.paymonth_picker_title),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(IconSpec.inline),
-                    )
-                }
-                if (!isCurrentMonth) {
-                    Spacer(Modifier.width(Spacing.xs))
-                    FilterChip(
-                                                colors = jiabanFilterChipColors(),
-                        selected = false,
-                        onClick = vm::goToCurrentMonth,
-                        label = {
-                            Text(
-                                stringResource(R.string.paymonth_this_month),
-                                style = MaterialTheme.typography.labelMedium,
-                            )
-                        },
-                    )
-                }
-                JiabanIconButton(onClick = vm::nextMonth) {
-                    Icon(EngineIcons.chevron(), stringResource(R.string.paymonth_next_cd))
-                }
-            }
-            Spacer(Modifier.height(Spacing.s))
+            MonthStepper(
+                label = stringResource(R.string.paymonth_month, month.year, month.monthValue),
+                nextEnabled = true,
+                onPrev = vm::prevMonth,
+                onNext = vm::nextMonth,
+                onOpenPicker = { showMonthPicker = true },
+                onBackToCurrent = if (isCurrentMonth) null else vm::goToCurrentMonth,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(StatsRangeSpacing))
 
             // 汇总卡（docs/20 P0-2）：实发大字 + 构成 + 考勤摘要（金额随实时预览走，随记随更新）。
             // 两个版式并列（点头部切换）：完整版=信息全，精简版=高度约一半（用户 A/B 对比用）

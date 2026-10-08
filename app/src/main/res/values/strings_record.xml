@@ -47,6 +47,12 @@
     <string name="ds_month_title">%1$d年%2$d月</string>
     <string name="ds_year_title">%1$d 年</string>
     <string name="ds_month_short">%1$d月</string>
+    <!-- 年份网格（统计页「年」维度跳转用；%1$d 起 %2$d 止） -->
+    <string name="ds_year_span">%1$d – %2$d 年</string>
+    <string name="ds_year_short">%1$d</string>
+    <string name="ds_back_this_year">回今年</string>
+    <!-- 区间选择弹窗标题：统计页与明细页、工地与非工地四种入口共用同一个弹窗语义 -->
+    <string name="range_pick_title">选择时间段</string>
     <string name="ds_prev_month">上个月</string>
     <string name="ds_next_month">下个月</string>
     <string name="ds_topbar_back_cd">返回</string>
