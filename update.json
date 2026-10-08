@@ -1,16 +1,16 @@
 {
-  "versionName": "0.7.8.2",
-  "versionCode": 62,
-  "tag": "v0.7.8.2",
-  "releaseNotes": "## 更新内容\n\n**修复**\n\n- 修复**记月页会丢数据**：已记录的金额在「增加项目」后被清 0，且自己新增的项目在改动其它项目时会消失\n- 修复连续添加多个项目时可能互相覆盖的问题\n- 修复记加班弹层的「删除」按钮要展开面板才看得见 —— 现在打开已记录的加班时即可直接删除\n- 修复弹窗关闭时**瞬间消失**、没有淡出动画\n- 修复弹窗状态在多窗口 / 应用预览下可能互相串扰\n\n\n系统要求：Android 10（API 29）及以上。",
+  "versionName": "0.7.8.3",
+  "versionCode": 63,
+  "tag": "v0.7.8.3",
+  "releaseNotes": "## 更新内容\n\n**新增**\n\n- **明细页可以切换查看的时间段了**：胶囊两侧的 ‹ › 按考勤周期前后翻，\n  点中间的胶囊还能直接跳到某个月 —— 不再只能看本月\n- **统计页的时间范围改成一颗胶囊**：点开弹窗可在「考勤周期 / 自然月 / 年 / 自定义」之间切换，\n  页面顶部不再常驻一排筛选按钮；选「年」还能直接跳到某一年\n- **工地记工的统计页与明细页也用同一套胶囊**：区间口径（本期待结 / 项目全周期 / 自定义）\n  收进弹窗，页面上不再堆着一排按钮和两个日期入口\n\n**界面**\n\n- 记月页的月份切换换成与明细页同款的胶囊，**统计 / 记月 / 明细三个页面的时间段控件样式与位置完全统一**\n- 胶囊支持「回本月 / 回本期 / 回今年」：翻到过去之后可以一键回到当下，并且带淡出动画、不再突兀消失\n- 收紧胶囊上下的留白，页面更紧凑；记月页顶部汇总卡默认收起，进页面先看到金额\n- 月份胶囊补回日历图标\n\n\n系统要求：Android 10（API 29）及以上。",
   "apkUrl": {
-    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.7.8.2/MDOT-RELEASE-0.7.8.2-v8a.apk",
-    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.7.8.2/MDOT-RELEASE-0.7.8.2-v7a.apk",
-    "universal": "https://github.com/3546475/mdot/releases/download/v0.7.8.2/MDOT-RELEASE-0.7.8.2-dual.apk"
+    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.7.8.3/MDOT-RELEASE-0.7.8.3-v8a.apk",
+    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.7.8.3/MDOT-RELEASE-0.7.8.3-v7a.apk",
+    "universal": "https://github.com/3546475/mdot/releases/download/v0.7.8.3/MDOT-RELEASE-0.7.8.3-dual.apk"
   },
   "apkSha256": {
-    "arm64-v8a": "a01230229bcf122369e74101277e043f880f558be3c8848020879e0ed7b97f30",
-    "armeabi-v7a": "afa658c4b11ca96ccd0afacbb289fcda2009cb262abdf061ad3cd439271be203",
-    "universal": "c5a838d342448c83efc8228fa6f52285dc467cdf74542af0a7e856a1bdceced4"
+    "arm64-v8a": "3c02ca71896fc68b27da3d5a2f1055638cbd672731b4990f3222f618e2f0e92c",
+    "armeabi-v7a": "d25d9b41ab4f0f57697cc3acf5470c1a21ca5333519ca794d468fb41f0fb0ab9",
+    "universal": "8b5e22094ac8c8a15fc323334e0aca3c2d128990e1b79ecbddabc8d4dced7b9c"
   }
 }
