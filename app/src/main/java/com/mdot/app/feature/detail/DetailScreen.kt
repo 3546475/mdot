@@ -87,6 +87,7 @@ import com.mdot.app.core.designsystem.component.JiabanButtonRole
 import com.mdot.app.core.designsystem.jiabanFilterChipColors
 import com.mdot.app.core.designsystem.emphasisCardSurface
 import com.mdot.app.core.designsystem.emphasisCardInk
+import com.mdot.app.core.designsystem.heroChipSurface
 
 /** 工地明细区间口径（21 文档 B1）：UNSETTLED/PROJECT_SPAN 走 domain 推导（SiteRanges.Kind），CUSTOM=用户选起止 */
 enum class SiteDetailRangeMode { UNSETTLED, PROJECT_SPAN, CUSTOM }
@@ -311,6 +312,10 @@ class DetailViewModel @Inject constructor(
  * 同功能必须同样式同实现，禁止两处各画一套。
  * 样式 = FilterChip 轻量筛选 chip（用户拍板 dec-8b817f2b6a12e91d：口径切换是次要信息，
  * ChoicePillRow 药丸太占视觉重心，与统计页维度 chips 统一成 chip 语言）。
+ *
+ * ⚠️ **2026-10-08（v0.7.8.3）起本组件不再直接铺在页面上**：工地两页的口径切换都收进了
+ * [com.mdot.app.feature.detail.SiteRangeDialog]，页面只剩一颗 [RangePill]（它才是唯一入口）。
+ * 本组件现在由该弹窗内部使用——**不要在页面层直接调用它**，否则又变回"胶囊 + chips"两套入口。
  */
 @Composable
 fun SiteRangeChips(
@@ -444,8 +449,13 @@ fun DetailPane(
  * 日历图标 + 文案 + ▾，点开弹窗换口径。工地在统计页与明细页共用本组件。
  *
  * ⚠️ 本组件**没有箭头**，高度只有胶囊本身（≈24dp）；而 MonthStepper 的行高由两侧
- * 48dp 最小触达的图标按钮撑起、胶囊在其中居中 ⇒ 工地那支会比非工地那支**高约 12dp**。
- * 用户看过这个状态并选择保留，**故不要**在这里补 `minHeight` 去对齐（补齐会牵动整体节奏）。
+ * 48dp 最小触达的图标按钮撑起、胶囊在其中居中。
+ * **2026-10-08 更新（commit 6085792）**：已改为把那侧的行高**锁到 `RangeCapsuleHeight`**，
+ * 于是两支胶囊实际落在同一条 y 上（真机实测两制度下胶囊中心同为 y=296）——
+ * 换句话说，「对齐」的责任放在**有行的那一侧**（MonthStepper），本组件**仍然不要**补 `minHeight`：
+ * 它本身就是那颗胶囊（`clip`+`background`+`padding` 挂在同一个 Row 上），
+ * 补 `minHeight` 会把胶囊自己撑成 48dp 的胖胶囊、并牵动整页节奏。
+ * 用户看过两态后选择保留本形态，要动就动 `RangeCapsuleHeight` 一处。
  */
 @Composable
 fun RangePill(
@@ -624,7 +634,7 @@ internal fun TierChip(tier: RateTier, out: PayrollCalculator.Output, modifier: M
     Box(
         modifier
             .clip(engineShape(Radius.pill))
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
+            .background(heroChipSurface())
             .padding(horizontal = Spacing.m, vertical = Spacing.xs),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

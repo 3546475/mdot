@@ -190,7 +190,7 @@ private fun PhotoSection(photos: List<String>, onAdd: (List<String>) -> Unit, on
     viewing?.let { path ->
         JiabanAlertDialog(containerColor = dialogContainerColor(), 
             onDismissRequest = { viewing = null },
-            confirmButton = {},
+            // 照片查看：只有「取消」⇒ 无确认键，传 null（不要传 `{}`，否则 MIUIX 会留半格空白 + 孤立竖线）
             text = {
                 val bmp = remember(path) {
                     runCatching { BitmapFactory.decodeFile(path)?.asImageBitmap() }.getOrNull()

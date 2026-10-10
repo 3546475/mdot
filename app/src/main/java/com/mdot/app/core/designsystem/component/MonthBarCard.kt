@@ -12,6 +12,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -24,6 +30,8 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -80,6 +88,15 @@ fun MonthBarCard(
     val barDates = (0 until days).map { dates?.getOrNull(it) ?: from.plusDays(it.toLong()) }
     val maxV = values.maxOrNull() ?: 0f
     val bestIdx = values.indices.maxByOrNull { values[it] } ?: 0
+    // 绘图区高度：**以左侧绘图区的实际测量值为唯一真值**（[plotHeightPx]），
+    // 右侧刻度按它定位 —— 两边不再各写一个 dp（此前 113/113 一写死就长期不一致：
+    // 顶对齐修掉了 18dp 整体下沉，但绘图区真实高度与写死值仍有差额，越靠上偏得越多）。
+    val chartHeight = 113.dp
+    var plotHeightPx by remember { mutableFloatStateOf(0f) }
+    // 组合期算好像素值（offset lambda 不是组合上下文，不能调 toPx()）
+    val fallbackPlotHeightPx = with(LocalDensity.current) { chartHeight.toPx() }
+    val tickMeasurer = rememberTextMeasurer()
+    val labelStyle = MaterialTheme.typography.labelSmall
     val hint = rememberChartHint()
     var tapEvent by remember { mutableStateOf<ChartEvent?>(null) }
     // 选中柱（点击切换；仅内部状态，周柱由外部 selectedLabel 驱动）
@@ -99,12 +116,16 @@ fun MonthBarCard(
     ) {
         ChartHintBox(hint = hint.value, columns = days) {
         Column(Modifier.padding(start = Spacing.l, end = Spacing.l, top = Spacing.l, bottom = Spacing.s)) {
-            Row(verticalAlignment = Alignment.Bottom) {
+            // ⚠️ 必须 **Top** 对齐（2026-10-09）：此前用 `Bottom`，而左列 = 绘图区 + x 轴标签（高 18dp）、
+            // 右列（右侧刻度）只有绘图区高 ⇒ 底部对齐会把右列整体**下沉 18dp**，刻度整体比网格线低一线。
+            Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .height(113.dp)
+                            .height(chartHeight)
+                            // 记下绘图区**实际**高度供右侧刻度定位（单一真值，避免两边各猜一个 dp）
+                            .onSizeChanged { plotHeightPx = it.height.toFloat() }
                     ) {
                         // 虚线网格（最大/半程/0）
                         val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
@@ -201,7 +222,6 @@ fun MonthBarCard(
                     // X 轴标签：周聚合桶自带「M/d」标签；日柱自动 1 5 10 15 20 25 30。
                     // 周桶稀疏**按实测宽度定步长**（相邻标签留间隙、保证不重叠）：按年筛选时周桶可达 53 个，
                     // 原「≤13 全标、否则隔一标一」会画出 26 个标签糊成一整条（2026-09-30 用户报）。
-                    val labelStyle = MaterialTheme.typography.labelSmall
                     val measurer = rememberTextMeasurer()
                     val labelTexts: List<Pair<Int, String>> = if (weeklyBars) {
                         barLabels.orEmpty().mapIndexedNotNull { i, l -> l?.let { i to it } }
@@ -237,28 +257,77 @@ fun MonthBarCard(
                     }
                 }
                 Spacer(Modifier.width(Spacing.s))
-                // 右侧刻度（与网格线对齐）
-                Box(Modifier.height(113.dp)) {
-                    Text(
-                        modeValueText(workSystem, maxV),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.align(Alignment.TopEnd),
-                    )
-                    Text(
-                        modeValueText(workSystem, maxV / 2f),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.align(Alignment.CenterEnd),
-                    )
-                    Text(
-                        "0",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.align(Alignment.BottomEnd),
-                    )
+                // 右侧刻度：**与绘图区同一个 [chartHeight]**、按网格线同样的公式定位——
+                // 不再 Top/Center/Bottom 均分（均分会让「0」的文字**底边**贴 0% 线、中心浮在线上方，
+                // 看着像掉出绘图区并与 x 轴日期挤在一行，2026-10-09 真机取像素定位）。
+                Box(Modifier.height(chartHeight)) {
+                    // 刻度拆成**数字列 + 单位列**两段（2026-10-09 用户要求）：
+                    // ① 先「0 要和数字对齐」——此前三档都是 End 右对齐，「4.5小时」/「2.3小时」的**末字**贴右边
+                    //    ⇒ 单独的「0」落在「时」下方而不是数字下方；
+                    // ② 再「0 和上方数字**左边**个位对齐」——数字列改**左对齐**，三档数字左缘齐平
+                    //    （`0` 只有个位，居在数字列左端；右缘不齐是有意为之）。
+                    // 两列各自固定宽度 ⇒ 数字列左缘对齐的同时，单位列仍整列齐平。
+                    val ticks = listOf(1f, 0.5f, 0f).map { f ->
+                        f to (if (f == 0f) "0" else modeValueText(workSystem, maxV * f))
+                    }
+                    fun splitTick(t: String): Pair<String, String> {
+                        val i = t.indexOfFirst { !it.isDigit() && it != '.' && it != '-' }
+                        return if (i > 0) t.substring(0, i) to t.substring(i) else t to ""
+                    }
+                    // 两列各自的列宽 = 该列在三档里的最大实测宽（数字列最宽档通常是「4.5」这类）
+                    val numW = ticks.maxOf { (_, t) ->
+                        tickMeasurer.measure(AnnotatedString(splitTick(t).first), labelStyle).size.width
+                    }.toFloat()
+                    val unitW = ticks.maxOf { (_, t) ->
+                        val u = splitTick(t).second
+                        if (u.isEmpty()) 0f
+                        else tickMeasurer.measure(AnnotatedString(u), labelStyle).size.width.toFloat()
+                    }
+                    val density = LocalDensity.current
+                    ticks.forEach { (f, tickText) ->
+                        // ⚠️ 文案与高度必须在**组合期**算好：modeValueText 是 @Composable，
+                        // 而 offset 的 lambda 跑在布局期，不能调它（2026-10-09 编译错）。
+                        val (numPart, unitPart) = splitTick(tickText)
+                        val tickH = tickMeasurer.measure(AnnotatedString(tickText), labelStyle).size.height
+                        Row(
+                            Modifier
+                                // TopStart：整列靠左起排，三档左缘齐平（Right 会把单字符的「0」甩到右边）
+                                .align(Alignment.TopStart)
+                                .offset {
+                                    // 与 Canvas 里 `size.height * (1f - f)` 完全同一公式。
+                                    // ⚠️ 垂直对齐按**文字块边缘**而非中心：顶部那条线就在绘图区顶边，
+                                    // 中心对齐会把两行的「4.5小时」压到线**下方** 45px（2026-10-09 真机量）。
+                                    // 规则：f=1 顶对齐、f=0.5 居中、f=0 底对齐 —— 三档各贴各的线。
+                                    val h = if (plotHeightPx > 0f) plotHeightPx else fallbackPlotHeightPx
+                                    val line = h * (1f - f)
+                                    val dy = when (f) {
+                                        1f -> 0f
+                                        0f -> -tickH.toFloat()
+                                        else -> -(tickH / 2f)
+                                    }
+                                    IntOffset(0, (line + dy).roundToInt())
+                                },
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            Text(
+                                numPart,
+                                style = labelStyle,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                // 固定列宽 + **左对齐**：三档数字左缘齐平（用户要求「0 和上方数字左边个位对齐」）
+                                modifier = Modifier.width(with(density) { numW.toDp() }),
+                            )
+                            if (unitPart.isNotEmpty()) {
+                                Text(
+                                    unitPart,
+                                    style = labelStyle,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            } else {
+                                // 「0」无单位 ⇒ 补同宽空位，单位列才与另两档齐平
+                                Spacer(Modifier.width(with(density) { unitW.toDp() }))
+                            }
+                        }
+                    }
                 }
             }
             // 周聚合说明（21 文档 B3 用户反馈：周柱与日柱同形，需明示聚合口径）

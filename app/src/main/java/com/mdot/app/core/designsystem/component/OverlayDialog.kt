@@ -141,7 +141,7 @@ internal fun OverlayDialogCard(
     icon: (@Composable () -> Unit)?,
     title: (@Composable () -> Unit)?,
     text: (@Composable () -> Unit)?,
-    confirmButton: @Composable () -> Unit,
+    confirmButton: (@Composable () -> Unit)?,
     dismissButton: (@Composable () -> Unit)?,
 ) {
     Surface(
@@ -152,23 +152,58 @@ internal fun OverlayDialogCard(
             .widthIn(min = DialogSpec.minWidth, max = DialogSpec.maxWidth),
     ) {
         Column {
+            // 内容区：四周 24dp。⚠️ MIUIX 的分隔线 + 按钮行**不在**这一层里（原因见下方 if 块注释）
             Column(Modifier.padding(Spacing.xl)) {
-            if (icon != null) {
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { icon() }
-                Spacer(Modifier.height(Spacing.m))
+                if (icon != null) {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { icon() }
+                    Spacer(Modifier.height(Spacing.m))
+                }
+                if (title != null) {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { title() }
+                }
+                if (text != null) {
+                    if (title != null) Spacer(Modifier.height(Spacing.s))
+                    text()
+                }
+                // MD3：按钮留在内容 padding 内（M3 AlertDialog 既有观感——右下角、随内容内缩）
+                if (!engineIsMiuix && (confirmButton != null || dismissButton != null)) {
+                    Spacer(Modifier.height(Spacing.l))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (dismissButton != null) {
+                            dismissButton()
+                            Spacer(Modifier.widthIn(min = Spacing.s))
+                        }
+                        confirmButton?.invoke()
+                    }
+                }
             }
-            if (title != null) {
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { title() }
-            }
-            if (text != null) {
-                if (title != null) Spacer(Modifier.height(Spacing.s))
-                text()
-            }
-            if (engineIsMiuix) {
-                // MIUIX：与窗口版 [MiuixDialogCard] 同观感——细分隔线 + 整宽分栏按钮行（左取消/右确认）
+            if (engineIsMiuix && (confirmButton != null || dismissButton != null)) {
+                // MIUIX：与窗口版 [MiuixDialogCard] 同观感——通栏细分隔线 + 贴底整宽分栏按钮行（左取消/右确认）
+                // ⚠️ 本块必须在上面 padded Column 的**外面**（2026-10-09 用户报「输入框与分割线贴在一起」根因，
+                // 仅是括号位置）：放进里面 = ① text 槽（输入框）与分隔线 0 间距，24dp 底部 padding 垫到按钮行下方去了；
+                // ② 分隔线/按钮行左右各缩 24dp、离卡片底沿再垫 24dp，与「通栏/贴底」不符。
+                // 放在外面后：输入框→分隔线的间距 = 内容区底部 padding（Spacing.xl = 24dp），与窗口版完全一致。
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 androidx.compose.runtime.CompositionLocalProvider(LocalDialogButtonFlat provides true) {
                     Row(Modifier.fillMaxWidth().height(DialogSpec.buttonRowHeight)) {
+                        if (confirmButton == null) {
+                            // 无确认键（单选日期/月份选择「点一下即生效」、照片查看等）：取消**铺满整行**，
+                            // 不给空槽留半格、也不画那条孤立的竖分隔线（2026-10-09 真机报「日期选择弹窗右下是空的」）
+                            Row(
+                                Modifier.fillMaxWidth().fillMaxHeight(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                androidx.compose.runtime.CompositionLocalProvider(
+                                    LocalDialogButtonNeutral provides true,
+                                    LocalDialogButtonFillCell provides true,
+                                ) { dismissButton?.invoke() }
+                            }
+                        } else {
                         if (dismissButton != null) {
                             Row(
                                 Modifier.weight(1f).fillMaxHeight(),
@@ -189,24 +224,11 @@ internal fun OverlayDialogCard(
                         ) {
                             androidx.compose.runtime.CompositionLocalProvider(
                                 LocalDialogButtonFillCell provides true,
-                            ) { confirmButton() }
+                            ) { confirmButton.invoke() }
+                        }
                         }
                     }
                 }
-            } else {
-                Spacer(Modifier.height(Spacing.l))
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (dismissButton != null) {
-                        dismissButton()
-                        Spacer(Modifier.widthIn(min = Spacing.s))
-                    }
-                    confirmButton()
-                }
-            }
             }
         }
     }

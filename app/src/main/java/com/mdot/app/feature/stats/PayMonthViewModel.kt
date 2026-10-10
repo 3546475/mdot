@@ -210,7 +210,7 @@ class PayMonthViewModel @Inject constructor(
         }
 
     /**
-     * 区间内的天数计数（供「按日计算」的行与全勤奖自动推导）。
+     * 区间内的天数计数（供「按日计算」的行推导）。
      * 推导本体在 domain（[PayMonthDaily.counts]），首页数据区用同一个函数，两处不会漂。
      */
     private fun dayCountsFlow(m: YearMonth): Flow<PayMonthDayCounts> {

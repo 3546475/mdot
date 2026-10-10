@@ -23,8 +23,6 @@
     <string name="stats_tab_detail">明细</string>
     <!-- 记月（月度工资单） -->
     <string name="paymonth_month">%1$d年%2$d月</string>
-    <string name="paymonth_prev_cd">上个月</string>
-    <string name="paymonth_next_cd">下个月</string>
     <string name="paymonth_group_basic">基本项目</string>
     <string name="paymonth_group_subsidy">补贴项目</string>
     <string name="paymonth_group_deduction">扣款项目</string>
@@ -100,7 +98,6 @@
     <string name="paymonth_insurance_formula">基数 %1$s × %2$s%% = ¥%3$s</string>
     <string name="paymonth_close">关闭</string>
     <string name="paymonth_picker_title">选择月份</string>
-    <string name="paymonth_this_month">回本月</string>
     <string name="paymonth_empty_hint">记录会自动算进工资单；先到「工资设定」填基本工资 / 加班基数</string>
     <string name="paymonth_recon_restore">恢复</string>
     <string name="paymonth_recon_restore_all">全部恢复</string>

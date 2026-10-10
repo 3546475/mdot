@@ -102,6 +102,31 @@ fun DayPickDialog(
     var selection by remember { mutableStateOf(initialSelection.ifEmpty { setOf(initial) }) }
     val maxDate = if (allowFuture) null else today
 
+    // 确认键：多选 =「完成」、需确认 =「确定」；**单选且免确认（点一下即生效）没有确认键** ——
+    // 这种情况必须传 **null**（不是空 lambda）：MIUIX 分栏按钮行只在确认键为 null 时把「取消」
+    // 铺满整行；传空 lambda 会照旧占出**半格空白 + 一条孤立的竖分隔线**（2026-10-09 真机报）。
+    val confirmSlot: (@Composable () -> Unit)? = when {
+        multi -> {
+            {
+                JiabanButton(
+                    text = stringResource(R.string.ds_pick_done),
+                    onClick = { onPickDates(selection) },
+                    role = JiabanButtonRole.GHOST,
+                )
+            }
+        }
+        confirmRequired -> {
+            {
+                JiabanButton(
+                    text = stringResource(R.string.ds_pick_confirm),
+                    onClick = { onPick(pending) },
+                    role = JiabanButtonRole.GHOST,
+                )
+            }
+        }
+        else -> null
+    }
+
     JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
         backdrop = backdrop,
@@ -165,21 +190,7 @@ fun DayPickDialog(
                 )
             }
         },
-        confirmButton = {
-            if (multi) {
-                JiabanButton(
-                    text = stringResource(R.string.ds_pick_done),
-                    onClick = { onPickDates(selection) },
-                    role = JiabanButtonRole.GHOST,
-                )
-            } else if (confirmRequired) {
-                JiabanButton(
-                    text = stringResource(R.string.ds_pick_confirm),
-                    onClick = { onPick(pending) },
-                    role = JiabanButtonRole.GHOST,
-                )
-            }
-        },
+        confirmButton = confirmSlot,
         dismissButton = {
             if (multi) {
                 // 多选态该槽放**两颗**（清除选择 + 取消）：各包一层等宽 Box，配合卡片的「整格可点」
@@ -254,7 +265,7 @@ fun MonthPickDialog(
                 onBackToCurrent = { onPick(thisMonth) },
             )
         },
-        confirmButton = {},
+        // 月份/年份粒度：点一下即生效并关闭 ⇒ **无确认键**（传 null，不要传 `{}`）
         dismissButton = {
             JiabanButton(
                 text = stringResource(R.string.ds_cancel),

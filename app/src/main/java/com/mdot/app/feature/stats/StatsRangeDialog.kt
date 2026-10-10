@@ -175,7 +175,8 @@ fun StatsRangeDialog(
                 role = JiabanButtonRole.GHOST,
             )
         },
-        dismissButton = {},
+        // 本弹窗只有「取消」一个动作 ⇒ 无次要槽。⚠️ 勿写 `dismissButton = {}`：空槽在 MIUIX 分栏行里
+        // 仍占半格 ⇒ 左半格空白 + 一条孤立的竖分隔线（DialogContractTest 守门）
     )
 
     // 起止日期选择：不关闭本弹窗，选完回到本弹窗（覆盖层栈支持弹窗叠弹窗）

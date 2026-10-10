@@ -120,6 +120,7 @@ import com.mdot.app.core.designsystem.component.JiabanIconButton
 import com.mdot.app.core.designsystem.component.FloatingLabelTextField
 import com.mdot.app.core.designsystem.emphasisCardSurface
 import com.mdot.app.core.designsystem.emphasisCardInk
+import com.mdot.app.core.designsystem.heroChipSurface
 import com.mdot.app.core.designsystem.jiabanFilterChipColors
 
 /**
@@ -690,16 +691,16 @@ private fun SumCell(label: String, cents: Long, negative: Boolean, modifier: Mod
     }
 }
 
-/** 摘要徽章：卡片底上的浅层小胶囊（读一眼「这个月干了多少 / 记了几天」） */
+/** 摘要徽章：卡片底上的浅层小胶囊（读一眼「这个月干了多少 / 记了几天」）。⚠️ 底色/字色走 [heroChipSurface]/[emphasisCardInk]，与统计/明细 hero 的分档胶囊同款 */
 @Composable
 private fun AttendanceBadge(text: String) {
     Text(
         text,
         style = MaterialTheme.typography.labelMedium,
-        color = emphasisCardInk().copy(alpha = 0.75f),
+        color = emphasisCardInk(),
         modifier = Modifier
             .clip(engineShape(Radius.pill))
-            .background(emphasisCardInk().copy(alpha = 0.12f))
+            .background(heroChipSurface())
             .padding(horizontal = Spacing.s, vertical = Spacing.xs),
     )
 }
@@ -777,7 +778,7 @@ private fun SummaryCardHeader(
             Row(
                 Modifier
                     .clip(engineShape(Radius.pill))
-                    .background(emphasisCardInk().copy(alpha = 0.12f))
+                    .background(heroChipSurface())
                     .padding(horizontal = Spacing.s, vertical = Spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -785,13 +786,13 @@ private fun SummaryCardHeader(
                     if (down) "↓" else "↑",
                     style = MaterialTheme.typography.labelMedium,
                     color = if (down) MaterialTheme.colorScheme.error
-                    else emphasisCardInk().copy(alpha = 0.75f),
+                    else emphasisCardInk(),
                 )
                 Spacer(Modifier.width(Spacing.xs))
                 Text(
                     stringResource(R.string.paymonth_mom, signedYuanText(delta)),
                     style = MaterialTheme.typography.labelMedium,
-                    color = emphasisCardInk().copy(alpha = 0.75f),
+                    color = emphasisCardInk(),
                 )
             }
             Spacer(Modifier.width(Spacing.xs))
@@ -987,7 +988,11 @@ private fun PayGroupCard(
                 )
                 AnimatedNumberText(
                     value = total,
-                    text = { cents -> if (negative) "-${Money.yuanTrimText(cents)}" else Money.yuanTrimText(cents) },
+                    // ⚠️ 0 不带负号：扣款/其他组默认显示 "-0"（2026-10-09 记月页巡查发现），
+                    // 零就是零。与 [SumCell] 同一口径（那里是 `negative && !zero`）
+                    text = { cents ->
+                        if (negative && cents != 0L) "-${Money.yuanTrimText(cents)}" else Money.yuanTrimText(cents)
+                    },
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
@@ -1017,7 +1022,9 @@ private fun PayGroupCard(
                         )
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                if (negative) "-${Money.yuanTrimText(item.amountCents)}" else Money.yuanTrimText(item.amountCents),
+                                // ⚠️ 0 不带负号（与分组小计、[SumCell] 同一口径）：否则空行显示 "-0"
+                                if (negative && item.amountCents != 0L) "-${Money.yuanTrimText(item.amountCents)}"
+                                else Money.yuanTrimText(item.amountCents),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.End,
@@ -1171,7 +1178,7 @@ private fun EditItemDialog(
             if (insurance != null && insurance.baseCents > 0) Money.yuanTrimText(insurance.baseCents) else ""
         )
     }
-    // ---- 「按日计算」态（v0.7.8.3：行级属性，任何行都能开）----
+    // ---- 「按日计算」态（v0.7.8.4：行级属性；只有「其它补贴」与用户自加行能开，见 supportsDailyRate）----
     var dailyOn by remember { mutableStateOf(item.isDailyComputed) }
     var dailyUnit by remember {
         mutableStateOf(if (item.dayRateCents > 0) Money.yuanTrimText(item.dayRateCents) else "")

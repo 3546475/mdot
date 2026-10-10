@@ -102,6 +102,7 @@ import com.mdot.app.domain.model.TierSource
 import com.mdot.app.domain.toCalcLite
 import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.domain.PayrollCalculator
+import com.mdot.app.domain.ShiftDefaults
 import com.mdot.app.domain.util.Money
 import com.mdot.app.domain.util.TimeUtils
 import com.mdot.app.feature.record.DurationGrid
@@ -224,7 +225,8 @@ class CalendarViewModel @Inject constructor(
     }
 
     /**
-     * 批量写入加班：统一时长；班次取首个可见班次（同单记默认），档位按各日期自动判定；
+     * 批量写入加班：统一时长；班次取**默认班次**（`ShiftDefaults`：排第一个的可见班次，同单记预选），
+     * 档位按各日期自动判定；
      * 已有加班记录的日期按 saveOt 语义覆盖（同单记编辑）。未来日期跳过。
      */
     fun saveBatch(durationMinutes: Int) {
@@ -232,7 +234,7 @@ class CalendarViewModel @Inject constructor(
         if (durationMinutes !in 1..RecordRepository.MAX_MINUTES || dates.isEmpty()) return
         viewModelScope.launch {
             val workdays = settings.workdaysFlow.first()
-            val shift = shiftRepo.getAll().firstOrNull { !it.hidden }
+            val shift = ShiftDefaults.of(shiftRepo.getAll())
             var success = 0
             dates.forEach { date ->
                 val r = recordRepo.saveOt(

@@ -71,7 +71,7 @@ class SettingsDataSource @Inject constructor(
         dataStore.edit { it[PAY_MONTH_COLLAPSED] = groups }
 
     /**
-     * **行模板**（v0.7.8.3）：用户新增的补贴/扣款行及其**按日计算配置**（日单价、天数口径、是否扣请假）。
+     * **行模板**（v0.7.8.4）：用户新增的补贴/扣款行及其**按日计算配置**（日单价、天数口径、是否扣请假）。
      *
      * 为什么需要：工资单按月存，新月份底稿只有出厂行，用户自己加的行**下个月就没了**
      * （2026-10-08 用户问"这个月添加的非默认项目下个月还会有吗"）。
@@ -151,7 +151,7 @@ class SettingsDataSource @Inject constructor(
 
     private val PAY_MONTH_COLLAPSED = stringSetPreferencesKey("paymonth_collapsed")
 
-    /** 行模板键（v0.7.8.3） */
+    /** 行模板键（v0.7.8.4） */
     private val PAY_MONTH_TEMPLATES = stringPreferencesKey("paymonth_templates")
     private val PAY_MONTH_CUSTOM_PRESETS = stringPreferencesKey("paymonth_custom_presets")
 

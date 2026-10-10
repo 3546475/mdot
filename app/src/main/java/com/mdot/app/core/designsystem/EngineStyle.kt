@@ -153,6 +153,24 @@ fun emphasisCardInk() = if (engineIsMiuix) MaterialTheme.colorScheme.onSurface
 else MaterialTheme.colorScheme.onPrimaryContainer
 
 /**
+ * hero 卡内**浅层胶囊**（信息胶囊）的底色——本口径的**唯一出处**。
+ *
+ * = `surface` α0.6 叠在卡底上 ⇒ 卡面上的一层**亮**色薄片；配 [emphasisCardInk] 全不透明文字。
+ *
+ * 沿革（2026-10-09 用户指出「记月页胶囊是暗的、统计和明细页是亮的」，两种主题都有）：
+ * 记月汇总卡的考勤徽章与「较上月」药丸此前用的是 `emphasisCardInk().copy(alpha = 0.12f)`
+ * ——**深色墨**叠浅卡底 = 暗蓝灰一层；而统计/明细 hero 的分档胶囊（`TierChip`）用
+ * `surface.copy(alpha = 0.6f)` = 亮一层。同样的卡底、同样叫"信息胶囊"，两种观感。
+ * 现两边统一到本函数；**新增 hero 胶囊一律走它**，别再各写各的 alpha。
+ *
+ * ⚠️ 不适用于：hero 卡上的**进度条**（记月「周期进度」用 ink α0.12/0.55，是轨道不是胶囊）、
+ * 以及卡内无底色的次级文字（那些用 `emphasisCardInk().copy(alpha = …)` 降层级）。
+ */
+@Composable
+fun heroChipSurface(): androidx.compose.ui.graphics.Color =
+    MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
+
+/**
  * 次级标签文字色（农历/节日、计划标注等"挂靠信息"）：
  * - MD3：`outline`（不透明中灰，与改动前逐像素一致）；
  * - MIUIX：`onSurfaceVariant`（60% 黑 / 50% 白，次级文字角色）。

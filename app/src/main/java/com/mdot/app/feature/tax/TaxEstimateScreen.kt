@@ -3,7 +3,6 @@ package com.mdot.app.feature.tax
 import com.mdot.app.core.designsystem.component.JiabanAlertDialog
 import com.mdot.app.core.designsystem.dialogContainerColor
 import com.mdot.app.core.designsystem.engineShape
-import com.mdot.app.core.designsystem.EngineIcons
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,7 +34,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.background
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.animation.animateContentSize
@@ -55,14 +53,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.Radius
-import com.mdot.app.core.designsystem.IconSpec
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.SolidColor
 import com.mdot.app.core.designsystem.HeroAmountTier
@@ -71,6 +67,7 @@ import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.AnimatedMoneyText
 import com.mdot.app.core.designsystem.component.AnimatedNumberText
 import com.mdot.app.core.designsystem.component.JiabanTopBar
+import com.mdot.app.core.designsystem.component.MonthStepper
 import com.mdot.app.core.designsystem.component.JiabanButton
 import com.mdot.app.core.designsystem.component.JiabanButtonRole
 import com.mdot.app.core.designsystem.component.JiabanButtonSize
@@ -81,7 +78,6 @@ import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import com.mdot.app.domain.TaxCalculator
 import com.mdot.app.domain.util.Money
 import java.time.YearMonth
-import com.mdot.app.core.designsystem.component.JiabanIconButton
 import com.mdot.app.core.designsystem.jiabanFilterChipColors
 
 /**
@@ -128,63 +124,23 @@ fun TaxEstimateScreen(
         ) {
             JiabanTopBar(title = stringResource(R.string.tax_title), onBack = onBack)
 
-            // ---- 月份导航（**与记月页同一套**）：标题可点 → 月份选择器；非本月时旁边给「回本月」----
-            // （用户 2026-09-23 定：不放在顶栏，且选择器要与记月一致）
-            val isCurrentMonth = state.month == YearMonth.now()
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                JiabanIconButton(onClick = { vm.onMonth(state.month.minusMonths(1)) }) {
-                    Icon(
-                        painterResource(R.drawable.ic_ms_keyboard_arrow_left),
-                        stringResource(R.string.paymonth_prev_cd),
-                    )
-                }
-                Row(
-                    Modifier
-                        .widthIn(min = 120.dp)
-                        .clip(engineShape(Radius.pill))
-                        .clickable { showMonthPicker = true }
-                        .padding(horizontal = Spacing.s, vertical = Spacing.xs),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        taxMonthLabel(state.month),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(Modifier.width(Spacing.xs))
-                    Icon(
-                        painterResource(R.drawable.ic_ms_expand_more),
-                        contentDescription = stringResource(R.string.paymonth_picker_title),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(IconSpec.inline),
-                    )
-                }
-                if (!isCurrentMonth) {
-                    Spacer(Modifier.width(Spacing.xs))
-                    FilterChip(
-                        colors = jiabanFilterChipColors(),
-                        selected = false,
-                        onClick = { vm.onMonth(YearMonth.now()) },
-                        label = {
-                            Text(
-                                stringResource(R.string.paymonth_this_month),
-                                style = MaterialTheme.typography.labelMedium,
-                            )
-                        },
-                    )
-                }
-                JiabanIconButton(onClick = { vm.onMonth(state.month.plusMonths(1)) }) {
-                    Icon(
-                        EngineIcons.chevron(),
-                        stringResource(R.string.paymonth_next_cd),
-                    )
-                }
-            }
+            // ---- 月份导航（**统计/记月/明细/工地四页共用同一套 `MonthStepper`**）----
+            // 用户 2026-09-23 定：不放在顶栏，且选择器要与记月一致。
+            // 2026-10-09：此前这里是自己画的一套（`Arrangement.Center` 居中、无日历图标、
+            // `titleMedium`+SemiBold、「回本月」用 `FilterChip`），与其它页**逐项漂移**——
+            // 改用共用组件后样式与居中口径自动对齐（见 docs/03 §5.4.3/§5.4.5）。
+            MonthStepper(
+                label = taxMonthLabel(state.month),
+                onPrev = { vm.onMonth(state.month.minusMonths(1)) },
+                onNext = { vm.onMonth(state.month.plusMonths(1)) },
+                onOpenPicker = { showMonthPicker = true },
+                // 已在当月 ⇒ 传 null，组件不渲染「回本月」（且有退场动画）
+                onBackToCurrent = if (state.month != YearMonth.now()) {
+                    { vm.onMonth(YearMonth.now()) }
+                } else {
+                    null
+                },
+            )
             Spacer(Modifier.height(Spacing.s))
 
             // ---- 结果（hero）：与首页/明细页 hero 卡**同一套**（primaryContainer + labelSmall 说明 +

@@ -61,6 +61,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -74,6 +75,7 @@ import com.mdot.app.core.designsystem.component.InlineConfirmButton
 import com.mdot.app.core.designsystem.component.InlineConfirmStyle
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.pressScale
+import com.mdot.app.domain.ShiftDefaults
 import com.mdot.app.domain.model.Shift
 import java.time.DayOfWeek
 import com.mdot.app.core.designsystem.component.JiabanButton
@@ -265,6 +267,9 @@ fun WorkdaysPane(vm: WorkdaysViewModel = hiltViewModel()) {
 @Composable
 fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
     val shifts by vm.shifts.collectAsStateWithLifecycle()
+    // 默认班次 = 排序后第一个**未隐藏**班次（ShiftDefaults）：拖到第一位即成为默认，
+    // 列表行上要标出来，否则用户不知道「拖排序」改的就是它（记加班预选同一个函数的口径）
+    val defaultShiftId = remember(shifts) { ShiftDefaults.idOf(shifts) }
     val message by vm.message.collectAsStateWithLifecycle()
     val messageIsError by vm.messageIsError.collectAsStateWithLifecycle()
     var showCreate by remember { mutableStateOf(false) }
@@ -458,7 +463,12 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
                                             Modifier
                                                 .weight(1f)
                                                 .pressScale(bodyInteraction, pressedScale = 0.98f)
-                                                .clip(engineShape(Radius.small))
+                                                // ⚠️ 这里**不能**加 `.clip(engineShape(Radius.small))`（v0.7.8.5 删除）：
+                                                //    这个点击区**没有底色/描边**，圆角本来就看不出，但 clip 会把整个区域
+                                                //    裁成圆角矩形 —— 而本区高度只有名称+副标题两行（≈36dp）、圆角半径 12dp，
+                                                //    左上圆弧恰好切进**名称首字**（用户报「班次名称显示不全，被圆角切割了」，
+                                                //    且「即使没被挤压也会被切割」）。区高远大于圆角时才无感，此处不是。
+                                                //    去掉后涟漪变成直角矩形——该区本就无底色，观感无碍。
                                                 .clickable(
                                                     interactionSource = bodyInteraction,
                                                     indication = LocalIndication.current,
@@ -471,7 +481,33 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(Spacing.s),
                                             ) {
-                                                Text(shift.name, style = MaterialTheme.typography.titleSmall)
+                                                Text(
+                                                    shift.name,
+                                                    style = MaterialTheme.typography.titleSmall,
+                                                    // 名称限一行 + 省略号 + `weight(1f, fill = false)`：
+                                                    // 徽标先被量、永不被长名字挤出，长名也不会把 56dp 拖拽格子撑破
+                                                    // （同工地项目行，见 docs/03 §14）
+                                                    modifier = Modifier.weight(1f, fill = false),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                                // 默认班次徽标：告诉用户「拖到第一个就是默认」（记加班预选的就是它）
+                                                if (shift.id == defaultShiftId) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .background(
+                                                                MaterialTheme.colorScheme.tertiaryContainer,
+                                                                engineShape(Radius.pill),
+                                                            )
+                                                            .padding(horizontal = Spacing.s, vertical = Spacing.xs),
+                                                    ) {
+                                                        Text(
+                                                            stringResource(R.string.shifts_default_badge),
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                                        )
+                                                    }
+                                                }
                                                 if (shift.rest) {
                                                     Box(
                                                         modifier = Modifier
@@ -496,6 +532,10 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
                                                 },
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                // 副标题同样恰好一行：删除钮展开成「取消/确认删除」时会挤窄本列，
+                                                // 折行就超出 56dp 拖拽格（与名称同一个坑）
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
                                             )
                                         }
                                         // 删除（仅自定义班次）：原地确认（只确认，不原地撤销：删除后本行即从列表消失）

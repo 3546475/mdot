@@ -32,8 +32,8 @@ android {
         applicationId = "com.mdot.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 64
-        versionName = "0.7.8.4"
+        versionCode = 65
+        versionName = "0.7.8.5"
     }
 
     signingConfigs {

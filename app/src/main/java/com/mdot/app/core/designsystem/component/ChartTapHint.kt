@@ -20,7 +20,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
@@ -79,6 +78,12 @@ fun chartHintText(
  * - **只保留淡入淡出**（去掉 scaleIn/slideIn）：缩放/位移的变换原点是容器而非气泡，
  *   气泡被定位到列位置后会被变换出「从别处滑入/半截浮现」的错觉，淡入不存在这种相位问题。
  * 列宽按 [columns] 均分，与各图表 weight 列布局一致。
+ *
+ * ⚠️ **不加投影**（2026-10-09 用户定：直接移除）：曾用 `Modifier.shadow(2.dp)`，真机表现为
+ * 「阴影比气泡晚一拍出现」；先试过「节点常驻 + 只播 alpha」预热（以为是首次建层），**仍然迟滞**；
+ * 再试过在同一个 draw pass 里自绘多层轮廓，**依旧迟滞** ⇒ 判定为该 ROM 的合成/绘制行为，
+ * 非本组件可隔离，用户定**去掉投影**。层次改由**主色细描边 + 抬一阶的底**承担。
+ * ⇒ 别再加回 shadow（会重现迟滞）；要加投影请先真机确认不再迟滞。
  */
 @Composable
 fun ChartHintBox(
@@ -133,21 +138,21 @@ private fun ChartHintBubbleRow(
     }
 }
 
-/** 气泡本体：文本单行自然宽度 + 柔和底 + 主色细描边 */
+/** 气泡本体：文本单行自然宽度 + 柔和底 + 主色细描边（**无投影**，见 [ChartHintBox] KDoc 的沿革） */
 @Composable
 private fun ChartHintBubble(text: String) {
+    val shape = engineShape(Radius.xs)
     Box(
         Modifier
             .wrapContentSize(Alignment.Center)
-            .shadow(2.dp, engineShape(Radius.xs))
             .background(
                 MaterialTheme.colorScheme.surfaceContainerHigh,
-                engineShape(Radius.xs),
+                shape,
             )
             .border(
                 1.dp,
                 MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
-                engineShape(Radius.xs),
+                shape,
             )
             .padding(horizontal = Spacing.m, vertical = Spacing.xs),
     ) {

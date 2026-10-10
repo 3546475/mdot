@@ -233,11 +233,16 @@ private fun DisablePlatformDim() {
  * 对话框（引擎无关入口，26 处调用点统一走它）：**卡片仍是 M3 [AlertDialog] 本体**（观感零变化），
  * 另开装饰窗在其下渲染「弹层背景」效果（压暗/模糊/模糊缩小，见 [DialogBackdropWindow]）。
  * 参数面与 M3 AlertDialog 对齐（title/text/confirmButton/dismissButton/containerColor…）。
+ *
+ * [confirmButton] 传 **null** = 「本弹窗没有确认键」（如单选日期/月份选择：点一下即生效、无需再确认）。
+ * ⚠️ **不要传空 lambda `{}`**——MIUIX 的分栏按钮行只看「槽在不在」，空 lambda 仍会占出半格，
+ * 于是出现「半格空白 + 一条孤立的竖分隔线」（2026-10-09 真机报「日期选择弹窗右下是空的」）。
+ * 传 null 时 MIUIX 会把「取消」铺满整行；两个槽都为 null 时整条按钮行与分隔线都不画。
  */
 @Composable
 fun JiabanAlertDialog(
     onDismissRequest: () -> Unit,
-    confirmButton: @Composable () -> Unit,
+    confirmButton: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
     dismissButton: @Composable (() -> Unit)? = null,
     icon: @Composable (() -> Unit)? = null,
@@ -379,7 +384,9 @@ fun JiabanAlertDialog(
                 // 与上面同一处：确认格包装**一定会被组合**（DisablePlatformDim 一直靠它生效），
                 // 故窗口位置探针也挂这里（三处探针幂等，谁先跑都行）
                 DialogWindowSettleProbe { windowSettled = true }
-                confirmButton()
+                // 无确认键（confirmButton = null）时本槽只跑副作用、不画任何东西：M3 侧本来就
+                // 「有则右对齐、无则只剩取消」，与 MIUIX 侧 null 的语义一致
+                confirmButton?.invoke()
             },
             modifier = cardModifier,
             dismissButton = dismissButton,
@@ -453,7 +460,7 @@ private fun MiuixDialogCard(
     icon: (@Composable () -> Unit)?,
     title: (@Composable () -> Unit)?,
     text: (@Composable () -> Unit)?,
-    confirmButton: @Composable () -> Unit,
+    confirmButton: (@Composable () -> Unit)?,
     dismissButton: (@Composable () -> Unit)?,
 ) {
     Dialog(
@@ -488,6 +495,20 @@ private fun MiuixDialogCard(
             // 按钮行扁平化：HyperOS 的对话框按钮是整宽纯文字格，不在文字下垫主题色圆角底
             androidx.compose.runtime.CompositionLocalProvider(LocalDialogButtonFlat provides true) {
             Row(Modifier.fillMaxWidth().height(DialogSpec.buttonRowHeight)) {
+                if (confirmButton == null) {
+                    // 无确认键（单选日期/月份选择「点一下即生效」、照片查看等）：取消**铺满整行**，
+                    // 不给空槽留半格、也不画那条孤立的竖分隔线（2026-10-09 真机报「日期选择弹窗右下是空的」）
+                    Row(
+                        Modifier.fillMaxWidth().fillMaxHeight(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.runtime.CompositionLocalProvider(
+                            LocalDialogButtonNeutral provides true,
+                            LocalDialogButtonFillCell provides true,
+                        ) { dismissButton?.invoke() }
+                    }
+                } else {
                 if (dismissButton != null) {
                     // ⚠️ 取消/次要格必须用 **Row**（不是 Box）：该槽可能同时放**多颗**按钮
                     // （日期选择多选态 = 「清除选择 + 取消」）——Box 会把它们叠在同一处，
@@ -516,7 +537,8 @@ private fun MiuixDialogCard(
                 ) {
                     androidx.compose.runtime.CompositionLocalProvider(
                         LocalDialogButtonFillCell provides true,
-                    ) { confirmButton() }
+                    ) { confirmButton.invoke() }
+                }
                 }
             }
             }

@@ -9,6 +9,7 @@ import com.mdot.app.core.repository.ShiftRepository
 import com.mdot.app.core.util.AppError
 import com.mdot.app.core.util.onFailure
 import com.mdot.app.core.util.onSuccess
+import com.mdot.app.domain.ShiftDefaults
 import com.mdot.app.domain.model.DailyRecord
 import com.mdot.app.domain.model.LeaveDraft
 import com.mdot.app.domain.model.LeaveType
@@ -45,7 +46,9 @@ data class SheetUiState(
     val durationMode: DurationInputMode = DurationInputMode.HOURS,
     /** 分钟模式下滚轮暂存的时长（分钟）；切到分钟模式时从 durationMinutes 初始化 */
     val pendingMinutes: Int = 0,
-    val shifts: List<Shift> = emptyList(),
+    // ⚠️ 原有一个 `shifts: List<Shift>` 字段，**从未被任何地方写过**（恒为空列表）——
+    //    而 bind() 拿它取默认班次 ⇒ 新记录的班次一直是「没预选」（shiftId/shiftName 存 null）。
+    //    班次候选的渲染源是 `visibleShifts`，此处只留「选中哪一条」，默认值见 bind()。
     val selectedShiftId: Long? = null,
     val selectedShiftName: String? = null,
     /** 选中的时长（十进制小时文本，如 "2.5"）；null = 未选择 */
@@ -78,7 +81,7 @@ data class SheetUiState(
 @HiltViewModel
 class RecordSheetViewModel @Inject constructor(
     private val recordRepo: RecordRepository,
-    shiftRepo: ShiftRepository,
+    private val shiftRepo: ShiftRepository,
     private val settings: SettingsDataSource,
     private val holidayRepo: HolidayRepository,
     private val controller: RecordSheetController,
@@ -113,6 +116,9 @@ class RecordSheetViewModel @Inject constructor(
             val records = recordRepo.observeByDate(request.date).first()
             existingRecord = records.firstOrNull { it.type == request.tab }
             val existing = existingRecord
+            // 新记录的默认班次：显式现取（`visibleShifts` 是 WhileSubscribed 的 StateFlow，
+            // 首次打开时它的 value 可能还是初始 emptyList —— 读 .value 会拿到空的，同硬规则 15 的陷阱）
+            val defaultShift = ShiftDefaults.of(shiftRepo.observeAll().first())
 
             _state.value = if (existing != null) {
                 SheetUiState(
@@ -120,7 +126,6 @@ class RecordSheetViewModel @Inject constructor(
                     tab = request.tab,
                     durationMode = DurationInputMode.HOURS,
                     pendingMinutes = existing.durationMinutes,
-                    shifts = _state.value.shifts,
                     selectedShiftId = existing.shiftId,
                     selectedShiftName = existing.shiftName,
                     hoursText = minutesToHoursText(existing.durationMinutes),
@@ -134,14 +139,15 @@ class RecordSheetViewModel @Inject constructor(
                     salary = _state.value.salary,
                 )
             } else {
+                // 新记录：预选**默认班次**（班次管理里排第一个的可见班次，见 ShiftDefaults）——
+                // 原先这里是 `_state.value.shifts.firstOrNull()`，而那个字段恒为空 ⇒ 班次一直没预选
                 SheetUiState(
                     date = request.date,
                     tab = request.tab,
                     durationMode = DurationInputMode.HOURS,
                     pendingMinutes = 0,
-                    shifts = _state.value.shifts,
-                    selectedShiftId = _state.value.shifts.firstOrNull()?.id,
-                    selectedShiftName = _state.value.shifts.firstOrNull()?.name,
+                    selectedShiftId = defaultShift?.id,
+                    selectedShiftName = defaultShift?.name,
                     hoursText = null,
                     tier = autoTier,
                     tierManual = false,

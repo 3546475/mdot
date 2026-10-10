@@ -230,7 +230,7 @@ class PayMonthRowTemplateTest {
     }
 
     @Test
-    fun `允许按日 - 全勤奖不允许（它是配置项，发不发由满勤判）`() {
+    fun `允许按日 - 全勤奖不允许（它是手填项，不参与引擎推导）`() {
         val row = PayMonthSheet.default().subsidy.single { it.id == PayMonthSheet.FULL_ATTENDANCE_ROW_ID }
         assertFalse(row.supportsDailyRate)
     }

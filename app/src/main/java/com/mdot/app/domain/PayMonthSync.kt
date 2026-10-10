@@ -33,7 +33,7 @@ internal fun applyRecordSync(
     /** 社保/公积金自动回填载荷（比例 0 = 不算，行保持原值） */
     insurance: InsuranceFill = InsuranceFill(),
     /**
-     * 本月的四个天数计数，供「按日计算」的行与全勤奖自动推导（v0.7.8.3）。
+     * 本月的四个天数计数，供「按日计算」的行做推导（v0.7.8.4）。
      * 默认全 0 ⇒ 这些行算出 0 元（而不是崩或沿用旧值），保持旧调用点行为不变。
      */
     dayCounts: PayMonthDayCounts = PayMonthDayCounts(),
@@ -98,7 +98,7 @@ internal fun applyRecordSync(
                 )
             },
     )
-    // ---- 按日计算的行 + 全勤奖自动发放（v0.7.8.3）：**四组都要过**，
+    // ---- 按日计算的行（v0.7.8.4）：**四组都要过**，（全勤奖已于同轮撤回自动化、降为手填。）
     // 且必须在上面那批引擎行回填之后（否则会覆盖掉它们的来源戳）----
     return engineFilled.copy(
         basic = applyAutoRows(engineFilled.basic, dayCounts, syncedAt),
@@ -223,9 +223,10 @@ private fun liveMerged(old: List<PayMonthItem>, new: List<PayMonthItem>): List<P
  * 实时预览对这种行保留用户值、不被引擎当前值覆盖；金额为 0 且从未同步的行视为「待引擎填」，
  * 正是实时预览要补上的部分。
  *
- * ⚠️ **引擎管钱的行（[PayMonthItem.isAutoManaged]：按日行与全勤奖）一律不算"用户自己的"**。
+ * ⚠️ **引擎管钱的行（[PayMonthItem.isAutoManaged]，目前只有按日行）一律不算"用户自己的"**。
  * 存盘里它们首次同步前 amountCents 非 0 且无引擎戳，若被判成用户所有，
- * 实时预览就会永远保留旧值 —— 按日补贴不自动算、全勤奖永远照发，自动推导形同虚设。
+ * 实时预览就会永远保留旧值 —— 按日补贴不自动算，自动推导形同虚设。
+ * （全勤奖曾也在此列，2026-10-08 撤回自动化后降为手填、**改为受本函数保护**，见 docs/11 077。）
  */
 internal fun PayMonthItem.isUserOwned(): Boolean =
     !isAutoManaged && (source == PayMonthSource.EDITED || (engineCents == null && amountCents != 0L))

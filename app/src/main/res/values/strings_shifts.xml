@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="shifts_drag_hint">长按拖动排序 · 点名称改名 · 删班次不影响已有记录</string>
+    <string name="shifts_drag_hint">长按拖动排序（第一个为默认班次）· 点名称改名 · 删班次不影响已有记录</string>
     <string name="shifts_add">新建</string>
     <string name="shifts_empty">还没有班次，点右上角「新建」添加</string>
     <string name="shifts_rest_badge">休息</string>
+    <!-- 默认班次徽标：记加班/请假时预选的就是它（= 列表里第一个未隐藏的班次） -->
+    <string name="shifts_default_badge">默认</string>
     <string name="shifts_builtin">预置</string>
     <string name="shifts_custom">自定义</string>
     <string name="shifts_hidden_suffix">" · 已隐藏"</string>
