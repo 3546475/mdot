@@ -998,11 +998,14 @@ private fun PayGroupCard(
                     fontWeight = FontWeight.Bold,
                     label = "payGroupTotal",
                 )
-                Spacer(Modifier.width(Spacing.s))
+                // 尾部折叠箭头与行尾 chevron 同尺寸(IconSpec.inline=16)、同间隙(Spacing.xs=4)，
+                // 使本卡小计数字的右缘与下方各行金额右缘对齐（跨行同列；原为默认 24dp + s=8，右缘内缩 12dp）
+                Spacer(Modifier.width(Spacing.xs))
                 Icon(
                     painterResource(if (expanded) R.drawable.ic_ms_expand_less else R.drawable.ic_ms_expand_more),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(IconSpec.inline),
                 )
             }
             if (expanded) {

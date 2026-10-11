@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -90,6 +91,10 @@ import com.mdot.app.core.designsystem.component.JiabanCircularProgress
 import com.mdot.app.core.designsystem.component.FloatingLabelTextField
 import com.mdot.app.core.designsystem.emphasisCardSurface
 import com.mdot.app.core.designsystem.emphasisCardInk
+import com.mdot.app.core.designsystem.ButtonSpec
+import com.mdot.app.domain.model.ThemeEngine
+import top.yukonga.miuix.kmp.basic.Button as MiuixButton
+import top.yukonga.miuix.kmp.basic.ButtonColors as MiuixButtonColors
 
 /** 更新与数据源（F7-9 / F8-1）：hero 版本卡（检查更新 + from 源选择胶囊，弹窗内选择/添加更新源）+ 节假日库卡，与首页/统计 hero 同视觉体系 */
 @Composable
@@ -497,45 +502,90 @@ private fun UpdateActionButton(
         },
         contentAlignment = Alignment.Center,
     ) {
+    // 按钮 modifier 链：收缩动画宽度 + idle 自然宽测量（两引擎共用）
+    val buttonModifier = Modifier
+        .then(
+            if (interpWpx != null) {
+                Modifier.width(with(density) { interpWpx.toDp() })
+            } else {
+                Modifier
+            }
+        )
+        .onGloballyPositioned {
+            if (!compact && it.size.width > idleWpx) idleWpx = it.size.width
+        }
+
+    if (Radius.engine == ThemeEngine.MIUIX) {
+        // MIUIX：走库 Button 浅灰底胶囊（与同屏"GitHub"数据源胶囊同款 Miuix 中性按钮）
+        MiuixButton(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = buttonModifier,
+            colors = MiuixButtonColors(
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                disabledColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                disabledContentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+        ) {
+            UpdateButtonContent(
+                busy = busy, progress = progress, state = state,
+                label = label, textAlpha = textAlpha,
+            )
+        }
+    } else {
         Button(
             onClick = onClick,
             enabled = enabled,
             shape = shape,
             contentPadding = contentPadding,
             colors = if (busy) activeColors else ButtonDefaults.buttonColors(),
-            modifier = Modifier
-                .then(
-                    if (interpWpx != null) {
-                        Modifier.width(with(density) { interpWpx.toDp() })
-                    } else {
-                        Modifier
-                    },
-                )
-                .onGloballyPositioned {
-                    // 记录 idle 自然宽（idle 时按钮宽 = interp = idleW，稳定不循环）
-                    if (!compact && it.size.width > idleWpx) idleWpx = it.size.width
-                },
+            modifier = buttonModifier,
         ) {
-            // busy 态只显示圆环（Button 内容默认居中），无文字——用户明确要求；
-            // 非 busy 态显示状态文字；文字直接切换（不用 Crossfade——新旧文字交叉淡化
-            // 的瞬间观感是「闪」，用户已否）。
-            ButtonSpinner(busy = busy, progress = progress)
-            if (state is UpdateState.Available) {
-                Icon(
-                    painterResource(R.drawable.ic_ms_file_download),
-                    contentDescription = label,
-                    modifier = Modifier.size(ButtonDefaults.IconSize),
-                )
-            } else if (!busy) {
-                Text(
-                    label,
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.alpha(textAlpha),
-                )
-            }
+            UpdateButtonContent(
+                busy = busy, progress = progress, state = state,
+                label = label, textAlpha = textAlpha,
+            )
         }
+    }
+    }
+}
+
+/**
+ * 更新按钮的 Row 内容（M3 Button 与 MIUIX 库 Button 共用）：
+ * busy 态只显圆环；Available 态显下载图标；其余显状态文字。
+ * ⚠️ ButtonSpinner 用 if(busy) 包裹不永远进 Row：spacedBy(8dp) 会在 0 宽节点与
+ * 右侧 Icon 之间加间距，导致图标偏右。
+ */
+@Composable
+private fun RowScope.UpdateButtonContent(
+    busy: Boolean,
+    progress: Float?,
+    state: UpdateState,
+    label: String,
+    textAlpha: Float,
+) {
+    if (busy) {
+        ButtonSpinner(busy = true, progress = progress)
+    }
+    if (state is UpdateState.Available) {
+        Icon(
+            painterResource(R.drawable.ic_ms_file_download),
+            contentDescription = label,
+            modifier = Modifier.size(ButtonDefaults.IconSize),
+            tint = if (Radius.engine == ThemeEngine.MIUIX)
+                MaterialTheme.colorScheme.onSurface
+            else
+                MaterialTheme.colorScheme.onPrimary,
+        )
+    } else if (!busy) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.alpha(textAlpha),
+        )
     }
 }
 
@@ -555,20 +605,29 @@ private fun ButtonSpinner(
         exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()) +
             shrinkHorizontally(animationSpec = MaterialTheme.motionScheme.fastSpatialSpec()),
     ) {
+        // ⚠️ 这里直接用 M3 CircularProgressIndicator，不走 JiabanCircularProgress 引擎分叉：
+        // 本按钮本身就是 M3 Button（定制收缩动画），小尺寸圆环（14dp）必须与 M3 Button 内容测量
+        // 严格对齐。MIUIX 库的 CircularProgressIndicator 不响应 Modifier.size(14.dp)（内部 defaultMinSize
+        // 强制最小尺寸），且圆环在其 Box 内绘制不居中——真机实测偏右 + 直径 ~23dp。
+        // 颜色按引擎分叉：MD3 按钮是 primary 实底 → onPrimary 白；MIUIX 按钮是浅灰底 → onSurface 深。
+        val spinnerColor = if (Radius.engine == ThemeEngine.MIUIX)
+            MaterialTheme.colorScheme.onSurface
+        else
+            MaterialTheme.colorScheme.onPrimary
         val p = progress
         if (p != null) {
-            JiabanCircularProgress(
+            CircularProgressIndicator(
                 progress = { p },
                 modifier = Modifier.size(14.dp),
                 strokeWidth = 1.5.dp,
-                color = MaterialTheme.colorScheme.onPrimary,
-                trackColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f),
+                color = spinnerColor,
+                trackColor = spinnerColor.copy(alpha = 0.3f),
             )
         } else {
-            JiabanCircularProgress(
+            CircularProgressIndicator(
                 modifier = Modifier.size(14.dp),
                 strokeWidth = 1.5.dp,
-                color = MaterialTheme.colorScheme.onPrimary,
+                color = spinnerColor,
             )
         }
     }

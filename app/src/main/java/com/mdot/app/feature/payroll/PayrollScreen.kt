@@ -485,7 +485,7 @@ private fun LeaveCoefficientSection(state: PayrollUiState, vm: PayrollViewModel)
                         Spacer(Modifier.weight(1f))
                     }
                 }
-                if (i + 2 < leaveTypes.size) Spacer(Modifier.height(12.dp))
+                if (i + 2 < leaveTypes.size) Spacer(Modifier.height(Spacing.m))
             }
         }
     }

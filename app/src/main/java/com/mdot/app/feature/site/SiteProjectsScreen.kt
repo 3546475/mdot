@@ -52,6 +52,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -263,7 +264,10 @@ fun SiteProjectsPane(
                             stringResource(R.string.site_projects_empty),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = Spacing.l, horizontal = Spacing.l),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = Spacing.l),
                         )
                     }
                     draftIds.forEachIndexed { index, id ->
@@ -504,7 +508,7 @@ fun SiteProjectsPane(
                                     Row(
                                         Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = Spacing.l, vertical = Spacing.m),
+                                            .padding(horizontal = Spacing.xs, vertical = Spacing.m),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Column(Modifier.weight(1f)) {

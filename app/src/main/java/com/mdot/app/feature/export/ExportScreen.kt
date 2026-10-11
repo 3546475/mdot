@@ -109,7 +109,6 @@ fun ExportScreen(
             stringResource(R.string.export_hint),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = Spacing.s),
         )
         Spacer(Modifier.height(Spacing.m))
 

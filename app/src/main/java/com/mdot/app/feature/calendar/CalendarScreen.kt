@@ -6,13 +6,16 @@ import com.mdot.app.core.designsystem.engineShape
 import com.mdot.app.core.designsystem.secondaryLabelColor
 import com.mdot.app.core.designsystem.EngineIcons
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -65,6 +68,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -560,28 +564,40 @@ fun CalendarScreen(
 @Composable
 private fun MonthHeaderRow(vm: CalendarViewModel) {
     val state by vm.uiState.collectAsStateWithLifecycle()
+    // 动效走 motionScheme（硬规则 7）；「回到今天」整块 AnimatedVisibility 永远在组合里，
+    // 不用 if 包裹——否则退场时节点瞬间摘除，收缩动画播不出（同 MonthStepper「回本期」范式）
+    val backFadeSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val backSlideSpec = MaterialTheme.motionScheme.fastSpatialSpec<IntSize>()
     Row(verticalAlignment = Alignment.CenterVertically) {
         JiabanIconButton(onClick = vm::prevMonth) {
             Icon(painterResource(R.drawable.ic_ms_keyboard_arrow_left), contentDescription = stringResource(R.string.calendar_prev_month))
         }
-        AnimatedContent(
-            targetState = state.month,
-            transitionSpec = {
-                val forward = targetState > initialState
-                val spec = spring<IntOffset>(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
-                (slideInHorizontally(spec) { if (forward) it else -it } + fadeIn(spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium))) togetherWith
-                    (slideOutHorizontally(spec) { if (forward) -it else it } + fadeOut(spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium)))
-            },
+        Box(
             modifier = Modifier.weight(1f),
-            label = "monthTitle",
-        ) { m ->
-            Text(
-                stringResource(R.string.calendar_month_title, m.year, m.monthValue),
-                style = MaterialTheme.typography.titleLarge,
-            )
+            contentAlignment = Alignment.Center,
+        ) {
+            AnimatedContent(
+                targetState = state.month,
+                transitionSpec = {
+                    val forward = targetState > initialState
+                    val spec = spring<IntOffset>(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)
+                    (slideInHorizontally(spec) { if (forward) it else -it } + fadeIn(spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium))) togetherWith
+                        (slideOutHorizontally(spec) { if (forward) -it else it } + fadeOut(spring(dampingRatio = 1f, stiffness = Spring.StiffnessMedium)))
+                },
+                label = "monthTitle",
+            ) { m ->
+                Text(
+                    stringResource(R.string.calendar_month_title, m.year, m.monthValue),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+            }
         }
         // 已选中今天时不显示「回到今天」：没有可回之处（同月选别的日期仍要能一键回今天）
-        if (state.selectedDate != LocalDate.now()) {
+        AnimatedVisibility(
+            visible = state.selectedDate != LocalDate.now(),
+            enter = fadeIn(backFadeSpec) + expandHorizontally(animationSpec = backSlideSpec),
+            exit = fadeOut(backFadeSpec) + shrinkHorizontally(animationSpec = backSlideSpec),
+        ) {
             TextButton(onClick = vm::goToday) { Text(stringResource(R.string.calendar_back_today)) }
         }
         // 当前月即尽头（未来不可记）：› 置灰，与网格横滑规则一致

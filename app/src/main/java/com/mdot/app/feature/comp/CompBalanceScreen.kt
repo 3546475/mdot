@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -271,6 +272,10 @@ fun CompBalancePane(
                         stringResource(R.string.comp_history_empty),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = Spacing.s),
                     )
                 } else {
                     state.adjustments.forEach { adj ->
@@ -286,6 +291,7 @@ fun CompBalancePane(
                                         "${TimeUtils.mdCn(adj.date)} ${TimeUtils.weekdayCn(adj.date)}",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f),
                                     )
                                     Spacer(Modifier.width(10.dp))
                                     Text(

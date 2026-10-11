@@ -452,9 +452,7 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
                                     contentAlignment = Alignment.CenterStart,
                                 ) {
                                     Row(
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = Spacing.xs),
+                                        Modifier.fillMaxWidth(),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         // 行主体点击 = 改名（把原 ⋮ 菜单里的「改名」提到明面；行整块长按才拖，与点按不冲突）

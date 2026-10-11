@@ -38,6 +38,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -347,13 +348,13 @@ fun SiteSettlementPane(
             ) {
                 item {
                     SectionCard {
-                        Column(Modifier.padding(Spacing.l)) {
+                        Column {
                             if (state.loading) {
-                                Text(stringResource(R.string.site_settlement_loading), style = MaterialTheme.typography.bodyMedium)
+                                Text(stringResource(R.string.site_settlement_loading), style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                             } else {
                                 val summary = state.summary
                                 if (summary == null) {
-                                    Text(stringResource(R.string.site_settlement_empty), style = MaterialTheme.typography.bodyMedium)
+                                    Text(stringResource(R.string.site_settlement_empty), style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                                 } else {
                                     Text(
                                         stringResource(R.string.site_settlement_pending_title, state.projectName),
@@ -420,7 +421,7 @@ fun SiteSettlementPane(
                                 fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
                             ),
                         ) {
-                            Column(Modifier.padding(horizontal = Spacing.l, vertical = Spacing.m)) {
+                            Column(Modifier.padding(vertical = Spacing.m)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
                                         AnimatedMoneyText(
@@ -468,7 +469,7 @@ fun SiteSettlementPane(
                                 fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
                             ),
                         ) {
-                            Column(Modifier.padding(horizontal = Spacing.l, vertical = Spacing.m)) {
+                            Column(Modifier.padding(vertical = Spacing.m)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
                                         AnimatedMoneyText(
@@ -512,7 +513,7 @@ fun SiteSettlementPane(
                         ) {
                             if (row.isPartial) {
                                 // 部分结算（本次结算金额）：到手流水，绿色；撤销即删除
-                                Column(Modifier.padding(horizontal = Spacing.l, vertical = Spacing.m)) {
+                                Column(Modifier.padding(vertical = Spacing.m)) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Column(Modifier.weight(1f)) {
                                             Text(stringResource(R.string.site_settlement_partial_row), style = MaterialTheme.typography.titleMedium)
@@ -533,7 +534,7 @@ fun SiteSettlementPane(
                                     }
                                 }
                             } else {
-                                Column(Modifier.padding(horizontal = Spacing.l, vertical = Spacing.m)) {
+                                Column(Modifier.padding(vertical = Spacing.m)) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Column(Modifier.weight(1f)) {
                                             Text(row.periodLabel, style = MaterialTheme.typography.titleMedium)
