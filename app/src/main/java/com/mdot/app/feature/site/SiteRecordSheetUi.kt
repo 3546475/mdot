@@ -309,9 +309,7 @@ fun SiteRecordScreen(
                     onPick = { vm.onDate(it); showDatePicker = false },
                     onPickDates = { vm.onSelectDates(it); showDatePicker = false },
                     onDismiss = { showDatePicker = false },
-                    // ⚠️ 工地弹层本身是**独立 Dialog 窗口**（SiteBottomSheet）⇒ 页内覆盖层会渲染到它下面
-                    // （看不见）。故此处先用回退的窗口形态；等工地弹层改成页内弹层后再去掉这行。
-                    asOverlay = false,
+                    // v0.7.9.0：工地弹层已改页内覆盖层 ⇒ 日期选择也回默认（同一栈上叠一层，按序渲染）
                 )
             }
 

@@ -10,6 +10,9 @@ sealed interface AppError {
     /** 时长非法（≤0 或 >1440） */
     data object InvalidDuration : AppError
 
+    /** 0 时长（只记班次）却没带班次/备注——空记录不允许（v0.7.9.0，见 RecordRules） */
+    data object MissingShiftOrNote : AppError
+
     /** 转调休超过本条加班时长 */
     data object InvalidComp : AppError
 

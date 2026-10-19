@@ -16,8 +16,38 @@ import com.mdot.app.domain.model.SalaryConfig
  * 「同步本月考勤」按钮移除）——[applyRecordSync] 仍作为两者的共同推导内核。
  */
 
-/** 记月同步（纯函数，供单测）：仅回填存在的行——加班工资/事假/病假；基本工资仅在薪资含底薪时回填；其余行与分组不动。
+/**
+ * 记月「实时预览单据」的**唯一组装处**：存盘单据 + 引擎输出 → 一份"页上看到的就是这份"的单据（只算不写盘）。
  *
+ * 三处共用：记月页 `PayMonthViewModel.previewFlow`、首页数据区、**导出「工资单 CSV」**（v0.7.9.0）。
+ * 各写一套必然漂移——尤其导出，正是 docs/20 P0-1 定下的「发出去的和 App 里看到的是同一份」。
+ *
+ * @param stored 已按行模板铺底的存盘单据（模板铺底只在"本月无存盘单据"时做一次，见 `PayMonthViewModel.storedFlow`）
+ * @param out 区间引擎输出；null（工地无引擎值）时原样返回 [stored]
+ * @param syncedAt 来源戳日期（VM 传当天，便于单测固定）
+ */
+fun previewSheet(
+    stored: PayMonthSheet,
+    out: PayrollCalculator.Output?,
+    salary: SalaryConfig,
+    dayCounts: PayMonthDayCounts,
+    syncedAt: String,
+): PayMonthSheet {
+    if (out == null) return stored
+    return livePreviewSheet(
+        stored,
+        out,
+        fillBase = salary.includeBase,
+        syncedAt = syncedAt,
+        compCashCents = PayrollCalculator.compCashCents(salary, out),
+        compMinutes = PayrollCalculator.compFromOtMinutes(out),
+        insurance = InsuranceFill.of(salary),
+        // 请假分钟取**引擎**的数（单一出处），不在这里重数一遍
+        dayCounts = dayCounts.copy(leaveMinutes = out.leaveMinutes),
+    )
+}
+
+/** 记月同步（纯函数，供单测）：仅回填存在的行——加班工资/事假/病假；基本工资仅在薪资含底薪时回填；其余行与分组不动。 *
  * 回填时打**来源戳**（[PayMonthSource.SYNCED] + engineCents 引擎原值 + syncedAt 日期），
  * 让「哪个数是引擎算的、哪个是手写的」可追溯（docs/20 P0-3）；[syncedAt] 由调用方传（VM 用当天日期，便于单测固定值）。
  */

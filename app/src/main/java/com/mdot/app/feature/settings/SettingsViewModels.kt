@@ -41,7 +41,15 @@ class CycleViewModel @Inject constructor(
     val anchorDay: StateFlow<Int> = settings.cycleAnchorDayFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, 1)
 
+    /** 日历月历是否按考勤周期展示（默认关 = 自然月） */
+    val calendarCycleView: StateFlow<Boolean> = settings.calendarCycleViewFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     fun set(day: Int) = viewModelScope.launch { settings.setCycleAnchorDay(day) }
+
+    fun setCalendarCycleView(value: Boolean) = viewModelScope.launch {
+        settings.setCalendarCycleView(value)
+    }
 }
 
 @HiltViewModel
@@ -395,7 +403,7 @@ class DataSourceViewModel @Inject constructor(
 }
 
 
-/** 设置中心/工时设置的行右值摘要 */
+/** 设置页签（原设置中心）/制度设定的行右值摘要 */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class SettingsHubViewModel @Inject constructor(
@@ -431,7 +439,7 @@ class SettingsHubViewModel @Inject constructor(
     val compBalance: StateFlow<Int> = recordRepo.observeCompBalance()
         .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
-    /** 工地记工当前项目（工时设置 SITE 形态「项目与结算」行摘要用；指针变化自动刷新） */
+    /** 工地记工当前项目（制度设定 SITE 形态「项目与结算」行摘要用；指针变化自动刷新） */
     val siteCurrentProject: StateFlow<com.mdot.app.domain.model.SiteProject?> =
         settings.salaryFlow
             .map { it.siteCurrentProjectId }

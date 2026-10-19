@@ -83,4 +83,34 @@ class SiteDetailRowsTest {
         assertEquals(2, rows.map { it.stableKey }.distinct().size)
         assertTrue(rows.map { it.stableKey }.containsAll(listOf("WORK_1", "ADVANCE_1")))
     }
+
+    /**
+     * 留证照片（v0.7.9.0）：出勤与借支上的照片都要带进明细行（包工没有该字段）。
+     * 守的是"明细里能看见照片张数"这条——串解析只有 domain 一个出处（`parsePhotoPaths`）。
+     */
+    @Test
+    fun `出勤与借支的留证照片进入明细行`() {
+        val rows = buildSiteDetailRows(
+            attendance = listOf(att(1, "2026-09-25").copy(photos = "/a.jpg\u0001/b.jpg")),
+            pieceWorks = emptyList(),
+            advances = listOf(
+                SiteAdvance(
+                    id = 2, projectId = 1, date = "2026-09-26", amountCents = 100,
+                    purpose = "OTHER", photos = "/c.jpg", createdAt = 0, updatedAt = 0,
+                ),
+            ),
+        )
+        assertEquals(listOf("/a.jpg", "/b.jpg"), rows.first { it.kind == SiteDetailKind.WORK }.photos)
+        assertEquals(listOf("/c.jpg"), rows.first { it.kind == SiteDetailKind.ADVANCE }.photos)
+    }
+
+    @Test
+    fun `没有照片时明细行为空列表而不是含空串`() {
+        val rows = buildSiteDetailRows(
+            attendance = listOf(att(1, "2026-09-25").copy(photos = "\u0001")),
+            pieceWorks = emptyList(),
+            advances = emptyList(),
+        )
+        assertTrue(rows.single().photos.isEmpty())
+    }
 }

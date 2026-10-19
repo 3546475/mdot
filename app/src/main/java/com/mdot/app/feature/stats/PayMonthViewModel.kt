@@ -11,6 +11,7 @@ import com.mdot.app.domain.PayMonthDaily
 import com.mdot.app.domain.PayMonthDayCounts
 import com.mdot.app.domain.PayrollCalculator
 import com.mdot.app.domain.livePreviewSheet
+import com.mdot.app.domain.previewSheet
 import com.mdot.app.domain.model.DEFAULT_COLLAPSED_GROUPS
 import com.mdot.app.domain.model.PayGroup
 import com.mdot.app.domain.model.PayMonthItem
@@ -188,7 +189,8 @@ class PayMonthViewModel @Inject constructor(
             stored ?: PayMonthSheet.default().withTemplateRows(tpl)
         }
 
-    /** 某月的实时预览单据（只算不写盘；与首页同款）。工地无引擎值 → 原样返回存盘单据 */
+    /** 某月的实时预览单据（只算不写盘；与首页/导出同款）——组装逻辑住 domain（[PayMonthSync.previewSheet]），
+     *  工地无引擎值 → 原样返回存盘单据 */
     private fun previewFlow(m: YearMonth): Flow<PayMonthSheet> =
         combine(
             storedFlow(m),
@@ -196,17 +198,7 @@ class PayMonthViewModel @Inject constructor(
             settings.salaryFlow,
             dayCountsFlow(m),
         ) { stored, out, salary, counts ->
-            if (out == null) stored else livePreviewSheet(
-                stored,
-                out,
-                fillBase = salary.includeBase,
-                syncedAt = LocalDate.now().toString(),
-                compCashCents = PayrollCalculator.compCashCents(salary, out),
-                compMinutes = PayrollCalculator.compFromOtMinutes(out),
-                insurance = InsuranceFill.of(salary),
-                // 请假分钟取**引擎**的数（单一出处），不在这里重数一遍
-                dayCounts = counts.copy(leaveMinutes = out.leaveMinutes),
-            )
+            previewSheet(stored, out, salary, counts, LocalDate.now().toString())
         }
 
     /**
@@ -227,6 +219,7 @@ class PayMonthViewModel @Inject constructor(
                 workdays = workdays,
                 holidays = holidays,
                 makeupDays = makeups,
+                // 含「只记班次」的 0 时长记录：用户 2026-10-17 拍板按"有记录"算一天，别按分钟数过滤
                 recordDates = records.filter { it.type == RecordType.OT }.map { it.date },
                 leaveMinutes = 0,   // 由 previewFlow 用引擎值覆盖
             )

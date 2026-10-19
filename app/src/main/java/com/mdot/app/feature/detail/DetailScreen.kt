@@ -47,18 +47,17 @@ import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.designsystem.component.AnimatedMoneyText
 import com.mdot.app.core.designsystem.component.DayPickDialog
-import com.mdot.app.core.designsystem.component.MonthPickDialog
-import com.mdot.app.core.designsystem.component.MonthStepper
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.navigation.contentPaddingValues
-import com.mdot.app.core.repository.DataRevision
 import com.mdot.app.core.repository.RecordRepository
 import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.core.holiday.HolidayRepository
 import com.mdot.app.core.repository.SiteRepository
 import com.mdot.app.domain.CycleCalculator
 import com.mdot.app.domain.PayrollCalculator
+import com.mdot.app.domain.RecordRules
 import com.mdot.app.domain.SitePayCalculator
+import com.mdot.app.domain.StatsRangeKind
 import com.mdot.app.domain.model.AdvancePurpose
 import com.mdot.app.domain.model.RateTier
 import com.mdot.app.domain.model.WorkSystem
@@ -80,6 +79,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import com.mdot.app.core.designsystem.component.JiabanButton
@@ -92,36 +92,9 @@ import com.mdot.app.core.designsystem.heroChipSurface
 /** 工地明细区间口径（21 文档 B1）：UNSETTLED/PROJECT_SPAN 走 domain 推导（SiteRanges.Kind），CUSTOM=用户选起止 */
 enum class SiteDetailRangeMode { UNSETTLED, PROJECT_SPAN, CUSTOM }
 
-/** 工地区间口径三元组（21 文档 B1）——三个 StateFlow 合成一路，避免 `combine` 超 5 流上限 */
-private data class SiteRangeParams(
-    val mode: SiteDetailRangeMode,
-    val customFrom: LocalDate?,
-    val customTo: LocalDate?,
-)
-
-/** VM 数据流合并参数（combine 五流解包） */
-private data class DetailParams(
-    val anchor: Int,
-    val salary: com.mdot.app.domain.model.SalaryConfig,
-    val workdays: Set<java.time.DayOfWeek>,
-    val site: SiteRangeParams,
-    val periodOffset: Int,
-)
-
-/** 明细页 UiState：非工地=所选考勤周期收入构成明细（可切到历史周期）；工地=项目区间流水（21 文档 B1） */
+/** 明细页 UiState：非工地=宿主所选区间的收入构成明细；工地=项目区间流水（21 文档 B1） */
 data class DetailUiState(
     val workSystem: WorkSystem = WorkSystem.STANDARD,
-    /** 周期区间标签（如「9月1日 – 9月30日」） */
-    val rangeLabel: String = "",
-    /** 非工地：相对本周期的**周期步进**（0=本周期，-1=上一周期…）；工地不用 */
-    val periodOffset: Int = 0,
-    /** 非工地：所选周期落在的**锚点自然月**（跨自然月周期取起始月）——月份选择器回显用 */
-    val periodStartMonth: java.time.YearMonth? = null,
-    /**
-     * 非工地：**今天所在周期**的锚点月——月份选择器的可选上限，**不随 periodOffset 回退**。
-     * 用「所选周期月」当上限会让用户退到上一期后连原路都回不去（前进箭头与选择器一起被封死）。
-     */
-    val currentCycleMonth: java.time.YearMonth? = null,
     /** 非工地：加班/请假逐条明细 + 引擎汇总（档位分布/合计） */
     val breakdowns: List<PayrollCalculator.RecordBreakdown> = emptyList(),
     val output: PayrollCalculator.Output? = null,
@@ -129,10 +102,22 @@ data class DetailUiState(
     val siteDetails: List<SiteDetailRow> = emptyList(),
     val siteSummary: SitePayCalculator.Output? = null,
     val sitePartialCents: Long = 0,
-    /** 工地区间口径（默认本期待结） */
-    val siteRangeMode: SiteDetailRangeMode = SiteDetailRangeMode.UNSETTLED,
-    val siteCustomFrom: LocalDate? = null,
-    val siteCustomTo: LocalDate? = null,
+)
+
+/**
+ * 明细页签的**宿主下发**（统计页 → 明细页签）。
+ *
+ * v0.7.9.0 起明细页签**跟随统计页的区间**（用户 2026-10-17 拍板：统计有「考勤周期/自然月」筛选，
+ * 明细也该有 ⇒ 做成**共用同一份状态**，而不是在明细里再开一套选择器——两套状态终究会对不上）。
+ * 故本页不再持有任何区间状态：头部（胶囊 + 步进 + 区间弹窗）由宿主给，取数区间也由宿主算好。
+ */
+class DetailPaneHost(
+    /** 区间头（统计页的 `StatsRangeHeader`）——两页同一组件、同一份状态 */
+    val header: @Composable () -> Unit,
+    /** 本次取数区间（统计页已算好：考勤周期/自然月/年/自定义；工地 = 项目口径） */
+    val range: CycleCalculator.Period?,
+    /** 区间维度（只用于本页文案口径词：本期/本月/本年/区间） */
+    val rangeKind: StatsRangeKind,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -140,134 +125,58 @@ data class DetailUiState(
 class DetailViewModel @Inject constructor(
     recordRepo: RecordRepository,
     private val settings: SettingsDataSource,
-    dataRevision: DataRevision,
     private val holidayRepo: HolidayRepository,
     private val siteRepo: SiteRepository,
     val recordSheet: RecordSheetController,
 ) : ViewModel() {
 
-    private val today: LocalDate = LocalDate.now()
-
-    /** 周期锚点变化（含云端恢复 bump）时重算 */
-    private val anchorFlow = combine(settings.cycleAnchorDayFlow, dataRevision.version) { a, _ -> a }
     private val salaryFlow = combine(settings.salaryFlow, settings.workdaysFlow) { s, w -> s to w }
 
-    /** 工地区间口径 + 自定义起止（21 文档 B1） */
-    private val siteMode = MutableStateFlow(SiteDetailRangeMode.UNSETTLED)
-    private val siteCustomFrom = MutableStateFlow<LocalDate?>(null)
-    private val siteCustomTo = MutableStateFlow<LocalDate?>(null)
-
-    /** 工地三流合一路（combine 的上限是 5 流；周期步进占了一路，故工地参数合并） */
-    private val siteParams = combine(siteMode, siteCustomFrom, siteCustomTo) { m, f, t ->
-        SiteRangeParams(m, f, t)
-    }
-
     /**
-     * 非工地：周期步进（0=本周期）。**不越今天**——只能往回看历史周期，未来周期无意义（同全 App 口径）。
+     * 宿主（统计页）下发的取数区间（见 [DetailPaneHost]）。本页**没有**自己的区间状态，
+     * 也就没有「另一套步进」可与统计页分叉。
+     * null = 首帧宿主还没算出区间（统计 state 还是种子值）——此时出空态，**不要**回落成"本周期"：
+     * 那会让两页在首帧显示不同区间，正是要消灭的现象。
      */
-    private val periodOffset = MutableStateFlow(0)
+    private val hostRange = MutableStateFlow<CycleCalculator.Period?>(null)
 
-    /** 上一个完整考勤周期 */
-    fun onPrevPeriod() {
-        periodOffset.value -= 1
+    fun setHostRange(period: CycleCalculator.Period?) {
+        hostRange.value = period
     }
 
-    /** 下一个考勤周期；已在本周期则不动（封顶到今天） */
-    fun onNextPeriod() {
-        if (periodOffset.value < 0) periodOffset.value += 1
-    }
-
-    /** 回本期（「回本月」胶囊；仅非本周期时可见） */
-    fun onBackToCurrentPeriod() {
-        periodOffset.value = 0
-    }
-
-    /**
-     * 跳到某个自然月所在的考勤周期（胶囊文字 → 月份选择器）。
-     * 反解逻辑住在 domain（[CycleCalculator.cycleOffsetToMonth]，纯函数可测）——UI/VM 不算日期。
-     * 锚点**现取**（`cycleAnchorDayFlow.first()`）而不是缓存字段：省掉「首次发射前字段还是默认值 1」
-     * 的初始化竞态（同硬规则 15 的「写前现取」精神）。
-     */
-    fun onPickMonth(month: java.time.YearMonth) {
-        viewModelScope.launch {
-            val anchor = settings.cycleAnchorDayFlow.first()
-            val base = CycleCalculator.cycleStartMonth(today, anchor)
-            periodOffset.value = CycleCalculator.cycleOffsetToMonth(base, month)
-        }
-    }
-
-    fun onSiteRangeMode(mode: SiteDetailRangeMode) {
-        siteMode.value = mode
-        if (mode != SiteDetailRangeMode.CUSTOM) {
-            siteCustomFrom.value = null
-            siteCustomTo.value = null
-        }
-    }
-
-    fun onSiteCustomFrom(d: LocalDate) {
-        siteCustomFrom.value = d
-        if ((siteCustomTo.value ?: d).isBefore(d)) siteCustomTo.value = d
-    }
-
-    fun onSiteCustomTo(d: LocalDate) {
-        if (d.isAfter(today)) return
-        siteCustomTo.value = d
-        if ((siteCustomFrom.value ?: d).isAfter(d)) siteCustomFrom.value = d
-    }
-
-    val uiState = combine(anchorFlow, salaryFlow, siteParams, periodOffset) { anchor, sw, site, offset ->
-        DetailParams(anchor, sw.first, sw.second, site, offset)
-    }.flatMapLatest { (anchor, salary, workdays, site, offset) ->
-        val mode = site.mode
-        val cf = site.customFrom
-        val ct = site.customTo
+    val uiState = combine(salaryFlow, hostRange) { (salary, workdays), range ->
+        Triple(salary, workdays, range)
+    }.flatMapLatest { (salary, workdays, range) ->
+        if (range == null) return@flatMapLatest flowOf(DetailUiState(workSystem = salary.workSystem))
         if (salary.workSystem == WorkSystem.SITE) {
-            // 工地（21 文档 B1）：项目区间流水（出工/包工/借支/部分结算合并倒序），
-            // 口径 = 本期待结/项目全周期/自定义；结算变化 → observeSettlements 触发区间滚动
+            // 工地（21 文档 B1）：项目区间流水（出工/包工/借支/部分结算合并倒序）。
+            // 区间由宿主下发（「本期待结」随结算滚动那一层订阅在统计页），故这里不再自己
+            // observeSettlements 推区间——一处推导，两页同一份。
             val pid = siteRepo.currentProjectId()
-            siteRepo.observeSettlements(pid).flatMapLatest {
-                val (from, to) = when (mode) {
-                    SiteDetailRangeMode.UNSETTLED -> siteRepo.unsettledRange(pid)
-                    SiteDetailRangeMode.PROJECT_SPAN -> siteRepo.projectSpan(pid)
-                    SiteDetailRangeMode.CUSTOM -> {
-                        val span = siteRepo.projectSpan(pid)
-                        val f = cf ?: span.first
-                        val t = maxOf(ct ?: today, f)
-                        f to t
-                    }
-                }
-                val rangeLabel = "${TimeUtils.mdCn(from)} – ${TimeUtils.mdCn(to)}"
-                combine(
-                    siteRepo.observeAttendance(pid, from, to),
-                    siteRepo.observePieceWorks(pid, from, to),
-                    siteRepo.observeAdvances(pid, from, to),
-                    siteRepo.observePartialSettlements(pid, from, to),
-                ) { atts, pieces, advs, partials ->
-                    // 流水行构造三处共用（21 文档 B5 重构）
-                    val details = buildSiteDetailRows(atts, pieces, advs, partials)
-                    val summary = SitePayCalculator.summarize(
-                        SitePayCalculator.Input(
-                            attendance = atts, pieceWorks = pieces, advances = advs,
-                        )
+            combine(
+                siteRepo.observeAttendance(pid, range.from, range.to),
+                siteRepo.observePieceWorks(pid, range.from, range.to),
+                siteRepo.observeAdvances(pid, range.from, range.to),
+                siteRepo.observePartialSettlements(pid, range.from, range.to),
+            ) { atts, pieces, advs, partials ->
+                // 流水行构造三处共用（21 文档 B5 重构）
+                val details = buildSiteDetailRows(atts, pieces, advs, partials)
+                val summary = SitePayCalculator.summarize(
+                    SitePayCalculator.Input(
+                        attendance = atts, pieceWorks = pieces, advances = advs,
                     )
-                    val partial = partials.sumOf { it.netCents }
-                    DetailUiState(
-                        workSystem = WorkSystem.SITE,
-                        rangeLabel = rangeLabel,
-                        siteDetails = details,
-                        siteSummary = summaryOut(summary, partial),
-                        sitePartialCents = partial,
-                        siteRangeMode = mode,
-                        siteCustomFrom = cf,
-                        siteCustomTo = ct,
-                    )
-                }
+                )
+                val partial = partials.sumOf { it.netCents }
+                DetailUiState(
+                    workSystem = WorkSystem.SITE,
+                    siteDetails = details,
+                    siteSummary = summaryOut(summary, partial),
+                    sitePartialCents = partial,
+                )
             }
         } else {
-            // 非工地：所选考勤周期（默认本周期，可经胶囊左右箭头步进 / 点文字跳月）加班/请假逐条
-            // 金额明细——同统计页/工资单口径；区间一律走 CycleCalculator，UI 层不另算日期
-            val range = CycleCalculator.periodOffsetFrom(today, anchor, offset)
-            val rangeLabel = "${TimeUtils.mdCn(range.from)} – ${TimeUtils.mdCn(range.to)}"
+            // 非工地：宿主所选区间的加班/请假逐条 + 金额明细——同统计页/工资单口径。
+            // 日期算术一律在 domain 与统计页（`StatsRanges`），本页不另算
             combine(
                 recordRepo.observeRange(range.from, range.to),
                 recordRepo.observeAdjustments(),
@@ -286,13 +195,8 @@ class DetailViewModel @Inject constructor(
                         standardMinutes = standardMinutes,
                     )
                 )
-                val currentCycleMonth = CycleCalculator.cycleStartMonth(today, anchor)
                 DetailUiState(
                     workSystem = salary.workSystem,
-                    rangeLabel = rangeLabel,
-                    periodOffset = offset,
-                    periodStartMonth = currentCycleMonth.plusMonths(offset.toLong()),
-                    currentCycleMonth = currentCycleMonth,
                     breakdowns = out.breakdowns,
                     output = out,
                 )
@@ -345,15 +249,22 @@ fun SiteRangeChips(
     }
 }
 
-/** 明细内容主体（统计页「明细」页签与本页共用）：区间胶囊 + 模式化汇总卡 + 逐条明细列表 */
+/**
+ * 明细内容主体（统计页「明细」页签）：区间头 + 模式化汇总卡 + 逐条明细列表。
+ *
+ * **区间由宿主要（见 [DetailPaneHost]）**：v0.7.9.0 起本页跟随统计页的区间（考勤周期/自然月/年/自定义；
+ * 工地 = 项目口径），自己不再持有步进与选择器——头部直接用宿主给的 `StatsRangeHeader`
+ * （同一 lambda、同一份状态），取数区间用宿主算好的 `range`。这样两页永远显示同一段区间。
+ */
 @Composable
 fun DetailPane(
     showBottomBar: Boolean,
+    host: DetailPaneHost,
     vm: DetailViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
-    var showMonthPicker by remember { mutableStateOf(false) } // 非工地：点区间胶囊 → 跳月
-    var showSiteRangeDialog by remember { mutableStateOf(false) } // 工地：点区间胶囊 → 口径/自定义起止
+    // 宿主区间变化 → 下发给 VM（keyed on range：同区间重组不会重复 set）
+    androidx.compose.runtime.LaunchedEffect(host.range) { vm.setHostRange(host.range) }
 
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(Spacing.xs),
@@ -363,37 +274,30 @@ fun DetailPane(
         contentPadding = com.mdot.app.core.navigation.contentPaddingValues(showBottomBar = showBottomBar),
     ) {
         item {
-            // 顶部不加 Spacer：宿主页签条（SegmentBar 撑满 64dp 顶栏）下方已有天然留白。
-            // 下方留白用 StatsRangeSpacing 与上方对齐（见该常量注释）。
-            if (state.workSystem == WorkSystem.SITE) {
-                // 工地：**胶囊 = 唯一入口**，口径切换与自定义起止都收进弹窗
-                // （此前是「SiteRangeChips + 起止按钮 + 只读胶囊」三样同时堆在页面上）
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    RangePill(
-                        label = state.rangeLabel,
-                        onClick = { showSiteRangeDialog = true },
-                    )
-                }
-                Spacer(Modifier.height(StatsRangeSpacing))
-            } else if (state.rangeLabel.isNotEmpty()) {
-                // 非工地：周期步进器（与记月页共用 MonthStepper）——整行居中
-                MonthStepper(
-                    label = state.rangeLabel,
-                    nextEnabled = state.periodOffset < 0,
-                    onPrev = vm::onPrevPeriod,
-                    onNext = vm::onNextPeriod,
-                    onOpenPicker = { showMonthPicker = true },
-                    onBackToCurrent = if (state.periodOffset < 0) vm::onBackToCurrentPeriod else null,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                // 三页共用的下方留白常量（见 StatsRangeSpacing 的注释：为何不是 Spacing 令牌）。
-                // 本页 LazyColumn 的 verticalArrangement = spacedBy(Spacing.xs) 会再补 4dp，
-                // 故这里减掉那 4dp，最终实际留白仍与统计页/记月页相等。
-                Spacer(Modifier.height(StatsRangeSpacing - Spacing.xs))
-            }
+            // 区间头（统计页与明细页签**同一组件**）：顶部不加 Spacer，宿主页签条下方已有天然留白。
+            host.header()
+            // 三页共用的下方留白常量（见 StatsRangeSpacing 的注释：为何不是 Spacing 令牌）。
+            // 本页 LazyColumn 的 verticalArrangement = spacedBy(Spacing.xs) 会再补 4dp，
+            // 故这里减掉那 4dp，最终实际留白仍与统计页/记月页相等。
+            Spacer(Modifier.height(StatsRangeSpacing - Spacing.xs))
         }
         item {
-            DetailSummary(state)
+            DetailSummary(
+                state = state,
+                // 口径词随宿主维度变：小时工看「工时收入」，其余按 本期/本月/本年/区间
+                incomeLabel = if (state.workSystem == WorkSystem.HOURLY) {
+                    stringResource(R.string.detail_income_work)
+                } else {
+                    stringResource(
+                        when (host.rangeKind) {
+                            StatsRangeKind.CYCLE -> R.string.detail_income_cycle
+                            StatsRangeKind.MONTH -> R.string.home_income_month
+                            StatsRangeKind.YEAR -> R.string.detail_income_year
+                            StatsRangeKind.CUSTOM -> R.string.detail_income_custom
+                        }
+                    )
+                },
+            )
             Spacer(Modifier.height(Spacing.m))
         }
         when {
@@ -413,33 +317,6 @@ fun DetailPane(
                 }
             }
         }
-    }
-
-    // 工地：区间口径弹窗（口径 chips + 自定义起止，日期选择叠在本弹窗之上）
-    if (showSiteRangeDialog) {
-        SiteRangeDialog(
-            mode = state.siteRangeMode,
-            customFrom = state.siteCustomFrom,
-            customTo = state.siteCustomTo,
-            onMode = vm::onSiteRangeMode,
-            onCustomFrom = vm::onSiteCustomFrom,
-            onCustomTo = vm::onSiteCustomTo,
-            onDismiss = { showSiteRangeDialog = false },
-        )
-    }
-
-    // 非工地：跳到某个自然月所在的考勤周期（复用记月页/个税页同一个 MonthPickDialog）
-    if (showMonthPicker) {
-        MonthPickDialog(
-            title = stringResource(R.string.detail_pick_month),
-            selected = state.periodStartMonth ?: java.time.YearMonth.now(),
-            maxMonth = state.currentCycleMonth,
-            onPick = { m ->
-                vm.onPickMonth(m)
-                showMonthPicker = false
-            },
-            onDismiss = { showMonthPicker = false },
-        )
     }
 }
 
@@ -501,7 +378,7 @@ fun RangePill(
 // ---- 模式化汇总卡 ----
 
 @Composable
-private fun DetailSummary(state: DetailUiState) {
+private fun DetailSummary(state: DetailUiState, incomeLabel: String) {
     SectionCard(onClick = {}, containerColor = emphasisCardSurface()) {
         Column(Modifier.fillMaxWidth()) {
             when {
@@ -546,10 +423,6 @@ private fun DetailSummary(state: DetailUiState) {
                 }
                 else -> {
                     val out = state.output ?: return@Column
-                    val incomeLabel = when (state.workSystem) {
-                        WorkSystem.HOURLY -> stringResource(R.string.detail_income_work)
-                        else -> stringResource(R.string.detail_income_cycle)
-                    }
                     Text(
                         incomeLabel,
                         style = MaterialTheme.typography.labelSmall,
@@ -744,14 +617,20 @@ private fun NormalDetailRow(
             }
         }
         Column(horizontalAlignment = Alignment.End) {
-            // 时长在上，金额在下
+            // 时长在上，金额在下。「只记班次」（0 时长，v0.7.9.0）显示「未加班」而不是「0小时」
             Text(
-                TimeUtils.hoursDecimal(r.durationMinutes) + stringResource(R.string.detail_worked_hours_unit),
+                if (RecordRules.isShiftOnly(r.durationMinutes)) stringResource(R.string.detail_no_ot)
+                else TimeUtils.hoursDecimal(r.durationMinutes) + stringResource(R.string.detail_worked_hours_unit),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                if (isOt) "+" + Money.yuanText(bd.amountCents) else "−" + Money.yuanText(bd.amountCents),
+                // 0 时长没有金额可看（+¥0 只会误导），显示占位符
+                when {
+                    RecordRules.isShiftOnly(r.durationMinutes) -> "-"
+                    isOt -> "+" + Money.yuanText(bd.amountCents)
+                    else -> "−" + Money.yuanText(bd.amountCents)
+                },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = if (isOt) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
@@ -792,6 +671,21 @@ fun SiteDetailRowItem(row: SiteDetailRow) {
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f),
         )
+        // 留证照片：行上显示张数，点开看大图（v0.7.9.0——照片以前只在编辑弹层里看得到）
+        var viewingPhotos by remember { mutableStateOf(false) }
+        if (row.photos.isNotEmpty()) {
+            com.mdot.app.feature.site.PhotoCountBadge(
+                count = row.photos.size,
+                onClick = { viewingPhotos = true },
+            )
+            Spacer(Modifier.width(Spacing.s))
+            if (viewingPhotos) {
+                com.mdot.app.feature.site.PhotoGalleryDialog(
+                    paths = row.photos,
+                    onDismiss = { viewingPhotos = false },
+                )
+            }
+        }
         val amountText = when {
             row.kind == SiteDetailKind.ADVANCE -> "−" + Money.yuanText(row.amountCents)
             row.kind == SiteDetailKind.PARTIAL -> "+" + Money.yuanText(row.amountCents)

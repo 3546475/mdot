@@ -17,6 +17,9 @@
     <string name="site_save_recent_title">刚记下 · 本项目最近流水</string>
     <string name="site_save_recent_all">查看全部明细</string>
     <string name="site_save_recent_close">关闭</string>
+    <!-- 明细/记录行里的照片留证（v0.7.9.0）：行上小徽章显示张数 → 先看缩略图 → 点开大图可左右滑 -->
+    <string name="site_photo_close">关闭</string>
+    <string name="site_photo_index">第 %1$d / %2$d 张</string>
     <string name="site_tab_ot">出工</string>
     <!-- 项目管理/项目设置（F-S2） -->
     <string name="site_projects_title">项目管理</string>

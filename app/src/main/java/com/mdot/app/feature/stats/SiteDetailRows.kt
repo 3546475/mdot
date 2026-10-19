@@ -29,6 +29,8 @@ fun buildSiteDetailRows(
                     worksMilli = worksMilliOf(a.workMinutes, a.baseMinutes),
                     otMinutes = a.otMinutes,
                     amountCents = a.workPayCents + a.otPayCents,
+                    // 留证照片：明细行上要能看见（v0.7.9.0）
+                    photos = com.mdot.app.domain.parsePhotoPaths(a.photos),
                 )
             )
         }
@@ -51,6 +53,7 @@ fun buildSiteDetailRows(
                     id = a.id,
                     amountCents = a.amountCents,
                     purpose = runCatching { AdvancePurpose.valueOf(a.purpose) }.getOrNull(),
+                    photos = com.mdot.app.domain.parsePhotoPaths(a.photos),
                 )
             )
         }

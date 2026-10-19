@@ -28,7 +28,7 @@ import com.mdot.app.feature.site.SiteProjectsPane
 import com.mdot.app.feature.site.SiteSettlementPane
 import kotlinx.coroutines.launch
 
-/** 按工时制度页签（v0.6.12：取代原工时设置入口列表，顶栏齿轮进入） */
+/** 按工时制度页签（v0.6.12：取代原「工时设置」入口列表，现由顶栏齿轮＝**制度设定**进入） */
 private enum class SystemTab(val labelRes: Int) {
     SALARY(R.string.sysset_tab_salary),
     COMP(R.string.sysset_tab_comp),

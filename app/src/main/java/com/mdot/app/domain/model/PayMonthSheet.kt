@@ -39,7 +39,7 @@ data class PayMonthItem(
      * 0 = 不按日算，保持纯手填（与社保/公积金「比例 0 = 未启用」的语义一致，不清零用户填的值）。
      */
     val dayRateCents: Long = 0,
-    /** 按日计算时的**天数口径**（应出勤日 / 实际记录日 / 周期自然日） */
+    /** 按日计算时的**天数口径**（应出勤日 / 实际记录日 / 本月天数） */
     val dayBasis: PayMonthDayBasis = PayMonthDayBasis.STANDARD,
     /** 按日计算时是否扣掉请假（用户开关，默认不扣——避免与事假/病假的金额扣减双重计账） */
     val dayDeductLeave: Boolean = false,
@@ -126,6 +126,20 @@ data class PayMonthSheet(
             IncomeSlice(IncomeSliceKind.OTHER_INCOME, incomeCents - base - overtime),
         ).filter { it.cents > 0 }
     }
+
+    /**
+     * **给人看**的形态（v0.7.9.0）：只保留金额非 0 的行；某组过滤后为空 ⇒ 整组（连组小计）不出现。
+     *
+     * 用途：导出**工资单长图**——用户 2026-10-20 定「图片只显示有数的项目，0 值行别占版面」。
+     * CSV 不走这里（CSV 是给机器/对账的，**必须记录所有行含 0 值**，见 `CsvWriter`）。
+     * 实发/应发这类汇总由调用方用原单据算，不受本函数影响（本函数只裁行）。
+     */
+    fun displayNonZero(): PayMonthSheet = copy(
+        basic = basic.filter { it.amountCents != 0L },
+        subsidy = subsidy.filter { it.amountCents != 0L },
+        deduction = deduction.filter { it.amountCents != 0L },
+        other = other.filter { it.amountCents != 0L },
+    )
 
     /**
      * 补齐出厂固定行（builtin）：老版本存的单子没有新加的固定行（如 2026-09-27 新增的「全勤奖」），

@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -217,7 +219,7 @@ private fun PhotoSection(photos: List<String>, onAdd: (List<String>) -> Unit, on
 }
 
 @Composable
-private fun PhotoThumb(path: String, onClick: () -> Unit, onLong: () -> Unit) {
+private fun PhotoThumb(path: String, onClick: () -> Unit, onLong: (() -> Unit)? = null) {
     val bitmap = remember(path) {
         runCatching {
             val opts = BitmapFactory.Options().apply { inSampleSize = 4 }
@@ -225,17 +227,26 @@ private fun PhotoThumb(path: String, onClick: () -> Unit, onLong: () -> Unit) {
         }.getOrNull()
     }
     val interaction = remember { MutableInteractionSource() }
+    val clickModifier = if (onLong != null) {
+        Modifier.combinedClickable(
+            interactionSource = interaction,
+            indication = LocalIndication.current,
+            onClick = onClick,
+            onLongClick = onLong,
+        )
+    } else {
+        Modifier.clickable(
+            interactionSource = interaction,
+            indication = LocalIndication.current,
+            onClick = onClick,
+        )
+    }
     Box(
         Modifier
             .size(76.dp)
             .pressScale(interaction, pressedScale = 0.92f)
             .clip(engineShape(Radius.button))
-            .combinedClickable(
-                interactionSource = interaction,
-                indication = LocalIndication.current,
-                onClick = onClick,
-                onLongClick = onLong,
-            ),
+            .then(clickModifier),
     ) {
         if (bitmap != null) {
             Image(
@@ -246,4 +257,119 @@ private fun PhotoThumb(path: String, onClick: () -> Unit, onLong: () -> Unit) {
             )
         }
     }
+}
+
+// ---- 明细 / 记录行里的照片可见性（v0.7.9.0）------------------------------------------
+// 背景：照片 12 文档 D10 起就存了，但**只在编辑弹层里能看到**——记完去翻明细、看月历都看不见，
+// 等于"留证留了个寂寞"。这里补两件东西：行上的张数小徽章 + 只读大图查看。
+
+/** 照片张数小徽章（明细/记录行用）：只读，点开看大图；0 张不渲染，调用方无需判空 */
+@Composable
+internal fun PhotoCountBadge(count: Int, onClick: () -> Unit) {
+    if (count <= 0) return
+    val interaction = remember { MutableInteractionSource() }
+    Row(
+        Modifier
+            .pressScale(interaction, pressedScale = 0.9f)
+            .clip(engineShape(Radius.pill))
+            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick)
+            .padding(horizontal = Spacing.s, vertical = 1.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        Icon(
+            painterResource(R.drawable.ic_ms_photo_camera), null,
+            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.size(IconSpec.inline),
+        )
+        Text(
+            count.toString(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+    }
+}
+
+/**
+ * 留证照片查看（明细/记录行点小徽章打开）：**两级**——
+ * 第一级先把这次记录的全部照片列成缩略图，点某一张才进大图；多张时在大图里左右滑动切换。
+ * 只读：删除仍回编辑弹层做（不在流水列表里误删留证）。
+ */
+@Composable
+internal fun PhotoGalleryDialog(paths: List<String>, onDismiss: () -> Unit) {
+    if (paths.isEmpty()) return
+    var viewing by remember { mutableStateOf<Int?>(null) }
+    JiabanAlertDialog(
+        containerColor = dialogContainerColor(),
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.site_photos)) },
+        // 只读：无确认键 ⇒ 传 null（传 `{}` 会留半格空白 + 孤立竖线）
+        text = {
+            FlowRow(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+                verticalArrangement = Arrangement.spacedBy(Spacing.s),
+            ) {
+                paths.forEachIndexed { index, path ->
+                    PhotoThumb(path = path, onClick = { viewing = index })
+                }
+            }
+        },
+        dismissButton = {
+            JiabanButton(
+                text = stringResource(R.string.site_photo_close),
+                onClick = onDismiss,
+                role = JiabanButtonRole.GHOST,
+            )
+        },
+    )
+    viewing?.let { index ->
+        PhotoPagerDialog(paths = paths, startIndex = index, onDismiss = { viewing = null })
+    }
+}
+
+/** 大图：横向分页（多张可左右滑动），标题显示「第 i / N 张」 */
+@Composable
+private fun PhotoPagerDialog(paths: List<String>, startIndex: Int, onDismiss: () -> Unit) {
+    val pager = rememberPagerState(initialPage = startIndex.coerceIn(0, paths.lastIndex)) { paths.size }
+    JiabanAlertDialog(
+        containerColor = dialogContainerColor(),
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                stringResource(
+                    R.string.site_photo_index,
+                    pager.currentPage + 1,
+                    paths.size,
+                )
+            )
+        },
+        text = {
+            HorizontalPager(
+                state = pager,
+                modifier = Modifier.fillMaxWidth().height(420.dp),
+            ) { page ->
+                val path = paths[page]
+                val bmp = remember(path) {
+                    runCatching { BitmapFactory.decodeFile(path)?.asImageBitmap() }.getOrNull()
+                }
+                if (bmp != null) {
+                    Image(
+                        bitmap = bmp,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        },
+        dismissButton = {
+            JiabanButton(
+                text = stringResource(R.string.site_photo_close),
+                onClick = onDismiss,
+                role = JiabanButtonRole.GHOST,
+            )
+        },
+    )
 }

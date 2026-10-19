@@ -31,6 +31,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,12 +48,24 @@ import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.SheetBackdrop
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.WindowSpec
+import com.mdot.app.core.designsystem.component.LocalOverlayDialogs
 import com.mdot.app.core.designsystem.component.LocalSheetBackdropState
+import com.mdot.app.core.designsystem.component.OverlayEntry
+import com.mdot.app.core.designsystem.component.OverlayKind
 import kotlinx.coroutines.delay
 
 /**
- * 记工页通用底部弹层容器（自实现：遮罩 + 顶部圆角面板 + motionScheme 滑入滑出；全页弹窗统一走此容器）。
- * 跨文件共用（记工页各弹窗与项目管理页），保持 internal。
+ * 记工页通用底部弹层容器（全页弹窗统一走此容器）。跨文件共用（记工页各弹窗与项目管理页），保持 `internal`。
+ *
+ * **v0.7.9.0 起默认走「页内模态覆盖层」**（用户拍板：工地弹层别再开窗口）——
+ * 与 `JiabanAlertDialog(asOverlay = true)` 同一套栈（`OverlayDialogController`，硬规则 14）：
+ * 1. 不开独立窗口 ⇒ 不再受 ROM 对话框窗口动画影响（`DialogBackdrop.kt` 里那堆逐帧门控正是为此）；
+ * 2. 弹出时页面的压暗/模糊/缩小由宿主 `SheetBackdropLayer` 负责（AppRoot 以"栈非空"判定），
+ *    与「记加班」弹层完全同拍；
+ * 3. 弹层里再开弹窗（日期/备注等）会**叠在同一栈上**，不再需要 `asOverlay = false` 那种特殊处理。
+ *
+ * 兜底：`LocalOverlayDialogs == null`（预览 / 单测 / 不在 App 组合内）时退回原来的 Dialog 实现，
+ * 功能与动画都不丢。
  */
 @Composable
 internal fun SiteBottomSheet(
@@ -60,23 +73,107 @@ internal fun SiteBottomSheet(
     onDismiss: () -> Unit,
     content: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit,
 ) {
-    // 动画/结构完全对齐其它模式的「记加班」弹窗（feature/record/RecordSheet.kt）
-    // 过渡状态：优先用宿主经 LocalSheetBackdropState 下发的共享状态（本弹层是 Dialog，
-    // 独立窗口，拿不到宿主 remember 的状态）——背景层 SheetBackdropLayer 与面板因此同拍。
-    // 无宿主提供时（单独调用）自建状态，并在弹层内自绘兑底压暗
+    val overlayCtl = LocalOverlayDialogs.current
+    if (overlayCtl != null) {
+        SiteSheetOverlay(title = title, onDismiss = onDismiss, content = content, controller = overlayCtl)
+        return
+    }
+    SiteSheetWindow(title = title, onDismiss = onDismiss, content = content)
+}
+
+/**
+ * 页内模态覆盖层形态（默认路径）。
+ *
+ * entry 只 push 一次（身份固定才能精确出栈），因此**标题/内容/关闭回调都用 `rememberUpdatedState`
+ * 取最新值**——把首帧 lambda 钉进 entry 会让后续状态变化（如"选了几工天"）在弹层里看不到。
+ * 关闭走 [dismissNow]：先从栈里移除（覆盖层会保留最后一条渲染到退场动画结束），再通知调用方。
+ */
+@Composable
+private fun SiteSheetOverlay(
+    title: String,
+    onDismiss: () -> Unit,
+    content: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit,
+    controller: com.mdot.app.core.designsystem.component.OverlayDialogController,
+) {
+    val latestTitle by rememberUpdatedState(title)
+    val latestOnDismiss by rememberUpdatedState(onDismiss)
+    val latestContent = rememberUpdatedState(content)
+
+    // 内容里的 dismiss 指向这个可变 lambda：entry 先建、再赋值，避免自引用
+    val overlayDismiss = remember { mutableStateOf<() -> Unit>({ latestOnDismiss() }) }
+    val entry = remember(controller) {
+        OverlayEntry(
+            kind = OverlayKind.SHEET,
+            onDismiss = { latestOnDismiss() },
+            content = {
+                SiteSheetPanel(
+                    title = latestTitle,
+                    onDismissRequest = { overlayDismiss.value() },
+                ) { dismiss -> latestContent.value.invoke(this, dismiss) }
+            },
+        )
+    }
+    overlayDismiss.value = { controller.remove(entry); latestOnDismiss() }
+
+    DisposableEffect(entry) {
+        controller.push(entry)
+        onDispose { controller.remove(entry) }
+    }
+}
+
+/**
+ * 弹层面板外观（页内覆盖层与 Dialog 兜底共用）：顶部圆角 + surfaceContainer 底 + 标题 + 内容，
+ * 宽屏四角全圆并底部留边（悬浮形态），窄屏全宽贴底。
+ *
+ * [onDismissRequest] 既从系统返回键/点遮罩来（兜底路径），也从内容里的「取消/确定」来 ——
+ * 走这里能保证**先播退场动画再真正关闭**（直接摘组合会吞掉 exit，docs/11 039）。
+ */
+@Composable
+private fun SiteSheetPanel(
+    title: String,
+    onDismissRequest: () -> Unit,
+    content: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit,
+) {
+    val wide = LocalWindowSpec.current == WindowSpec.EXPANDED
+    Column(
+        Modifier
+            .widthIn(max = AdaptiveSpecs.sheetMaxWidth)
+            .fillMaxWidth()
+            .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.92f).dp)
+            .padding(bottom = if (wide) Spacing.l else 0.dp)
+            .clip(
+                if (wide) engineShape(Radius.sheet)
+                else engineShape(topStart = Radius.sheet, topEnd = Radius.sheet, bottomEnd = 0.dp, bottomStart = 0.dp)
+            )
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clickable(enabled = false) { }
+            .imePadding()
+            .padding(Spacing.l),
+    ) {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(Spacing.m))
+        content { onDismissRequest() }
+    }
+}
+
+/**
+ * Dialog 兜底实现（无覆盖层宿主时）：原样保留 v0.6.18 那套「遮罩 + 面板两个 AnimatedVisibility +
+ * 共享过渡状态」——开工单窗口时背景压暗/模糊由宿主 `SheetBackdropLayer` 呈现。
+ */
+@Composable
+private fun SiteSheetWindow(
+    title: String,
+    onDismiss: () -> Unit,
+    content: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit,
+) {
     val hostState = LocalSheetBackdropState.current
     val fallbackState = remember { MutableTransitionState(false) }
     val visibleState = hostState ?: fallbackState
-    // 置 true 放在一次性 effect 里：原写法在组合体内无条件置 true，退场途中任何一次重组都会把动画拉回
     LaunchedEffect(Unit) { visibleState.targetState = true }
     var dismissRequested by remember { mutableStateOf(false) }
 
     fun requestDismiss() { dismissRequested = true }
 
-    // 兜底复位：任何路径摘除本弹层（含内容按钮直接调 onDismiss、点格/确定直连宿主的 onPick/onApply
-    // 等）都会让共享过渡状态留在「展开」态——宿主的背景层（SheetBackdropLayer）因此一直停在
-    // 模糊/缩小不消失（docs/11 039）。这里在组合销毁时一律拉回关闭态；requestDismiss 路径早已
-    // 置 false，故幂等、不影响正常退出动画。
     DisposableEffect(visibleState) {
         onDispose { visibleState.targetState = false }
     }
@@ -90,22 +187,12 @@ internal fun SiteBottomSheet(
     }
     BackHandler(onBack = { requestDismiss() })
 
-    // 遮罩与面板拆成两个 AnimatedVisibility（共享同一 visibleState）：遮罩原地淡入淡出、
-    // 面板自下而上滑入/下滑淡出——避免遮罩跟随上推，且保证退出动画完整播放
-    // （原外层 if 会在 dismiss 同帧移除组合，吞掉 exit 动画，导致弹层突兀消失）
-    // v0.6.18：背景效果（压暗/模糊/缩小）改由宿主窗口的 SheetBackdropLayer 负责——
-    // 本弹层是独立窗口，透明区域会露出宿主窗口，故遮罩盒子只留「挡板」职责（消费点击、
-    // 拦截穿透）；仅当宿主未提供共享状态时自绘兑底压暗，避免弹层失去层级感
-    // 弹层提速只动 MIUIX；MD3 原速（sheetSpatialSpec 档位选择，与记加班弹层同款）
     val sheetSlideSpec = com.mdot.app.core.designsystem.sheetSpatialSpec<androidx.compose.ui.unit.IntOffset>()
     val sheetFadeSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     Dialog(
         onDismissRequest = { requestDismiss() },
-        // decorFitsSystemWindows=false：IME insets 走 Compose 侧，imePadding 精准避让，
-        // 否则弹窗窗口被系统 pan/双重补偿，输入法弹出后输入框与键盘间留大片空白
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        // 遮罩：原地淡入淡出
         AnimatedVisibility(
             visibleState = visibleState,
             enter = fadeIn(sheetFadeSpec),
@@ -115,46 +202,24 @@ internal fun SiteBottomSheet(
                 Modifier
                     .fillMaxSize()
                     .then(
-                        // 兑底（无宿主背景层时）：自绘压暗。平台压暗已被 themes.xml 的
-                        // FloatingDialogWindowTheme 覆盖关掉（见 themes.xml 注释），故只需一处压暗
                         if (hostState == null) Modifier.background(Color.Black.copy(alpha = SheetBackdrop.contentScrimNoBlur))
                         else Modifier
                     )
                     .pointerInput(Unit) { detectTapGestures { requestDismiss() } }
             )
         }
-        // 面板：自下而上滑入 / 下滑淡出
         AnimatedVisibility(
             visibleState = visibleState,
             enter = slideInVertically(sheetSlideSpec) { it },
             exit = slideOutVertically(sheetSlideSpec) { it } + fadeOut(sheetFadeSpec),
         ) {
-            // 面板（Box 提供 BottomCenter 对齐作用域）
             Box(Modifier.fillMaxSize()) {
-            // 面板：宽屏四角全圆 + 底部留边（悬浮形态）；窄屏全宽贴底
-            val wide = LocalWindowSpec.current == WindowSpec.EXPANDED
-                    Column(
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .widthIn(max = AdaptiveSpecs.sheetMaxWidth)
-                            .fillMaxWidth()
-                            .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.92f).dp)
-                            .padding(bottom = if (wide) Spacing.l else 0.dp)
-                            .clip(
-                                if (wide) engineShape(Radius.sheet)
-                                else engineShape(topStart = Radius.sheet, topEnd = Radius.sheet, bottomEnd = 0.dp, bottomStart = 0.dp)
-                            )
-                            .background(MaterialTheme.colorScheme.surfaceContainer)
-                            .clickable(enabled = false) { }
-                            .navigationBarsPadding()
-                            .imePadding()
-                            .padding(Spacing.l),
-                    ) {
-                        Text(title, style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(Spacing.m))
-                        // 内容按钮应通过 dismiss（= requestDismiss）关闭：走退出动画 + 复位共享状态；
-                        // 勿在内容里直接调 onDismiss（会跳过动画并让背景层卡住，docs/11 039）
-                        content { requestDismiss() }
+                Box(Modifier.align(Alignment.BottomCenter).navigationBarsPadding()) {
+                    SiteSheetPanel(
+                        title = title,
+                        onDismissRequest = { requestDismiss() },
+                        content = content,
+                    )
                 }
             }
         }

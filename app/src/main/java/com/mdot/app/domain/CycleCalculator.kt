@@ -5,6 +5,7 @@ import java.math.RoundingMode
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.temporal.ChronoUnit
 
 /** 考勤周期区间计算（anchorDay 1–31，默认 1 = 自然月） */
 object CycleCalculator {
@@ -15,6 +16,10 @@ object CycleCalculator {
     /** 闭区间周期 */
     data class Period(val from: LocalDate, val to: LocalDate) {
         fun contains(date: LocalDate): Boolean = !date.isBefore(from) && !date.isAfter(to)
+
+        /** 闭区间天数（月历 7 列网格的格子数 = 本值 + 前导空格数，见 [leadingBlanks]） */
+        val days: Int get() = (ChronoUnit.DAYS.between(from, to) + 1).toInt()
+
         override fun toString(): String = "${from.year}年${from.monthValue}月${from.dayOfMonth}日 – ${to.year}年${to.monthValue}月${to.dayOfMonth}日"
     }
 
@@ -108,11 +113,67 @@ object CycleCalculator {
             .toInt()
             .coerceAtMost(0)
 
+    /**
+     * 月份选择器的「点某月 → 步进 offset」反解（**自然月维度**）：基准 = [baseMonth]，
+     * 调用方传**今天所在自然月**（不是锚点月！）。
+     *
+     * ⚠️ 与 [cycleOffsetToMonth] 只差"基准月"，但**混用就整体错开一个月**：
+     * 自然月维度每步走**整月**（[com.mdot.app.domain.StatsRanges.step] 的 MONTH 分支），
+     * 周期维度每步走**整期**。拿「今天所在周期的锚点月」当自然月的基准时——起始日 26、今天 10 月
+     * ⇒ 基准取到 9 月，点「1 月」算出 -8 而不是 -9，**界面上显示成 2 月**；
+     * 点「2 月」显示 3 月，整体后移一个月（2026-10-20 用户报，见 docs/11 092）。
+     */
+    fun monthOffsetTo(baseMonth: YearMonth, target: YearMonth): Int =
+        java.time.temporal.ChronoUnit.MONTHS
+            .between(baseMonth, target)
+            .toInt()
+            .coerceAtMost(0)
+
     /** 自然月区间 */
     fun naturalMonth(month: YearMonth): Period = Period(month.atDay(1), month.atEndOfMonth())
 
     /** 自然年区间 */
     fun yearPeriod(year: Int): Period = Period(LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31))
+
+    // ---- 月历展示区间（自然月 / 考勤周期二选一，见日历页「按考勤周期展示」开关）----
+
+    /**
+     * 月历一次展示的区间：[byCycle] 真 = 锚点月 [month] 对应的**完整考勤周期**
+     * （起始日 26 时即「本月 26 日 → 下月 25 日」），假 = 该自然月。
+     *
+     * 网格与小结都按本区间取数，故「展示方式」只在这一处决定 —— 与 `StatsRanges` 同一口径
+     * （区间推导集中在 domain，禁止 UI/VM 各算一套，否则「一期有多长」必然漂移）。
+     */
+    fun calendarRange(month: YearMonth, anchorDay: Int, byCycle: Boolean): Period =
+        if (byCycle) periodOfMonth(month, anchorDay) else naturalMonth(month)
+
+    /** 月历 7 列网格（周一起始）里，区间首日之前的前导空格数 */
+    fun leadingBlanks(period: Period): Int = period.from.dayOfWeek.value - 1
+
+    /**
+     * 月历可展示的锚点月**上限**（含）：今天所在区间的锚点月。
+     * 自然月 = 今天所在自然月；考勤周期 = 含今天那一期的起始月（见 [cycleStartMonth]）。
+     * 全 App「不越今天」的口径在这里对月历落地（前进方向到上限即置灰 / 被守卫拒绝）。
+     */
+    fun displayAnchorCap(today: LocalDate, anchorDay: Int, byCycle: Boolean): YearMonth =
+        if (byCycle) cycleStartMonth(today, anchorDay) else YearMonth.from(today)
+
+    /**
+     * 把「要展示的锚点月」收敛到 [displayAnchorCap] 之内（超上限 ⇒ 取上限）。
+     *
+     * 为什么必须有这一步：切到周期视图时页面手里的月份仍是**今天所在自然月**（如 2026-10），
+     * 而起始日 26 时含今天的周期其实始于上月（9/26–10/25）⇒ 不收敛就会**一进来整屏未来日期**
+     * （10/26 起全置灰、一条记录也点不动）。收敛后首屏即今天所在的那一期。
+     */
+    fun clampDisplayMonth(
+        month: YearMonth,
+        today: LocalDate,
+        anchorDay: Int,
+        byCycle: Boolean,
+    ): YearMonth {
+        val cap = displayAnchorCap(today, anchorDay, byCycle)
+        return if (month.isAfter(cap)) cap else month
+    }
 
     /**
      * 综合工时：区间内应出勤天数 × 8h 的标准工时分钟数（10 文档 §4，纯函数可测）。

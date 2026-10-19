@@ -577,7 +577,7 @@ private fun AppRootContent(
                     }
                     composable(Routes.SYSTEM) {
                         AdaptiveContainer {
-                            // 顶栏齿轮：当前工时制度的设定多页签页（原工时设置入口列表页移除）
+                            // 顶栏齿轮＝**制度设定**：当前工时制度的多页签页（原「工时设置」入口列表页移除）
                             SystemSettingsScreen(
                                 onBack = { navController.popBackStack() },
                                 onOpenProject = { id -> navTo(navController, Routes.siteProjectEdit(id), slots) },

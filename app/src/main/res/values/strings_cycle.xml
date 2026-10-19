@@ -5,4 +5,7 @@
     <string name="cycle_period_example">当前周期：%1$s</string>
     <string name="cycle_month_anchor_heading">每月起始日</string>
     <string name="cycle_anchor_summary">每月%1$d号起</string>
+    <!-- 月历展示方式（开关卡，就在「每月起始日」卡片下方）：默认关 = 自然月 -->
+    <string name="cycle_calendar_view_heading">月历按考勤周期展示</string>
+    <string name="cycle_calendar_view_desc">每月 %1$d 号排到下月起始日前一天</string>
 </resources>

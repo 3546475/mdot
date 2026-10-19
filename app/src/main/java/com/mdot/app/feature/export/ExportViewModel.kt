@@ -16,6 +16,8 @@ import com.mdot.app.core.util.PayslipRenderer
 import com.mdot.app.domain.CycleCalculator
 import com.mdot.app.domain.PayrollCalculator
 import com.mdot.app.domain.model.PayMonthSheet
+import com.mdot.app.domain.model.WorkSystem
+import com.mdot.app.domain.model.withTemplateRows
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,8 +44,10 @@ enum class ExportBusyAction { CSV, PAYSLIP }
 data class ExportUiState(
     val dimension: ExportDimension = ExportDimension.CYCLE,
     val range: CycleCalculator.Period? = null,
-    /** 工资单长图数据源（docs/20 P0-1）：默认记月单据 */
-    val payslipSource: PayslipSource = PayslipSource.MONTH_SHEET,
+    /** 当前制度（工地没有「记月」工资单 ⇒ 隐藏工资单相关动作） */
+    val workSystem: WorkSystem = WorkSystem.STANDARD,
+    /** 工资单对应的月份（= 区间结束日所在月；v0.7.9.0 起只有「记月单据」一个来源） */
+    val sheetMonth: java.time.YearMonth = java.time.YearMonth.now(),
     val busy: Boolean = false,
     /** 正在 busy 的导出按钮（CSV 详情 / 生成工资单）；null=无导出按钮在 busy */
     val busyAction: ExportBusyAction? = null,
@@ -54,15 +58,6 @@ data class ExportUiState(
     /** 预览弹窗产物：工资单长图 或 CSV */
     val preview: PreviewArtifact? = null,
 )
-
-/** 工资单长图数据源（docs/20 P0-1） */
-enum class PayslipSource(val labelRes: Int) {
-    /** 记月单据（用户在记月页维护的那张单：含社保/公积金/个税等），**默认** */
-    MONTH_SHEET(com.mdot.app.R.string.export_payslip_source_sheet),
-
-    /** 考勤计算（PayrollCalculator 口径，长图不包含手填项） */
-    ATTENDANCE(com.mdot.app.R.string.export_payslip_source_attendance),
-}
 
 /** 导出预览产物 */
 sealed interface PreviewArtifact {
@@ -86,7 +81,8 @@ class ExportViewModel @Inject constructor(
     val uiState: StateFlow<ExportUiState> = combine(
         extra,
         settings.cycleAnchorDayFlow,
-    ) { st, anchor ->
+        settings.salaryFlow,
+    ) { st, anchor, salary ->
         val range = when (st.dimension) {
             ExportDimension.CYCLE -> CycleCalculator.periodContaining(today, anchor)
             ExportDimension.MONTH -> CycleCalculator.naturalMonth(java.time.YearMonth.from(today))
@@ -96,11 +92,14 @@ class ExportViewModel @Inject constructor(
                 if (from.isAfter(to)) null else CycleCalculator.Period(from, to)
             }
         }
-        st.copy(range = range)
+        st.copy(range = range, workSystem = salary.workSystem, sheetMonth = sheetMonthOf(range))
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ExportUiState())
 
+    /** 工资单月份 = 区间**结束日**所在月（自然月=本月；周期 9/26–10/25=10 月；自定义=止日所在月） */
+    private fun sheetMonthOf(range: CycleCalculator.Period?): java.time.YearMonth =
+        java.time.YearMonth.from(range?.to ?: today)
+
     fun onDimension(d: ExportDimension) = extra.update { it.copy(dimension = d, doneText = null, errorText = null) }
-    fun onPayslipSource(s: PayslipSource) = extra.update { it.copy(payslipSource = s, doneText = null, errorText = null) }
     fun onCustomFrom(d: LocalDate) = extra.update { it.copy(customFrom = d) }
     fun onCustomTo(d: LocalDate) = extra.update { it.copy(customTo = d) }
 
@@ -170,10 +169,18 @@ class ExportViewModel @Inject constructor(
                         extra.update { it.copy(busy = false, busyAction = null, errorText = "该区间没有记录") }
                         return@launch
                     }
-                    csv = CsvWriter.buildRangeCsv(
-                        range, records, salary,
+                    // 一份 CSV 装全部数据（v0.7.9.0 用户拍板）：前半段逐日考勤（可再导入），
+                    // 后半段记月工资单（全部行含 0 值）。工单月份 = 区间结束日所在月。
+                    val month = sheetMonthOf(range)
+                    val sheet = liveSheetFor(month, salary, workdays)
+                    csv = CsvWriter.buildFullCsv(
+                        range = range,
+                        records = records,
+                        salary = salary,
                         tierOf = { date -> holidayRepo.tierFor(date, workdays) },
                         standardMinutes = autoStandardMinutes(salary, workdays, range),
+                        monthLabel = context.getString(R.string.paymonth_month, month.year, month.monthValue),
+                        sheet = sheet,
                     )
                     fileName = "${when (salary.workSystem) {
                         com.mdot.app.domain.model.WorkSystem.HOURLY -> "工作明细"
@@ -189,6 +196,46 @@ class ExportViewModel @Inject constructor(
                 extra.update { it.copy(busy = false, busyAction = null, errorText = e.message ?: "生成失败") }
             }
         }
+    }
+
+    /**
+     * 某月的**实时预览记月单据**（与记月页/首页同一处组装，见 `domain/previewSheet`）。
+     *
+     * v0.7.9.0 起工资单只剩这一个数据源（用户 2026-10-20：「抹掉记月单据 / 考勤计算的分叉」）——
+     * 考勤本来就是记月的子集（单据里基本工资/加班工资/事假那几行正是引擎按考勤算出来的）。
+     * 工地没有记月，调用方别用它。
+     */
+    private suspend fun liveSheetFor(
+        month: java.time.YearMonth,
+        salary: com.mdot.app.domain.model.SalaryConfig,
+        workdays: Set<java.time.DayOfWeek>,
+    ): PayMonthSheet {
+        val from = month.atDay(1)
+        val to = month.atEndOfMonth()
+        val records = recordRepo.getRange(from, to)
+        val out = PayrollCalculator.summarize(
+            PayrollCalculator.Input(
+                salary,
+                records.map { it.toCalcLite() },
+                tierOf = { date -> holidayRepo.tierFor(date, workdays) },
+                standardMinutes = autoStandardMinutes(salary, workdays, CycleCalculator.Period(from, to)),
+            )
+        )
+        val templates = settings.payMonthTemplatesFlow.first()
+        val stored = settings.payMonthFlow(month.toString()).first()
+            ?: PayMonthSheet.default().withTemplateRows(templates)
+        val (holidays, makeups) = holidayRepo.holidaySetsInRange(from, to)
+        val counts = com.mdot.app.domain.PayMonthDaily.counts(
+            from = from,
+            to = to,
+            workdays = workdays,
+            holidays = holidays,
+            makeupDays = makeups,
+            // 含「只记班次」的 0 时长记录（用户 2026-10-17 拍板算一天）
+            recordDates = records.filter { it.type == com.mdot.app.domain.model.RecordType.OT }.map { it.date },
+            leaveMinutes = out.leaveMinutes,
+        )
+        return com.mdot.app.domain.previewSheet(stored, out, salary, counts, today.toString())
     }
 
     /** 生成工资单长图并打开预览弹窗（不直接分享） */
@@ -233,56 +280,32 @@ class ExportViewModel @Inject constructor(
                     )
                     fileName = "结算单_${range.from}_${range.to}.png"
                 } else {
-                    // 记月单据（默认）：单据整月全 0 时回落考勤计算并提示（docs/20 P0-1）
-                    val month = java.time.YearMonth.from(range.to)
-                    val sheet = settings.payMonthFlow(month.toString()).first() ?: PayMonthSheet.default()
-                    val sheetFilled = sheet.incomeCents != 0L || sheet.netCents != 0L
-                    if (st.payslipSource == PayslipSource.MONTH_SHEET && sheetFilled) {
-                        bitmap = PayslipRenderer.renderSheet(
-                            context,
-                            title = "工资单",
-                            monthLabel = context.getString(
-                                com.mdot.app.R.string.paymonth_month,
-                                month.year,
-                                month.monthValue,
-                            ),
-                            sheet = sheet,
-                            palette = palette,
-                        )
-                        fileName = "工资单_${month}.png"
-                    } else {
-                        if (st.payslipSource == PayslipSource.MONTH_SHEET) {
-                            extra.update { it.copy(doneText = context.getString(com.mdot.app.R.string.export_payslip_sheet_empty)) }
-                        }
-                        val records = recordRepo.getRange(range.from, range.to)
-                        if (records.isEmpty()) {
-                            extra.update { it.copy(busy = false, busyAction = null, errorText = "该区间没有记录") }
-                            return@launch
-                        }
-                        val out = PayrollCalculator.summarize(
-                            PayrollCalculator.Input(
-                                salary,
-                                records.map { it.toCalcLite() },
-                                tierOf = { date -> holidayRepo.tierFor(date, workdays) },
-                                standardMinutes = autoStandardMinutes(salary, workdays, range),
+                    // 工资单 = 记月单据（**唯一来源**）。图**只画有金额的项目**（用户 2026-10-20 定）；
+                    // 全部行（含 0 值）在 CSV 里。整月一个数都没有 ⇒ 提示，而不是导出一张空表。
+                    val month = sheetMonthOf(range)
+                    val live = liveSheetFor(month, salary, workdays)
+                    if (live.incomeCents == 0L && live.deductionCents == 0L && live.otherCents == 0L) {
+                        extra.update {
+                            it.copy(
+                                busy = false,
+                                busyAction = null,
+                                errorText = context.getString(R.string.export_sheet_empty),
                             )
-                        )
-                        val showMoney = when (salary.mode) {
-                            com.mdot.app.domain.model.SalaryMode.BASE -> salary.hasBaseSalary
-                            com.mdot.app.domain.model.SalaryMode.MANUAL ->
-                                salary.hasBaseSalary || salary.manualRatesCents.values.any { it > 0 }
                         }
-                        bitmap = PayslipRenderer.render(
-                            context,
-                            title = "工资单",
-                            range = range,
-                            output = out,
-                            showMoney = showMoney,
-                            workSystem = salary.workSystem,
-                            palette = palette,
-                        )
-                        fileName = "工资单_${range.from}_${range.to}.png"
+                        return@launch
                     }
+                    bitmap = PayslipRenderer.renderSheet(
+                        context,
+                        title = "工资单",
+                        monthLabel = context.getString(
+                            com.mdot.app.R.string.paymonth_month,
+                            month.year,
+                            month.monthValue,
+                        ),
+                        sheet = live.displayNonZero(),
+                        palette = palette,
+                    )
+                    fileName = "工资单_${month}.png"
                 }
                 val file = PayslipRenderer.savePng(bitmap, context, fileName)
                 extra.update { it.copy(busy = false, busyAction = null, preview = PreviewArtifact.Payslip(file)) }

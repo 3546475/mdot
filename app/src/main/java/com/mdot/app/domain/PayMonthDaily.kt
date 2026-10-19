@@ -10,8 +10,14 @@ import java.math.RoundingMode
  * - [STANDARD] 应出勤日：按工作日设定 + 节假日调休修正算，**不依赖用户记不记加班**，最稳。
  * - [RECORD] 实际记录日：区间内有加班记录的去重日期数。贴近"我实际干几天"，
  *   但用户没记加班的日子根本不在库里，会偏少（记月页的出勤摘要已在用同一口径）。
- * - [CALENDAR] 周期自然日：考勤周期首末日之差。完全不受记录影响，
- *   但锚点周期（如 26 日起算）只有 30 天、自然月 31 天，**每月金额会跳**。
+ *   ⚠️ **「只记班次」的 0 时长记录也算一天**（用户 2026-10-17 拍板：「我上班了就该算」，见 docs/22
+ *   F-20261017-1）——调用方按 `type == OT` 过滤即可，**不要**再按 `durationMinutes > 0` 过滤。
+ * - [CALENDAR] **本月天数**：所在区间的自然日数（记月传的是**自然月**，见 [counts] 的 from/to）。
+ *   完全不受记录影响，但**每月天数会跳**（28–31 天）。
+ *
+ * ⚠️ [CALENDAR] 原名「周期自然日」，2026-10-17 用户拍板**改名「本月天数」**（文案与实现对齐，
+ * 不改实现）：一张**月度单据天然跨两个考勤周期**（如 10 月含 9/26–10/25 与 10/26–11/25 各一半），
+ * 「这一期的天数」根本不存在唯一答案；真要按周期算钱得先让单据本身按周期出。见 docs/11 091。
  */
 enum class PayMonthDayBasis {
     STANDARD,
@@ -27,7 +33,7 @@ enum class PayMonthDayBasis {
  *
  * @property standardMinutes 应出勤工时（[CycleCalculator.standardMinutesFor] 的输出）
  * @property recordDayCount 区间内有加班记录的**去重日期数**
- * @property calendarDayCount 考勤周期的自然日数（含首尾）
+ * @property calendarDayCount 区间自然日数（含首尾）；记月传自然月 ⇒ 即**本月天数**
  * @property leaveMinutes 请假总分钟（事假 + 病假）
  */
 data class PayMonthDayCounts(

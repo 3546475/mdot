@@ -34,45 +34,12 @@ object PayslipRenderer {
         val bold: Boolean = false,
     )
 
-    fun render(
-        context: Context,
-        title: String,
-        range: CycleCalculator.Period,
-        output: PayrollCalculator.Output,
-        showMoney: Boolean,
-        palette: Palette,
-        workSystem: WorkSystem = WorkSystem.STANDARD,
-    ): Bitmap {
-        val isHourly = workSystem == WorkSystem.HOURLY
-        val isComp = workSystem == WorkSystem.COMPREHENSIVE
-        // isMoney 沿用旧口径：带「费/款/收入」字样的行才加 ¥（保证老包长图不变样）
-        fun row(label: String, value: String) = Row(label, value, money = label.contains("费") || label.contains("款") || label.contains("收入"))
-        val rows = buildList {
-            add(Row("考勤周期", range.toString()))
-            if (isComp) {
-                // 综合工时：周期口径字段（10 文档 F-Z6）
-                add(row("周期工时合计", TimeUtils.prettyDuration(output.otMinutes + output.holidayWorkMinutes)))
-                add(row("标准工时", TimeUtils.prettyDuration(output.periodStandardMinutes)))
-                add(row("超时工时", TimeUtils.prettyDuration(output.overtimeMinutes)))
-                add(row("加班费", Money.yuanText(output.otPayCents)))
-            } else {
-                add(row((if (isHourly) "工时" else "加班时长"), TimeUtils.prettyDuration(output.otMinutes)))
-                add(row((if (isHourly) "工作收入" else "加班费"), Money.yuanText(output.otPayCents)))
-            }
-            add(row("请假时长", TimeUtils.prettyDuration(output.leaveMinutes)))
-            add(row("请假扣款", Money.yuanText(output.leaveDeductCents)))
-            if (!isHourly && !isComp) {
-                add(row("调休余额", TimeUtils.prettyDuration(output.compBalanceMinutes)))
-            }
-            add(row("净收入", Money.yuanText(output.incomeCents)))
-        }
-        return draw(context, title, rows, showMoney, palette)
-    }
-
     /**
-     * **记月工资单长图**（docs/20 P0-1）：以**记月单据**为数据源——四分组逐行 + 组小计 + 实发。
+     * **记月工资单长图**（docs/20 P0-1）：四分组逐行 + 组小计 + 实发。
      *
-     * 与 [render]（考勤计算口径）并存，由导出页的数据源选择决定用哪个。
+     * v0.7.9.0 起这是**唯一**的工资单长图口径（用户 2026-10-20 抹掉「记月单据 / 考勤计算」分叉：
+     * 考勤本来就是记月的子集）。调用方应传 [PayMonthSheet.displayNonZero] 的结果 ——
+     * **图只画有金额的项目**；需要全部行（含 0 值）的场合走 CSV，不在这里加参数。
      * 存扣款/其他组为正数，长图上也渲为负数（与记月页一致）。
      */
     fun renderSheet(

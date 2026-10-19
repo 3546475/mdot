@@ -81,7 +81,20 @@ class OverlayDialogController {
  */
 val LocalOverlayDialogs = androidx.compose.runtime.staticCompositionLocalOf<OverlayDialogController?> { null }
 
+/**
+ * 覆盖层形态（v0.7.9.0 补 [SHEET]）：同一套栈里既能挂"居中卡片"（对话框），也能挂"底部弹层"
+ * （工地记工页的 [SiteBottomSheet]）——两者都是**页内**渲染，不开窗口，进场动画按形态分叉。
+ */
+internal enum class OverlayKind {
+    /** 居中卡片：缩放 + 渐显（对话框口径，见 [OverlayDialogCard]） */
+    CARD,
+
+    /** 底部弹层：自下而上滑入（不缩放、不渐显），内容自带面板圆角与标题 */
+    SHEET,
+}
+
 internal data class OverlayEntry(
+    val kind: OverlayKind = OverlayKind.CARD,
     val onDismiss: () -> Unit,
     val content: @Composable () -> Unit,
 )
@@ -120,16 +133,22 @@ fun OverlayDialogLayer(controller: OverlayDialogController) {
                     if (entry != null) detectTapGestures { entry.onDismiss() }
                 },
         )
+        // 面板/卡片：形态决定进场方式 —— 卡片缩放+渐显（原口径），弹层自下而上滑入（不缩放）
+        val isSheet = shown.kind == OverlayKind.SHEET
         Box(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
                     val p = progress.value
-                    scaleX = 0.92f + 0.08f * p
-                    scaleY = 0.92f + 0.08f * p
-                    alpha = p
+                    if (isSheet) {
+                        translationY = (1f - p) * size.height
+                    } else {
+                        scaleX = 0.92f + 0.08f * p
+                        scaleY = 0.92f + 0.08f * p
+                        alpha = p
+                    }
                 },
-            contentAlignment = Alignment.Center,
+            contentAlignment = if (isSheet) Alignment.BottomCenter else Alignment.Center,
         ) { shown.content() }
     }
 }

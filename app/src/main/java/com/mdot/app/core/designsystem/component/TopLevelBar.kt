@@ -42,7 +42,12 @@ val TopBarHeight = 56.dp
 
 /**
  * 一级页面统一顶栏（M3 Expressive）：无标题；
- * 左侧「标准工时 ⇄」tonal 胶囊入口，右侧两个圆形 tonal 图标按钮（**外观**、设置）。
+ * 左侧「标准工时 ⇄」胶囊 = **切换工时**（当前制度名 → 直达「切换工时制度」页），
+ * 右侧两个图标按钮 = **外观**（「外观/首页/底栏」配置页）、**制度设定**（齿轮 → `SystemSettingsScreen` 多页签）。
+ *
+ * 术语（用户 2026-10-16 统一）：这条入口一律叫**制度设定**（旧称/反馈里的「工时设置」同义），
+ * 顶栏左侧按钮叫**切换工时**——无障碍标签 `ds_topbar_settings_cd` / `ds_topbar_switch_cd` 与之同字，
+ * 免得读屏把齿轮念成「设置」而与「我的 → 关于与设置」里的「设置」页签混起来。见 docs/03 §5.5。
  *
  * ⚠️ 右侧「外观」按钮是**设置入口的兜底**：外观/首页卡片/底栏/同步/关于 原本只挂在「我的」页，
  * 而「我的」可以从底栏移除 → 一旦移除就再也进不去设置。首页不可从底栏移除、一级页顶栏恒在，
@@ -74,7 +79,7 @@ fun TopLevelBar(
             .padding(horizontal = if (miuix) Spacing.l else Spacing.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // 工时制度：入口胶囊（clickable 置于 Surface 内部，涟漪被形状裁剪）
+        // 工时制度：入口胶囊（clickable 置于 Surface 内部，涟漪被形状裁剪）；无障碍标签「切换工时」
         val switchInteraction = remember { MutableInteractionSource() }
         Surface(
             shape = engineShape(Radius.pill),
@@ -136,7 +141,7 @@ fun TopLevelBar(
             }
         }
         Spacer(Modifier.size(Spacing.s))
-        // 设置：同上
+        // 制度设定（齿轮）：同上（旧称「工时设置」，术语已统一）
         if (miuix) {
             JiabanIconButton(onClick = onOpenSettings, modifier = Modifier.size(40.dp)) {
                 Icon(

@@ -223,4 +223,55 @@ class StatsRangesTest {
         assertEquals(LocalDate.parse("2026-09-23"), prev.from)
         assertEquals(LocalDate.parse("2026-09-30"), prev.to)
     }
+
+    // ---- 点月反解：点哪个月就该显示哪个月（2026-10-20 用户报「点 1 月跳到 2 月」）----
+
+    @Test
+    fun `点月反解 - 自然月维度的基准是今天所在自然月而非周期锚点月`() {
+        val today = LocalDate.parse("2026-10-20")
+        val baseMonth = YearMonth.from(today)                                // 2026-10（正确基准）
+        val cycleAnchorMonth = CycleCalculator.cycleStartMonth(today, 26)    // 2026-09（陷阱）
+        assertEquals(YearMonth.of(2026, 9), cycleAnchorMonth)
+        // 正确：今天 10 月，点 1 月 ⇒ -9
+        assertEquals(-9, CycleCalculator.monthOffsetTo(baseMonth, YearMonth.of(2026, 1)))
+        // 错把锚点月当基准会得到 -8 ⇒ 界面显示成 2 月（正是用户看到的症状）
+        assertEquals(-8, CycleCalculator.cycleOffsetToMonth(cycleAnchorMonth, YearMonth.of(2026, 1)))
+    }
+
+    @Test
+    fun `不变量 - 自然月维度点哪个月就显示哪个月`() {
+        val today = LocalDate.parse("2026-10-20")
+        val current = StatsRanges.current(StatsRangeKind.MONTH, today, 26, null, null, null)!!
+        (1..10).forEach { m ->
+            val target = YearMonth.of(2026, m)
+            val offset = CycleCalculator.monthOffsetTo(YearMonth.from(today), target)
+            val shown = StatsRanges.step(StatsRangeKind.MONTH, current, 26, offset, today)!!
+            assertEquals("点 $target 后显示 $shown", target, YearMonth.from(shown.from))
+        }
+    }
+
+    @Test
+    fun `不变量 - 考勤周期维度点哪个月就显示始于该月的那一期`() {
+        val today = LocalDate.parse("2026-10-20")
+        listOf(1, 15, 26, 29).forEach { anchor ->
+            val current = StatsRanges.current(StatsRangeKind.CYCLE, today, anchor, null, null, null)!!
+            val base = CycleCalculator.cycleStartMonth(today, anchor)   // 今天所在那一期的锚点月
+            // ① 锚点月及更早：点哪个月 ⇒ 显示**始于该月**的那一期（短月回退月末仍属该月）
+            (1..base.monthValue).forEach { m ->
+                val target = YearMonth.of(base.year, m)
+                val offset = CycleCalculator.cycleOffsetToMonth(base, target)
+                val shown = StatsRanges.step(StatsRangeKind.CYCLE, current, anchor, offset, today)!!
+                assertEquals("anchor=$anchor 点 $target 后显示 $shown", target, YearMonth.from(shown.from))
+            }
+            // ② 锚点月之后、但自然月已到来的那一月，被 `coerceAtMost(0)` 夹回**本期**——
+            //    这是 docs/11 074 记下的**已知取舍**（月份选择器上限按自然月，点本月落在本期），
+            //    别再当 bug 修；起始日 = 1 时它天然不存在（锚点月 ≡ 今天所在自然月）。
+            if (base.monthValue < YearMonth.from(today).monthValue) {
+                val later = base.plusMonths(1)
+                val offset = CycleCalculator.cycleOffsetToMonth(base, later)
+                val shown = StatsRanges.step(StatsRangeKind.CYCLE, current, anchor, offset, today)!!
+                assertEquals("anchor=$anchor 点 $later 应夹回本期", base, YearMonth.from(shown.from))
+            }
+        }
+    }
 }

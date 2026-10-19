@@ -87,6 +87,7 @@ import com.mdot.app.core.designsystem.component.FloatingLabelTextField
 @Composable
 fun CyclePane(vm: CycleViewModel = hiltViewModel()) {
     val anchor by vm.anchorDay.collectAsStateWithLifecycle()
+    val cycleView by vm.calendarCycleView.collectAsStateWithLifecycle()
     val example = stringResource(R.string.cycle_period_example, remember(anchor) { buildExample(anchor) })
 
     Column(
@@ -161,6 +162,29 @@ fun CyclePane(vm: CycleViewModel = hiltViewModel()) {
                     }
                     Spacer(Modifier.height(8.dp))
                 }
+            }
+        }
+
+        Spacer(Modifier.height(Spacing.m))
+
+        // 月历展示方式（默认关 = 自然月）：只影响日历页「月历」的排列与小结区间，
+        // 起始日之上的口径（加班费/周期汇总）仍走 CycleCalculator，两处同一份推导
+        SectionCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.cycle_calendar_view_heading),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Spacer(Modifier.height(Spacing.xs))
+                    Text(
+                        stringResource(R.string.cycle_calendar_view_desc, anchor),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.width(Spacing.m))
+                JiabanSwitch(checked = cycleView, onCheckedChange = vm::setCalendarCycleView)
             }
         }
         Spacer(Modifier.height(Spacing.xl))

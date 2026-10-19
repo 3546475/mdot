@@ -190,6 +190,87 @@ object CsvWriter {
         return sb.toString()
     }
 
+    /**
+     * **记月工资单段**（v0.7.9.0）：组别 / 名称 / 金额(元) / 来源 四列，**记录所有行（含 0 值）**。
+     *
+     * 与长图的分工（用户 2026-10-20 定）：**图只显示有数的项目，CSV 记录全部**——CSV 是给机器/对账的，
+     * 少一行就会让"某项目本月到底有没有"变成猜。
+     * 扣款与其他组写**负数** ⇒ 整列求和 = 实发，表格里可直接核；金额用**无千分位**纯数字
+     * （带千分位会被 CSV 规则加引号、表格软件也不当数字求和）。
+     *
+     * ⚠️ 传入的 [sheet] 应是**实时预览单据**（`domain/previewSheet` 的产物），与记月页同一份。
+     * CSV 内容允许硬编码中文（硬规则 10 的例外：导出文件内容）。
+     */
+    fun buildPayMonthSection(monthLabel: String, sheet: com.mdot.app.domain.model.PayMonthSheet): String {
+        val nl = "\r\n"
+        val sb = StringBuilder()
+        // 段落标记：导入侧见到这一行就停止（工资单不走 CSV 导入，它在备份包里）
+        sb.append("工资单").append(nl)
+        sb.append("月份,").append(escape(monthLabel)).append(nl)
+        sb.append("组别,名称,金额(元),来源").append(nl)
+
+        /** 一行：扣款/其他写负号（列求和 = 实发）；金额为 0 时**不写负号**（别出现 `-0.00`，同 docs/11 083） */
+        fun row(group: String, item: com.mdot.app.domain.model.PayMonthItem, negate: Boolean) {
+            val amount = if (negate && item.amountCents != 0L) "-" + yuanPlain(item.amountCents)
+            else yuanPlain(item.amountCents)
+            sb.append(
+                listOf(group, item.name, amount, sourceText(item.source)).joinToString(",") { escape(it) }
+            ).append(nl)
+        }
+
+        sheet.basic.forEach { row("基本项目", it, negate = false) }
+        sheet.subsidy.forEach { row("补贴项目", it, negate = false) }
+        sheet.deduction.forEach { row("扣款项目", it, negate = true) }
+        sheet.other.forEach { row("其他项目", it, negate = true) }
+
+        // 汇总行（与记月汇总卡同口径：应发 − 扣款 − 其他 = 实发）；0 同样不加负号
+        fun minus(cents: Long): String = if (cents == 0L) yuanPlain(0) else "-" + yuanPlain(cents)
+        sb.append("应发合计,,${yuanPlain(sheet.incomeCents)},").append(nl)
+        sb.append("扣款合计,,${minus(sheet.deductionCents)},").append(nl)
+        sb.append("其他合计,,${minus(sheet.otherCents)},").append(nl)
+        sb.append("实发,,${yuanPlain(sheet.netCents)},").append(nl)
+        return sb.toString()
+    }
+
+    /**
+     * **一份 CSV 装全部数据**（v0.7.9.0 用户拍板：导出/导入是给机器用的，不必给人看）：
+     * 前半段 = 逐日考勤明细（可直接再导入，格式与旧版完全一致）；后半段 = 记月工资单段。
+     *
+     * 为什么合一份：两段本来就是同一份数据的不同切面（考勤⇒加班的计算依据），拆成两个按钮/两个文件
+     * 只会让用户每次要点两次、还要自己记住哪个是哪个。导入侧只读前半段（见 `CsvReader.parse` 的段落截断）。
+     *
+     * @param sheet 记月工资单（可空：工地制度没有记月，或不做工资单段时传 null）
+     */
+    fun buildFullCsv(
+        range: CycleCalculator.Period,
+        records: List<com.mdot.app.domain.model.DailyRecord>,
+        salary: SalaryConfig,
+        tierOf: (LocalDate) -> com.mdot.app.domain.model.RateTier,
+        standardMinutes: Int? = null,
+        monthLabel: String? = null,
+        sheet: com.mdot.app.domain.model.PayMonthSheet? = null,
+    ): String {
+        val base = buildRangeCsv(range, records, salary, tierOf, standardMinutes)
+        return if (sheet == null || monthLabel == null) base
+        else base + "\r\n" + buildPayMonthSection(monthLabel, sheet)
+    }
+
+    /**
+     * 金额（分）→ CSV 里的**纯数字**元文本：`5000.00`。
+     * ⚠️ 不用 [Money.yuanText]——它带千分位（`5,000.00`），在 CSV 里会被迫加引号、
+     * 也没法被表格软件当数字求和（本表的核心用途就是"整列求和 = 实发"）。
+     */
+    private fun yuanPlain(cents: Long): String =
+        String.format(Locale.US, "%.2f", cents / 100.0)
+
+    /** 记月行的来源戳 → 与记月页文案同义的纯文本（导出文件里不带「· 21.5 天 × 50」这类推导细节） */
+    private fun sourceText(source: com.mdot.app.domain.model.PayMonthSource?): String = when (source) {
+        com.mdot.app.domain.model.PayMonthSource.SYNCED -> "来自考勤 · 自动计算"
+        com.mdot.app.domain.model.PayMonthSource.EDITED -> "已手改"
+        com.mdot.app.domain.model.PayMonthSource.ESTIMATED -> "来自个税估算"
+        null -> ""
+    }
+
     private fun escape(cell: String): String =
         if (cell.contains(',') || cell.contains('"') || cell.contains('\n')) {
             "\"" + cell.replace("\"", "\"\"") + "\""

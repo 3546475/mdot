@@ -165,6 +165,17 @@ class SettingsDataSource @Inject constructor(
         dataStore.edit { it[CYCLE_ANCHOR_DAY] = day }
     }
 
+    /**
+     * 日历页月历展示方式：**false = 自然月（出厂默认）**，true = 按考勤周期
+     * （起始日 26 时即「本月 26 日 → 下月 25 日」一期）。开关在「制度设定-周期」页，
+     * 与 [cycleAnchorDayFlow] 同处一张卡下方 —— 读侧只有日历页（`CalendarViewModel`）。
+     */
+    val calendarCycleViewFlow: Flow<Boolean> =
+        dataStore.data.map { it[CALENDAR_CYCLE_VIEW] ?: false }
+
+    suspend fun setCalendarCycleView(value: Boolean) =
+        dataStore.edit { it[CALENDAR_CYCLE_VIEW] = value }
+
     // ---- 工作日设定 ----
     val workdaysFlow: Flow<Set<DayOfWeek>> = dataStore.data.map { prefs ->
         val names = prefs[WORKDAYS]?.let { runCatching { json.decodeFromString<List<String>>(it) }.getOrNull() }
@@ -337,6 +348,7 @@ class SettingsDataSource @Inject constructor(
 
         private val SALARY = stringPreferencesKey("salary_config")
         private val CYCLE_ANCHOR_DAY = intPreferencesKey("cycle_anchor_day")
+        private val CALENDAR_CYCLE_VIEW = booleanPreferencesKey("calendar_cycle_view")
         private val WORKDAYS = stringPreferencesKey("workdays")
         private val APPEARANCE = stringPreferencesKey("appearance")
         private val BOTTOM_BAR = stringPreferencesKey("bottom_bar_slots")

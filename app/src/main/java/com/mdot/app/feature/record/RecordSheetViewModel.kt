@@ -9,6 +9,7 @@ import com.mdot.app.core.repository.ShiftRepository
 import com.mdot.app.core.util.AppError
 import com.mdot.app.core.util.onFailure
 import com.mdot.app.core.util.onSuccess
+import com.mdot.app.domain.RecordRules
 import com.mdot.app.domain.ShiftDefaults
 import com.mdot.app.domain.model.DailyRecord
 import com.mdot.app.domain.model.LeaveDraft
@@ -53,6 +54,12 @@ data class SheetUiState(
     val selectedShiftName: String? = null,
     /** 选中的时长（十进制小时文本，如 "2.5"）；null = 未选择 */
     val hoursText: String? = null,
+    /**
+     * 「没加班，只记班次」（0 时长记录，v0.7.9.0，用户 2026-10-17 拍板）：
+     * 真时 [durationMinutes] 恒按 0 处理，保存要求**已选班次或填了备注**（规则见 [RecordRules.canSaveOt]）。
+     * 与时长输入**互斥**：点了任意时长预设/自定义/滚轮，本标记自动取消。
+     */
+    val noOvertime: Boolean = false,
     /** 生效档位（含手动补改） */
     val tier: RateTier = RateTier.WEEKDAY,
     val tierManual: Boolean = false,
@@ -66,6 +73,8 @@ data class SheetUiState(
     val errorText: String? = null,
 ) {
     fun durationMinutes(): Int {
+        // 「只记班次」= 0 时长，与网格/滚轮里残留的选择无关（切标记时已清空选择）
+        if (noOvertime) return 0
         if (durationMode == DurationInputMode.MINUTES) {
             return pendingMinutes.coerceIn(0, 1440)
         }
@@ -76,6 +85,17 @@ data class SheetUiState(
 
     /** 选中时长的小时数（未选择时为 null），供网格高亮 */
     fun hoursValue(): Double? = hoursText?.toDoubleOrNull()?.takeIf { it > 0.0 }
+
+    /**
+     * 保存按钮可用性——**与仓库层同一套规则**（[RecordRules]），别在 UI 另写条件：
+     * 加班 = 有效时长，或「只记班次」且带班次/备注；请假 = 必须有时长。
+     */
+    val canSave: Boolean
+        get() = if (tab == RecordType.OT) {
+            RecordRules.canSaveOt(durationMinutes(), selectedShiftName, note)
+        } else {
+            RecordRules.canSaveLeave(durationMinutes())
+        }
 }
 
 @HiltViewModel
@@ -129,6 +149,8 @@ class RecordSheetViewModel @Inject constructor(
                     selectedShiftId = existing.shiftId,
                     selectedShiftName = existing.shiftName,
                     hoursText = minutesToHoursText(existing.durationMinutes),
+                    // 已存的 0 时长记录 = 「只记班次」：回显该标记，否则打开就是一排空时长却"有记录"
+                    noOvertime = RecordRules.isShiftOnly(existing.durationMinutes),
                     tier = existing.tier ?: autoTier,
                     tierManual = existing.tierSource == TierSource.MANUAL,
                     autoTier = autoTier,
@@ -197,20 +219,37 @@ class RecordSheetViewModel @Inject constructor(
         )
     }
 
-    /** 分钟模式：滚轮暂存时长变化（小时、分钟两列合成） */
+    /** 分钟模式：滚轮暂存时长变化（小时、分钟两列合成）；滚轮一动即视作"有加班"，退出只记班次 */
     fun onPendingMinutes(minutes: Int) = _state.update {
-        if (it.durationMode == DurationInputMode.MINUTES) it.copy(pendingMinutes = minutes.coerceIn(0, 1440))
-        else it
+        if (it.durationMode == DurationInputMode.MINUTES) {
+            it.copy(pendingMinutes = minutes.coerceIn(0, 1440), noOvertime = false)
+        } else it
     }
 
     fun onShiftSelect(shift: Shift) = _state.update {
         it.copy(selectedShiftId = shift.id, selectedShiftName = shift.name)
     }
 
+    /**
+     * 「没加班，只记班次」开关（v0.7.9.0）：打开时清空时长与转调休，避免残留值让用户以为还有加班。
+     * 关闭只恢复可编辑状态，不自动补时长。
+     */
+    fun onNoOvertimeChange(on: Boolean) = _state.update {
+        if (!on) it.copy(noOvertime = false)
+        else it.copy(
+            noOvertime = true,
+            hoursText = null,
+            pendingMinutes = 0,
+            toCompMinutes = 0,
+            errorText = null,
+        )
+    }
+
     fun onPresetHours(hours: Double) = _state.update {
         it.copy(
             hoursText = hours.toString(),
             pendingMinutes = (hours * 60).roundToInt(),
+            noOvertime = false,
             errorText = null,
         )
     }
@@ -225,6 +264,7 @@ class RecordSheetViewModel @Inject constructor(
             else -> it.copy(
                 hoursText = minutesToHoursText(minutes),
                 pendingMinutes = minutes,
+                noOvertime = false,
                 errorText = null,
             )
         }
@@ -351,6 +391,7 @@ class RecordSheetViewModel @Inject constructor(
 
 fun AppError.toText(): String = when (this) {
     AppError.InvalidDuration -> "时长需在 0–24 小时之间"
+    AppError.MissingShiftOrNote -> "0 小时（只记班次）需选班次或填备注"
     AppError.InvalidComp -> "转调休不能超过本条加班时长"
     AppError.FutureDate -> "不能选择未来的日期"
     AppError.DuplicateName -> "名称已存在"

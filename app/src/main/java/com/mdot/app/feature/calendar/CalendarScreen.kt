@@ -141,6 +141,11 @@ data class CalendarCell(
     val label: DayCellLabel = DayCellLabel.EMPTY,
     /** 工地记工：当日工数×1000（非 SITE=0） */
     val worksMilli: Long = 0,
+    /**
+     * 工地角标（v0.7.9.0）：这天有没有留证照片 / 包工 / 借支。
+     * 月历格子只有 ~40dp，写字放不下 ⇒ UI 只画角落小点（口径见 [com.mdot.app.domain.SiteDayBadges]）。
+     */
+    val badges: com.mdot.app.domain.SiteDayBadges = com.mdot.app.domain.SiteDayBadges(),
 )
 
 /** 月网格动画的稳定目标态：仅月+格子参与相等性，选日期不触发切换动画 */
@@ -165,6 +170,29 @@ data class CalendarUiState(
     /** 工地记工：选中日工数×1000 / 本月工数×1000（非 SITE=0） */
     val selectedWorksMilli: Long = 0,
     val monthWorksMilli: Long = 0,
+    /**
+     * 本次实际展示的区间：自然月，或（开启「按考勤周期展示」时）该锚点月对应的完整考勤周期。
+     * **网格与小结都按它取数**——「本月小结」的月份数字、加班/请假合计、已记录天数全在这里，
+     * 所以周期视图下这些数字是「本期」而非「自然月」口径。
+     */
+    val period: com.mdot.app.domain.CycleCalculator.Period =
+        com.mdot.app.domain.CycleCalculator.naturalMonth(YearMonth.now()),
+    /** 是否按考勤周期展示（标题副行与小结文案随之变化） */
+    val isCycleView: Boolean = false,
+    /** 前进方向是否可用（不越今天）：自然月 = 今天所在月，周期 = 含今天的周期的锚点月 */
+    val canGoNext: Boolean = false,
+)
+
+/**
+ * 月历一次查询的口径：展示月（已收敛到上限内）+ 选中日 + 考勤周期设置。
+ * 单独成类是为了让 uiState 的 combine 链只多一层，周期起始日/展示方式变化能整体重算
+ * （起始日改了 ⇒ 网格区间与小结口径都得跟着变，不能只算日期）。
+ */
+private data class CalendarQuery(
+    val month: YearMonth,
+    val selectedDate: LocalDate,
+    val anchorDay: Int,
+    val byCycle: Boolean,
 )
 
 /** 小结卡工时行标签随制度变化（综合工时=上班、小时工=工作、标准=加班） */
@@ -260,109 +288,136 @@ class CalendarViewModel @Inject constructor(
         }
     }
 
-    val uiState: StateFlow<CalendarUiState> = month.flatMapLatest { m ->
-        selectedDate.flatMapLatest { selDate ->
-            settings.salaryFlow.flatMapLatest { salary ->
-                if (salary.workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
-                    siteStateFlow(m, selDate)
-                } else {
-                    normalStateFlow(m, selDate, salary)
-                }
+    /**
+     * 展示口径三件套：展示月（收敛到「不越今天」的上限内）+ 选中日 + 考勤周期设置。
+     *
+     * ⚠️ 展示月**必须在这里收敛**（[com.mdot.app.domain.CycleCalculator.clampDisplayMonth]）：
+     * 切到周期视图时 [month] 仍是今天所在自然月，而含今天的周期可能始于上月
+     * （起始日 26、今天 10/16 ⇒ 本期 9/26–10/25），不收敛就会一进来整屏未来日期。
+     */
+    val uiState: StateFlow<CalendarUiState> = combine(
+        month,
+        selectedDate,
+        settings.cycleAnchorDayFlow,
+        settings.calendarCycleViewFlow,
+    ) { m, selDate, anchor, byCycle ->
+        CalendarQuery(
+            month = com.mdot.app.domain.CycleCalculator.clampDisplayMonth(
+                m, LocalDate.now(), anchor, byCycle,
+            ),
+            selectedDate = selDate,
+            anchorDay = anchor,
+            byCycle = byCycle,
+        )
+    }.flatMapLatest { q ->
+        settings.salaryFlow.flatMapLatest { salary ->
+            if (salary.workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
+                siteStateFlow(q)
+            } else {
+                normalStateFlow(q, salary)
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CalendarUiState())
 
-    /** 普通制度（标准/小时/综合）：每日加班/请假记录 + PayrollCalculator 汇总 */
+    /** 普通制度（标准/小时/综合）：每日加班/请假记录 + PayrollCalculator 汇总（区间 = 本次展示区间） */
     private fun normalStateFlow(
-        m: YearMonth,
-        selDate: LocalDate,
+        q: CalendarQuery,
         salary: com.mdot.app.domain.model.SalaryConfig,
-    ) = combine(
-        recordRepo.observeRange(m.atDay(1), m.atEndOfMonth()),
-        settings.workdaysFlow,
-        showLunar,
-    ) { records, workdays, showLunarDate ->
-        val byDate = records.groupBy { it.date }
-        val leading = (m.atDay(1).dayOfWeek.value - 1) // 周一起始
-        val cells = buildList {
-            repeat(leading) { add(CalendarCell(null)) }
-            (1..m.lengthOfMonth()).forEach { day ->
-                val date = m.atDay(day)
-                val dayRecords = byDate[date].orEmpty()
-                val ot = dayRecords.firstOrNull { it.type == com.mdot.app.domain.model.RecordType.OT }
-                val leave = dayRecords.firstOrNull { it.type == com.mdot.app.domain.model.RecordType.LEAVE }
-                add(
-                    CalendarCell(
-                        date = date,
-                        otMinutes = ot?.durationMinutes ?: 0,
-                        leaveMinutes = leave?.durationMinutes ?: 0,
-                        shiftName = ot?.shiftName ?: leave?.shiftName,
-                        label = dayLabels.labelFor(date, showLunarDate),
+    ) = run {
+        val range = com.mdot.app.domain.CycleCalculator.calendarRange(q.month, q.anchorDay, q.byCycle)
+        combine(
+            recordRepo.observeRange(range.from, range.to),
+            settings.workdaysFlow,
+            showLunar,
+        ) { records, workdays, showLunarDate ->
+            val byDate = records.groupBy { it.date }
+            val leading = com.mdot.app.domain.CycleCalculator.leadingBlanks(range) // 周一起始
+            val cells = buildList {
+                repeat(leading) { add(CalendarCell(null)) }
+                // 逐日铺满整段区间（周期视图下会跨自然月，故不能再用 month.lengthOfMonth）
+                for (offset in 0 until range.days) {
+                    val date = range.from.plusDays(offset.toLong())
+                    val dayRecords = byDate[date].orEmpty()
+                    val ot = dayRecords.firstOrNull { it.type == com.mdot.app.domain.model.RecordType.OT }
+                    val leave = dayRecords.firstOrNull { it.type == com.mdot.app.domain.model.RecordType.LEAVE }
+                    add(
+                        CalendarCell(
+                            date = date,
+                            otMinutes = ot?.durationMinutes ?: 0,
+                            leaveMinutes = leave?.durationMinutes ?: 0,
+                            shiftName = ot?.shiftName ?: leave?.shiftName,
+                            label = dayLabels.labelFor(date, showLunarDate),
+                        )
                     )
-                )
+                }
             }
-        }
-        // 综合工时：本月标准 = 应出勤天数 × 8h（10 文档 §4）；单日小结用同一标准（普通工时不即时计酬）
-        val monthStart = m.atDay(1)
-        val monthEnd = m.atEndOfMonth()
-        val standardMinutes =
-            if (salary.workSystem == com.mdot.app.domain.model.WorkSystem.COMPREHENSIVE) {
-                val (holidays, makeups) = holidayRepo.holidaySetsInRange(monthStart, monthEnd)
-                com.mdot.app.domain.CycleCalculator.standardMinutesFor(
-                    monthStart, monthEnd, workdays, holidays, makeups,
+            // 综合工时：本期标准 = 应出勤天数 × 8h（10 文档 §4）；单日小结用同一标准（普通工时不即时计酬）
+            val standardMinutes =
+                if (salary.workSystem == com.mdot.app.domain.model.WorkSystem.COMPREHENSIVE) {
+                    val (holidays, makeups) = holidayRepo.holidaySetsInRange(range.from, range.to)
+                    com.mdot.app.domain.CycleCalculator.standardMinutesFor(
+                        range.from, range.to, workdays, holidays, makeups,
+                    )
+                } else null
+            val out = PayrollCalculator.summarize(
+                PayrollCalculator.Input(
+                    salary,
+                    records.map { it.toCalcLite() },
+                    tierOf = { date -> holidayRepo.tierFor(date, workdays) },
+                    standardMinutes = standardMinutes,
                 )
-            } else null
-        val out = PayrollCalculator.summarize(
-            PayrollCalculator.Input(
-                salary,
-                records.map { it.toCalcLite() },
-                tierOf = { date -> holidayRepo.tierFor(date, workdays) },
-                standardMinutes = standardMinutes,
             )
-        )
-        val selCell = cells.firstOrNull { it.date == selDate }
-        val selRecords = byDate[selDate].orEmpty()
-        val selOut = if (selRecords.isNotEmpty()) PayrollCalculator.summarize(
-            PayrollCalculator.Input(
-                salary,
-                selRecords.map { it.toCalcLite() },
-                tierOf = { date -> holidayRepo.tierFor(date, workdays) },
-                standardMinutes = standardMinutes,
+            val selCell = cells.firstOrNull { it.date == q.selectedDate }
+            val selRecords = byDate[q.selectedDate].orEmpty()
+            val selOut = if (selRecords.isNotEmpty()) PayrollCalculator.summarize(
+                PayrollCalculator.Input(
+                    salary,
+                    selRecords.map { it.toCalcLite() },
+                    tierOf = { date -> holidayRepo.tierFor(date, workdays) },
+                    standardMinutes = standardMinutes,
+                )
+            ) else null
+            val isComp = salary.workSystem == com.mdot.app.domain.model.WorkSystem.COMPREHENSIVE
+            CalendarUiState(
+                month = q.month,
+                cells = cells,
+                monthOtMinutes = if (isComp) out.otMinutes + out.holidayWorkMinutes else out.otMinutes,
+                monthLeaveMinutes = out.leaveMinutes,
+                monthOtPayCents = if (salary.hasBaseSalary || salary.mode == com.mdot.app.domain.model.SalaryMode.MANUAL) out.otPayCents else null,
+                recordedDays = byDate.size,
+                selectedDate = q.selectedDate,
+                selectedOtMinutes = selCell?.otMinutes ?: 0,
+                selectedLeaveMinutes = selCell?.leaveMinutes ?: 0,
+                selectedOtPayCents = selOut?.let { if (salary.hasBaseSalary || salary.mode == com.mdot.app.domain.model.SalaryMode.MANUAL) it.otPayCents else null },
+                selectedShiftName = selCell?.shiftName,
+                workSystem = salary.workSystem,
+                period = range,
+                isCycleView = q.byCycle,
+                canGoNext = q.month.isBefore(
+                    com.mdot.app.domain.CycleCalculator.displayAnchorCap(LocalDate.now(), q.anchorDay, q.byCycle)
+                ),
             )
-        ) else null
-        val isComp = salary.workSystem == com.mdot.app.domain.model.WorkSystem.COMPREHENSIVE
-        CalendarUiState(
-            month = m,
-            cells = cells,
-            monthOtMinutes = if (isComp) out.otMinutes + out.holidayWorkMinutes else out.otMinutes,
-            monthLeaveMinutes = out.leaveMinutes,
-            monthOtPayCents = if (salary.hasBaseSalary || salary.mode == com.mdot.app.domain.model.SalaryMode.MANUAL) out.otPayCents else null,
-            recordedDays = byDate.size,
-            selectedDate = selDate,
-            selectedOtMinutes = selCell?.otMinutes ?: 0,
-            selectedLeaveMinutes = selCell?.leaveMinutes ?: 0,
-            selectedOtPayCents = selOut?.let { if (salary.hasBaseSalary || salary.mode == com.mdot.app.domain.model.SalaryMode.MANUAL) it.otPayCents else null },
-            selectedShiftName = selCell?.shiftName,
-            workSystem = salary.workSystem,
-        )
+        }
     }
 
     /** 工地记工：每日出勤工数（workMinutes/baseMinutes 快照）+ 加班分钟；无 PayrollCalculator 汇总 */
-    private fun siteStateFlow(
-        m: YearMonth,
-        selDate: LocalDate,
-    ) = kotlinx.coroutines.flow.flow<CalendarUiState> {
+    private fun siteStateFlow(q: CalendarQuery) = kotlinx.coroutines.flow.flow<CalendarUiState> {
         val pid = siteRepo.currentProjectId()
+        val range = com.mdot.app.domain.CycleCalculator.calendarRange(q.month, q.anchorDay, q.byCycle)
         combine(
-            siteRepo.observeAttendance(pid, m.atDay(1), m.atEndOfMonth()),
+            siteRepo.observeAttendance(pid, range.from, range.to),
+            siteRepo.observePieceWorks(pid, range.from, range.to),
+            siteRepo.observeAdvances(pid, range.from, range.to),
             showLunar,
-        ) { atts, showLunarDate ->
+        ) { atts, pieces, advances, showLunarDate ->
             val byDate = atts.groupBy { java.time.LocalDate.parse(it.date) }
-            val leading = (m.atDay(1).dayOfWeek.value - 1)
+            val piecesByDate = pieces.groupBy { java.time.LocalDate.parse(it.date) }
+            val advancesByDate = advances.groupBy { java.time.LocalDate.parse(it.date) }
+            val leading = com.mdot.app.domain.CycleCalculator.leadingBlanks(range)
             val cells = buildList {
                 repeat(leading) { add(CalendarCell(null)) }
-                (1..m.lengthOfMonth()).forEach { day ->
-                    val date = m.atDay(day)
+                for (offset in 0 until range.days) {
+                    val date = range.from.plusDays(offset.toLong())
                     val dayAtts = byDate[date].orEmpty()
                     val workAtt = dayAtts.firstOrNull { it.dayStatus == "WORK" }
                     val worksMilli = dayAtts.sumOf { com.mdot.app.domain.SitePayCalculator.worksMilliOf(it.workMinutes, it.baseMinutes) }
@@ -374,22 +429,32 @@ class CalendarViewModel @Inject constructor(
                             worksMilli = worksMilli,
                             shiftName = workAtt?.let { if (worksMilli % 1000L == 0L) (worksMilli / 1000L).toString() else String.format(java.util.Locale.US, "%.1f", worksMilli / 1000f) },
                             label = dayLabels.labelFor(date, showLunarDate),
+                            badges = com.mdot.app.domain.SiteDayBadges.of(
+                                attendances = dayAtts,
+                                pieces = piecesByDate[date].orEmpty(),
+                                advances = advancesByDate[date].orEmpty(),
+                            ),
                         )
                     )
                 }
             }
-            val selCell = cells.firstOrNull { it.date == selDate }
+            val selCell = cells.firstOrNull { it.date == q.selectedDate }
             CalendarUiState(
-                month = m,
+                month = q.month,
                 cells = cells,
                 recordedDays = byDate.size,
-                selectedDate = selDate,
+                selectedDate = q.selectedDate,
                 selectedOtMinutes = selCell?.otMinutes ?: 0,
                 selectedShiftName = selCell?.shiftName,
                 selectedWorksMilli = selCell?.worksMilli ?: 0,
                 monthOtMinutes = atts.sumOf { it.otMinutes },
                 monthWorksMilli = atts.sumOf { it.workMinutes * 1000L / it.baseMinutes.coerceAtLeast(1) },
                 workSystem = com.mdot.app.domain.model.WorkSystem.SITE,
+                period = range,
+                isCycleView = q.byCycle,
+                canGoNext = q.month.isBefore(
+                    com.mdot.app.domain.CycleCalculator.displayAnchorCap(LocalDate.now(), q.anchorDay, q.byCycle)
+                ),
             )
         }.collect { emit(it) }
     }
@@ -401,22 +466,53 @@ class CalendarViewModel @Inject constructor(
 
     fun prevMonth() {
         exitBatchSelect()
-        month.value = month.value.minusMonths(1)
+        viewModelScope.launch {
+            // 步进基准是**实际展示的那个月**（可能被上限收敛过），不是 month 的原始值——
+            // 否则收敛期间点 ‹ 会拿回被夹掉的值、看起来"点一下没反应"（同 docs/11 074 的锚点月坑）
+            month.value = shownAnchorMonth().minusMonths(1)
+        }
     }
 
     fun nextMonth() {
-        // 未来不可记（未来日期不可选）→ 不允许切到未来月份；网格横滑到尽头与 › 按钮同此规则
-        if (!month.value.isBefore(YearMonth.now())) return
-        exitBatchSelect()
-        month.value = month.value.plusMonths(1)
+        // 未来不可记（未来日期不可选）→ 不允许切到未来的月/周期；网格横滑到尽头与 › 按钮同此规则
+        viewModelScope.launch {
+            val shown = shownAnchorMonth()
+            if (!shown.isBefore(anchorMonthCap())) return@launch
+            exitBatchSelect()
+            month.value = shown.plusMonths(1)
+        }
     }
 
     fun goToday() {
         exitBatchSelect()
-        month.value = YearMonth.now()
-        selectedDate.value = LocalDate.now()
-        recordSheet.setCalendarSelectedDate(LocalDate.now())
+        viewModelScope.launch {
+            val today = LocalDate.now()
+            // 「回到今天」= 回到今天所在区间：自然月视图回今天所在月，周期视图回含今天的周期的锚点月
+            month.value = anchorMonthCap()
+            selectedDate.value = today
+            recordSheet.setCalendarSelectedDate(today)
+        }
     }
+
+    /**
+     * 实际展示的锚点月（与 [uiState] 用同一个收敛函数，见 [CalendarQuery] 注释）。
+     * 读盘取真值而非读 stateIn 的 `.value`（硬规则 15：无订阅者时 `.value` 是种子值）。
+     */
+    private suspend fun shownAnchorMonth(): YearMonth =
+        com.mdot.app.domain.CycleCalculator.clampDisplayMonth(
+            month.value,
+            LocalDate.now(),
+            settings.cycleAnchorDayFlow.first(),
+            settings.calendarCycleViewFlow.first(),
+        )
+
+    /** 展示区间的「今天上限」锚点月（前进方向的边界，也是「回到今天」的目标月） */
+    private suspend fun anchorMonthCap(): YearMonth =
+        com.mdot.app.domain.CycleCalculator.displayAnchorCap(
+            LocalDate.now(),
+            settings.cycleAnchorDayFlow.first(),
+            settings.calendarCycleViewFlow.first(),
+        )
 
     fun initMonth(initial: String?) {
         val parsed = initial?.let { runCatching { YearMonth.parse(it) }.getOrNull() }
@@ -586,10 +682,25 @@ private fun MonthHeaderRow(vm: CalendarViewModel) {
                 },
                 label = "monthTitle",
             ) { m ->
-                Text(
-                    stringResource(R.string.calendar_month_title, m.year, m.monthValue),
-                    style = MaterialTheme.typography.titleLarge,
-                )
+                // 周期视图下标题仍是「锚点月」（与明细/统计页「点 n 月 = 以 n 月为锚点的那一期」同一语义），
+                // 第二行补出**本次实际展示的区间**，否则用户看不出网格为什么从 26 号起、又为什么跨到下月
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        stringResource(R.string.calendar_month_title, m.year, m.monthValue),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    if (state.isCycleView) {
+                        val p = state.period
+                        Text(
+                            stringResource(
+                                R.string.calendar_period_range,
+                                p.from.monthValue, p.from.dayOfMonth, p.to.monthValue, p.to.dayOfMonth,
+                            ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
         }
         // 已选中今天时不显示「回到今天」：没有可回之处（同月选别的日期仍要能一键回今天）
@@ -600,8 +711,8 @@ private fun MonthHeaderRow(vm: CalendarViewModel) {
         ) {
             TextButton(onClick = vm::goToday) { Text(stringResource(R.string.calendar_back_today)) }
         }
-        // 当前月即尽头（未来不可记）：› 置灰，与网格横滑规则一致
-        JiabanIconButton(onClick = vm::nextMonth, enabled = state.month.isBefore(YearMonth.now())) {
+        // 已到今天所在区间（自然月 = 今天所在月；周期 = 含今天的周期的锚点月）即尽头：› 置灰
+        JiabanIconButton(onClick = vm::nextMonth, enabled = state.canGoNext) {
             Icon(EngineIcons.chevron(), contentDescription = stringResource(R.string.calendar_next_month))
         }
     }
@@ -796,7 +907,14 @@ private fun SummaryCards(
     Spacer(Modifier.height(Spacing.m))
     SectionCard {
         Column {
-            Text(stringResource(R.string.calendar_month_summary), style = MaterialTheme.typography.titleSmall)
+            // 周期视图下第二张卡的口径是「本期」（锚点月对应的完整考勤周期），不是自然月
+            Text(
+                stringResource(
+                    if (state.isCycleView) R.string.calendar_cycle_summary
+                    else R.string.calendar_month_summary
+                ),
+                style = MaterialTheme.typography.titleSmall,
+            )
             Spacer(Modifier.height(Spacing.s))
             Row {
                 if (state.workSystem == com.mdot.app.domain.model.WorkSystem.SITE) {
@@ -833,7 +951,11 @@ private fun SummaryCards(
             }
             Spacer(Modifier.height(Spacing.s))
             Text(
-                stringResource(R.string.calendar_month_recorded, state.month.monthValue, state.recordedDays),
+                if (state.isCycleView) {
+                    stringResource(R.string.calendar_cycle_recorded, state.recordedDays)
+                } else {
+                    stringResource(R.string.calendar_month_recorded, state.month.monthValue, state.recordedDays)
+                },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1040,6 +1162,19 @@ private fun CalendarCellView(
                         )
                 )
             }
+            // 工地角标（v0.7.9.0）：左下角最多三颗小点 —— 照片 / 包工 / 借支。
+            // 格子只有 ~40dp、第二行已被「N 工」占用，写不下字 ⇒ 用点阵表示"这天还留了证 / 另有记录"。
+            // 颜色沿用全局语义：primary = 记录加速（照片）、tertiary = 包工、secondary = 借支
+            if (isSite && !cell.badges.isEmpty) {
+                Row(
+                    Modifier.align(Alignment.BottomStart).padding(Spacing.xs),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                ) {
+                    if (cell.badges.hasPhotos) Dot(colorScheme.primary, small = true)
+                    if (cell.badges.hasPiece) Dot(colorScheme.tertiary, small = true)
+                    if (cell.badges.hasAdvance) Dot(colorScheme.secondary, small = true)
+                }
+            }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
@@ -1069,6 +1204,18 @@ private fun CalendarCellView(
                     )
                 } else if (cell.leaveMinutes > 0) {
                     Dot(colorScheme.error)
+                } else if (!isSite && !cell.shiftName.isNullOrBlank()) {
+                    // 「只记班次」的日子（0 时长，v0.7.9.0）：给一个**首字**标记（白 / 夜 / …），
+                    // 否则用户记完在月历上看不见，等于白记；完整班次名在「X月X日 小结」里。
+                    // 工地不走这条（那边 shiftName 装的是「N 工」文本，见 siteStateFlow）
+                    cell.shiftName?.let { name ->
+                        Text(
+                            name.take(1),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colorScheme.tertiary,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
                 } else {
                     Spacer(Modifier.height(10.dp))
                 }

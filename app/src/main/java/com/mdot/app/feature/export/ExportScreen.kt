@@ -79,6 +79,8 @@ fun ExportScreen(
     vm: ExportViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
+    /** 工地记工：没有记月工资单，长图是「结算单」（区间口径），卡片文案与按钮名随之变 */
+    val isSite = state.workSystem == com.mdot.app.domain.model.WorkSystem.SITE
     val context = LocalContext.current
     var picking by remember { mutableStateOf<String?>(null) } // "from" | "to"
 
@@ -105,12 +107,6 @@ fun ExportScreen(
             .verticalScroll(rememberScrollState()),
     ) {
         JiabanTopBar(title = if (canBack) stringResource(R.string.export_screen_title) else null, showBack = canBack, onBack = onBack)
-        Text(
-            stringResource(R.string.export_hint),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(Spacing.m))
 
         Row(
             Modifier
@@ -157,52 +153,85 @@ fun ExportScreen(
 
         Spacer(Modifier.height(Spacing.l))
 
+        // ============ 卡片 1 · 工资单（给人看） ============
+        // v0.7.9.0 重构：**数据源只留「记月单据」**（用户 2026-10-20：抹掉「记月单据 / 考勤计算」分叉，
+        // 考勤本来就是记月的子集）。图**只画有金额的项目**，0 值行不上图；全部行在下面那张 CSV 里。
         SectionCard {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.m)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(
+                            if (isSite) R.string.export_card_settlement_title else R.string.export_card_payslip_title
+                        ),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    if (!isSite) {
+                        // 单据月份写明白：它由区间结束日决定，用户不必自己换算
+                        Text(
+                            stringResource(R.string.paymonth_month, state.sheetMonth.year, state.sheetMonth.monthValue),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                // 只留一句「图里为什么可能少一行」——其余说明交给按钮名自己说（用户 2026-10-20：小字能去就去）
+                if (!isSite) {
+                    Text(
+                        stringResource(R.string.export_card_payslip_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(Spacing.xs))
                 JiabanButton(
-                    text = stringResource(R.string.export_import_csv),
-                    onClick = { openDoc.launch(arrayOf("text/*", "text/csv", "*/*")) },
-                    role = JiabanButtonRole.SECONDARY,
-                    size = JiabanButtonSize.L,
-                    enabled = !state.busy,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                JiabanButton(
-                    text = stringResource(R.string.export_csv_detail),
-                    onClick = { vm.prepareCsvPreview() },
-                    role = JiabanButtonRole.PRIMARY,
-                    size = JiabanButtonSize.L,
-                    loading = state.busyAction == ExportBusyAction.CSV,
-                    enabled = !state.busy && state.range != null,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                JiabanButton(
-                    text = stringResource(R.string.export_payslip_generate),
+                    text = stringResource(
+                        if (isSite) R.string.export_payslip_generate_site else R.string.export_payslip_generate
+                    ),
                     onClick = { vm.preparePayslipPreview(payslipPalette) },
-                    role = JiabanButtonRole.SECONDARY,
+                    role = JiabanButtonRole.PRIMARY,
                     size = JiabanButtonSize.L,
                     loading = state.busyAction == ExportBusyAction.PAYSLIP,
                     enabled = !state.busy && state.range != null,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                // 长图数据源（docs/20 P0-1）：默认记月单据——用户发出去的和 App 里看到的是同一份
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        stringResource(R.string.export_payslip_source_label),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+            }
+        }
+
+        Spacer(Modifier.height(Spacing.m))
+
+        // ============ 卡片 2 · CSV（给机器：备份 / 迁移 / 对账） ============
+        // 一份文件装全部数据：前半段逐日考勤（可直接再导入），后半段记月工资单（**含 0 值行**）。
+        SectionCard {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                Text(
+                    stringResource(R.string.export_card_csv_title),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    stringResource(R.string.export_card_csv_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(Spacing.xs))
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
+                    JiabanButton(
+                        text = stringResource(R.string.export_csv_export),
+                        onClick = { vm.prepareCsvPreview() },
+                        role = JiabanButtonRole.PRIMARY,
+                        size = JiabanButtonSize.L,
+                        loading = state.busyAction == ExportBusyAction.CSV,
+                        enabled = !state.busy && state.range != null,
+                        modifier = Modifier.weight(1f),
                     )
-                    Spacer(Modifier.width(Spacing.s))
-                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s)) {
-                        PayslipSource.entries.forEach { src ->
-                            FilterChip(
-                                colors = jiabanFilterChipColors(),
-                                selected = state.payslipSource == src,
-                                onClick = { vm.onPayslipSource(src) },
-                                label = { Text(stringResource(src.labelRes)) },
-                            )
-                        }
-                    }
+                    JiabanButton(
+                        text = stringResource(R.string.export_csv_import),
+                        onClick = { openDoc.launch(arrayOf("text/*", "text/csv", "*/*")) },
+                        role = JiabanButtonRole.SECONDARY,
+                        size = JiabanButtonSize.L,
+                        enabled = !state.busy,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
         }

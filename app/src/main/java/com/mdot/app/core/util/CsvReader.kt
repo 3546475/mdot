@@ -28,16 +28,21 @@ object CsvReader {
     private const val C_LEAVE_HOURS = 9
     private const val C_NOTE = 11
 
+    /** 工资单段的分隔标记（与本文件 `CsvWriter.buildPayMonthSection` 的首行一致） */
+    private const val SECTION_PAY_MONTH = "工资单"
+
     fun parse(csv: String): ImportResult {
         val ot = mutableListOf<OtDraft>()
         val leave = mutableListOf<LeaveDraft>()
         var skipped = 0
 
-        // 去 BOM，按行切（导出用 \r\n）
+        // 去 BOM，按行切（导出用 \r\n）；遇到「工资单」段就停——那段是金额单据，
+        // 不走 CSV 导入（它在备份包里），继续往下读只会把它的行算成"跳过"（v0.7.9.0 合一份 CSV）
         csv.trimStart('\uFEFF')
             .lines()
             .map { it.trim('\r') }
             .filter { it.isNotBlank() }
+            .takeWhile { it.trim() != SECTION_PAY_MONTH }
             .forEach { line ->
                 val cols = parseCsvLine(line)
                 val date = parseDateCell(cols.getOrNull(C_DATE)) ?: run {

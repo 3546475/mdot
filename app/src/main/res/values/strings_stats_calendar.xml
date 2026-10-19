@@ -7,7 +7,7 @@
     <string name="month_stepper_pick_cd">按月跳转</string>
     <string name="month_stepper_back_to_current">回本月</string>
     <!-- 统计页·区间选择弹窗（标题与工地/明细共用 range_pick_title） -->
-    <string name="stats_range_custom_hint">自定义区间按所选天数整段前后平移</string>
+    <string name="stats_range_custom_hint">按所选天数整段平移</string>
     <string name="stats_range_custom_invalid">起始日不能晚于结束日</string>
     <string name="stats_range_back_to_current">回本期</string>
     <!-- 胶囊两侧箭头的无障碍描述：按维度说人话（读屏用户听到"上一期"才知道一次走多远） -->
@@ -31,11 +31,11 @@
     <string name="paymonth_add_subsidy">添加补贴</string>
     <string name="paymonth_add_other">添加其他项</string>
     <string name="paymonth_add_count">添加 %1$d 项</string>
-    <string name="paymonth_add_multi_hint">可多选一次添加多项；金额添加后在列表里逐条填</string>
+    <string name="paymonth_add_multi_hint">可多选；金额添加后逐条填</string>
     <!-- 「＋」预设管理：增删同处（用户 2026-10-09 定） -->
     <string name="paymonth_add_new_preset">＋ 预设管理</string>
     <string name="paymonth_manage_preset_title">预设管理</string>
-    <string name="paymonth_manage_preset_hint">建好后会一直在添加列表里（下个月也在）。删除只是从列表移除，不动已录入的项目</string>
+    <string name="paymonth_manage_preset_hint">删除只从列表移除，不动已录入的项目</string>
     <string name="paymonth_manage_preset_confirm">删除</string>
     <string name="paymonth_add_preset_action">添加</string>
     <string name="paymonth_done">完成</string>
@@ -57,10 +57,12 @@
     <string name="paymonth_daily_basis_label">天数按哪种口径算</string>
     <string name="paymonth_daily_basis_standard">应出勤日</string>
     <string name="paymonth_daily_basis_record">实际记录日</string>
-    <string name="paymonth_daily_basis_calendar">周期自然日</string>
+    <!-- v0.7.9.0 改名：原「周期自然日」——实现一直取的是**自然月**天数（记月单据按月存、天然跨两期，
+         不存在唯一的「本期天数」），文案与实现对齐，见 docs/11 091 / docs/22 F-20261017-3 -->
+    <string name="paymonth_daily_basis_calendar">本月天数</string>
     <string name="paymonth_daily_deduct_leave">请假扣减天数</string>
     <string name="paymonth_daily_hint_record">只数有加班记录的天，漏记的日期不计入</string>
-    <string name="paymonth_daily_hint_calendar">按周期天数固定算，不随请假变化</string>
+    <string name="paymonth_daily_hint_calendar">按本月天数固定算，不随请假变化</string>
     <string name="paymonth_daily_hint_standard">按工作日设定推算，不受记不记加班影响</string>
     <!-- 行上的推导依据：21.5 天 × ¥50 -->
     <string name="paymonth_daily_derivation">%1$s 天 × %2$s</string>
@@ -98,7 +100,7 @@
     <string name="paymonth_insurance_formula">基数 %1$s × %2$s%% = ¥%3$s</string>
     <string name="paymonth_close">关闭</string>
     <string name="paymonth_picker_title">选择月份</string>
-    <string name="paymonth_empty_hint">记录会自动算进工资单；先到「工资设定」填基本工资 / 加班基数</string>
+    <string name="paymonth_empty_hint">先到「工资设定」填基本工资 / 加班基数</string>
     <string name="paymonth_recon_restore">恢复</string>
     <string name="paymonth_recon_restore_all">全部恢复</string>
     <!-- 记月添加条目预选项（参考主流记工记账 App 常见工资项） -->
@@ -170,6 +172,8 @@
     <string name="calendar_prev_month">上个月</string>
     <string name="calendar_next_month">下个月</string>
     <string name="calendar_month_title">%1$d年%2$d月</string>
+    <!-- 月历「按考勤周期展示」时的标题副行：本次实际展示的区间（如 9月26日 – 10月25日） -->
+    <string name="calendar_period_range">%1$d月%2$d日 – %3$d月%4$d日</string>
     <string name="calendar_back_today">回到今天</string>
     <string name="calendar_weekday_mon">一</string>
     <string name="calendar_weekday_tue">二</string>
@@ -199,6 +203,9 @@
     <string name="calendar_batch_confirm">写入</string>
     <string name="calendar_month_summary">本月小结</string>
     <string name="calendar_month_recorded">%1$d 月已记录 %2$d 天</string>
+    <!-- 月历按考勤周期展示时的口吻（「本期」= 锚点月对应的完整考勤周期） -->
+    <string name="calendar_cycle_summary">本期小结</string>
+    <string name="calendar_cycle_recorded">本期已记录 %1$d 天</string>
     <string name="comp_balance_current">当前调休余额</string>
     <string name="comp_balance_explain">加班「转调休」增加余额，请假「调休假」扣减；补差或修正用下方手动调整，每笔留痕</string>
     <string name="comp_adjust_title">手动调整</string>
@@ -222,7 +229,7 @@
     <!-- 柱状图周聚合「最多」行（21 文档 B3）：%1$s = 周起 M/d -->
     <string name="stats_bar_best_label">%1$s 起最多 · %2$s</string>
     <!-- 柱状图周聚合说明（21 文档 B3 用户反馈：周柱与日柱同形需明示口径） -->
-    <string name="stats_bar_weekly_hint">按周汇总 · 每柱 = 周一至周日合计</string>
+    <string name="stats_bar_weekly_hint">每柱 = 周一至周日合计</string>
     <string name="stats_ot_duration_line">加班 %1$s</string>
     <string name="stats_leave_deduct_line">请假扣款 %1$s</string>
     <string name="stats_period_line">周期总 %1$s · 标准 %2$s · 超时 %3$s</string>
@@ -235,7 +242,7 @@
     <string name="tax_result_label">%1$d年%2$d月 应预扣预缴</string>
     <string name="tax_result_breakdown">累计应纳税所得额 %1$s · 预扣率 %2$d%% · 速算扣除数 %3$s</string>
     <string name="tax_sources_title">数据来源</string>
-    <string name="tax_sources_hint">以下数字都由 App 从「记月」自动汇总，不用手填</string>
+    <string name="tax_sources_hint">都由「记月」自动汇总，不用手填</string>
     <string name="tax_sources_summary">累计收入 %1$s · 累计已缴 %2$s</string>
     <string name="tax_sources_toggle_cd">展开或收起数据来源明细</string>
     <string name="tax_source_income">累计收入（1–%1$d月）</string>
@@ -246,7 +253,7 @@
     <string name="tax_deduction_title">专项附加扣除</string>
     <string name="tax_deduction_edit">修改</string>
     <string name="tax_deduction_summary">已选 %1$d 项 · 每月合计 ¥%2$s</string>
-    <string name="tax_deduction_hint">勾选符合的项目，金额按月合计自动累加；没有就不勾</string>
+    <string name="tax_deduction_hint">勾选符合的项目，没有就不勾</string>
     <string name="tax_deduction_group_common">常用</string>
     <string name="tax_deduction_group_other">其他</string>
     <string name="tax_deduction_item_amount">¥%1$s/月</string>

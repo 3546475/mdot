@@ -141,7 +141,13 @@ class SiteRecordViewModel @Inject constructor(
         }
     }
 
-    fun open(date: LocalDate) {
+    /**
+     * 按日期载入一笔记工（编辑回显）。
+     *
+     * @param transform 载入后的再加工（如多选日期要补 `extraDates`）——放在这里而不是调用方
+     *   "open 完再 update"，否则与 [open] 内部的 `launch` 竞争，附加日期可能被覆盖掉。
+     */
+    fun open(date: LocalDate, transform: (SiteRecordUiState) -> SiteRecordUiState = { it }) {
         viewModelScope.launch {
             val pid = siteRepo.currentProjectId()
             val project = siteRepo.getProject(pid)
@@ -149,7 +155,8 @@ class SiteRecordViewModel @Inject constructor(
             val baseMinutes = project?.baseMinutes ?: 480
             val wm = existing?.workMinutes ?: baseMinutes
             _state.update {
-                SiteRecordUiState(
+                transform(
+                    SiteRecordUiState(
                     loading = false, date = date, projectId = pid,
                     projectName = project?.name.orEmpty(), project = project,
                     // 编辑回显：已有出勤载入，否则默认 1 个工；按分钟数推断选中瓦片
@@ -179,6 +186,7 @@ class SiteRecordViewModel @Inject constructor(
                     } ?: "",
                     note = existing?.note ?: "",
                     photos = existing?.photos.parsePhotos(),
+                )
                 )
             }
         }
@@ -249,12 +257,25 @@ class SiteRecordViewModel @Inject constructor(
         it.copy(rateYuanText = v.filter { c -> c.isDigit() || c == '.' }, error = null)
     }
     fun onNote(v: String) = _state.update { it.copy(note = v.take(100)) }
-    fun onDate(v: LocalDate) = _state.update { it.copy(date = v, error = null) }
-    /** 多选整组日期：最早的一天作主日期，其余作为附加（选择器「多选 → 完成」用） */
+    /**
+     * 换日期：**按新日期重载这一天的记录**（照片 / 备注 / 工时 / 工钱都换成那天的）。
+     *
+     * ⚠️ 原实现只 `copy(date = v)`，其余字段原样留着 —— 于是"在 A 日加了照片，切到 B 日照片栏还是那几张"，
+     * 保存时还会把 A 日的留证挂到 B 日（用户 2026-10-20 报）。换日期就是想看那一天，必须重载。
+     */
+    fun onDate(v: LocalDate) {
+        if (v == _state.value.date) {
+            _state.update { it.copy(error = null) }
+            return
+        }
+        open(v)
+    }
+
+    /** 多选整组日期：最早的一天作主日期（**按它重载**），其余作为批量附加（选择器「多选 → 完成」用） */
     fun onSelectDates(dates: Set<LocalDate>) {
         if (dates.isEmpty()) return
         val sorted = dates.sorted()
-        _state.update { it.copy(date = sorted.first(), extraDates = sorted.drop(1)) }
+        open(sorted.first()) { it.copy(extraDates = sorted.drop(1)) }
     }
 
     fun onToggleExtraDate(v: LocalDate) = _state.update {
@@ -451,5 +472,4 @@ internal fun com.mdot.app.core.util.AppError.toSiteErrorText(): String = when (t
     else -> "操作失败，请重试"
 }
 
-internal fun String?.parsePhotos(): List<String> =
-    this?.takeIf { it.isNotBlank() }?.split('\u0001') ?: emptyList()
+internal fun String?.parsePhotos(): List<String> = com.mdot.app.domain.parsePhotoPaths(this)

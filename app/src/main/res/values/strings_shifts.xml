@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="shifts_drag_hint">长按拖动排序（第一个为默认班次）· 点名称改名 · 删班次不影响已有记录</string>
+    <string name="shifts_drag_hint">长按拖动排序（第一个为默认）· 点名称改名 · 删了不影响已有记录</string>
     <string name="shifts_add">新建</string>
     <string name="shifts_empty">还没有班次，点右上角「新建」添加</string>
     <string name="shifts_rest_badge">休息</string>

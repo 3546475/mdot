@@ -30,6 +30,10 @@ docs/test-s3.local.properties
 docs/结构图/
 # Added by code-review-graph
 .code-review-graph/
+# 另一款独立工具 CodeGraph 的本地图索引（非 code-review-graph 产出），勿入库
+.codegraph/
+# codegraph 项目配置（deprioritize 等）：每人索引偏好不同，只在本机生效，不入库
+codegraph.json
 
 # ---- 13 文档审查 B7-06：开发工具与本地产物（勿再误提交） ----
 patch_tools/

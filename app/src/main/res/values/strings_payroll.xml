@@ -37,7 +37,7 @@
     <string name="payroll_std_manual_hint">已手动覆盖，清空即恢复自动</string>
     <string name="payroll_tier_overtime">超时</string>
     <string name="payroll_tier_statutory">法定</string>
-    <string name="payroll_comp_multiplier_hint">超标准工时的部分按「超时」倍率周期末结算；法定节假日按「法定」倍率即时结算</string>
+    <string name="payroll_comp_multiplier_hint">超标准工时按「超时」期末结算；法定节假日即时结算</string>
     <string name="payroll_cd_collapse">收起</string>
     <string name="payroll_cd_expand">展开</string>
 </resources>

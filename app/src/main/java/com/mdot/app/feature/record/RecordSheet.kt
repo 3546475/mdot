@@ -287,7 +287,8 @@ fun RecordSheet(
                                     label = "durationValue",
                                 ) { minutes ->
                                     Text(
-                                        minutes.takeIf { it > 0 }
+                                        if (state.noOvertime) stringResource(R.string.record_no_ot_value)
+                                        else minutes.takeIf { it > 0 }
                                             ?.let { TimeUtils.prettyDuration(it) } ?: "…",
                                         style = MaterialTheme.typography.headlineSmall,
                                     )
@@ -315,7 +316,13 @@ fun RecordSheet(
                         // 外圈 6dp 凹面留边；预设已扩至 24h、更多的行在网格内部滚动），
                         // 切换不引起弹层高度跳动
                         // 高度 = DurationGrid 可视 3 行（44×3 + Spacing.s×2 = 148）+ SunkenWell 内衬 Spacing.s×2
-                        SunkenWell(Modifier.fillMaxWidth().height(164.dp)) {
+                        // 「只记班次」时整体压暗但仍可点：点任意时长即自动退出该模式（见 onPresetHours）
+                        SunkenWell(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(164.dp)
+                                .graphicsLayer { alpha = if (state.noOvertime) 0.45f else 1f },
+                        ) {
                             if (state.durationMode == DurationInputMode.MINUTES) {
                                 MinutesWheels(
                                     totalMinutes = state.pendingMinutes,
@@ -327,6 +334,36 @@ fun RecordSheet(
                                     onPreset = vm::onPresetHours,
                                     onCustomCommit = vm::onCustomHours,
                                 )
+                            }
+                        }
+
+                        // ---- 「没加班，只记班次」（0 时长，v0.7.9.0）-----------------------------
+                        // 用户 2026-10-17：正常上班没加班的日子也想留下"今天上的白班/夜班"。
+                        // 0 时长必须带班次或备注，否则是空记录（规则在 domain/RecordRules，仓库层同口径）。
+                        if (state.tab == RecordType.OT) {
+                            Spacer(Modifier.height(Spacing.s))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.s),
+                            ) {
+                                FilterChip(
+                                    colors = jiabanFilterChipColors(),
+                                    selected = state.noOvertime,
+                                    onClick = { vm.onNoOvertimeChange(!state.noOvertime) },
+                                    label = {
+                                        Text(
+                                            stringResource(R.string.record_no_ot_chip),
+                                            style = MaterialTheme.typography.labelMedium,
+                                        )
+                                    },
+                                )
+                                if (state.noOvertime) {
+                                    Text(
+                                        stringResource(R.string.record_no_ot_hint),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
 
@@ -561,7 +598,7 @@ fun RecordSheet(
                                     vm.save()
                                 },
                                 role = JiabanButtonRole.PRIMARY,
-                                enabled = state.durationMinutes() > 0,
+                                enabled = state.canSave,
                                 modifier = Modifier.weight(1.6f),
                             )
                             }

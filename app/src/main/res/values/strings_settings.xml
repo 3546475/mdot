@@ -20,10 +20,10 @@
     <string name="settings_group_personalization">个性化</string>
     <string name="settings_row_appearance">外观</string>
 
-    <!-- 工时设置 -->
+    <!-- 制度设定（旧称「工时设置」，术语见 docs/03 §5.5） -->
     <string name="settings_system_desc_hourly">按小时计薪，无底薪、无转调休</string>
 
-    <!-- 切换工时制度 -->
+    <!-- 切换工时制度页（顶栏左侧按钮叫「切换工时」） -->
     <string name="settings_switch_title">切换工时制度</string>
     <string name="settings_system_standard">标准工时</string>
     <string name="settings_system_standard_desc">底薪 + 加班工资，超 8 小时算加班</string>

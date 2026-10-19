@@ -1,6 +1,7 @@
 package com.mdot.app.domain
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -425,5 +426,126 @@ class CycleCalculatorTest {
             LocalDate.parse("2026-09-10"), LocalDate.parse("2026-09-01"), monFri, emptySet(),
         )
         assertEquals(0, m)
+    }
+
+    // ---- 月历展示区间（日历页「按考勤周期展示」开关）----
+
+    @Test
+    fun `月历区间 自然月与考勤周期二选一`() {
+        val m = YearMonth.of(2026, 10)
+        val byMonth = CycleCalculator.calendarRange(m, 26, byCycle = false)
+        assertEquals(LocalDate.parse("2026-10-01"), byMonth.from)
+        assertEquals(LocalDate.parse("2026-10-31"), byMonth.to)
+
+        // 用户口径：起始日 26 时「本月 26 → 下月 25」
+        val byCycle = CycleCalculator.calendarRange(m, 26, byCycle = true)
+        assertEquals(LocalDate.parse("2026-10-26"), byCycle.from)
+        assertEquals(LocalDate.parse("2026-11-25"), byCycle.to)
+    }
+
+    @Test
+    fun `月历区间 anchor 1 时周期与自然月等价`() {
+        listOf(1, 2, 6, 9, 12).forEach { month ->
+            val m = YearMonth.of(2026, month)
+            assertEquals(
+                "m=$m",
+                CycleCalculator.calendarRange(m, 1, byCycle = false),
+                CycleCalculator.calendarRange(m, 1, byCycle = true),
+            )
+        }
+    }
+
+    @Test
+    fun `月历区间 相邻两期首尾相接不跳格`() {
+        (1..12).forEach { month ->
+            val m = YearMonth.of(2026, month)
+            val cur = CycleCalculator.calendarRange(m, 26, byCycle = true)
+            val next = CycleCalculator.calendarRange(m.plusMonths(1), 26, byCycle = true)
+            assertEquals("m=$m", cur.to.plusDays(1), next.from)
+        }
+    }
+
+    @Test
+    fun `月历区间 短月回退到月末且不与前一期重叠`() {
+        // 起始日 29、平年 2 月只有 28 天：该期从 2/28 起（与 periodContaining 同口径）
+        val feb = CycleCalculator.calendarRange(YearMonth.of(2026, 2), 29, byCycle = true)
+        assertEquals(LocalDate.parse("2026-02-28"), feb.from)
+        assertEquals(LocalDate.parse("2026-03-28"), feb.to)
+        val jan = CycleCalculator.calendarRange(YearMonth.of(2026, 1), 29, byCycle = true)
+        assertEquals(LocalDate.parse("2026-01-29"), jan.from)
+        assertEquals(LocalDate.parse("2026-02-27"), jan.to)
+    }
+
+    @Test
+    fun `月历网格 天数与前导空格`() {
+        // 2026-10-26 是周一 → 前导 0 格；区间 10/26–11/25 共 31 天
+        val cycle = CycleCalculator.calendarRange(YearMonth.of(2026, 10), 26, byCycle = true)
+        assertEquals(31, cycle.days)
+        assertEquals(0, CycleCalculator.leadingBlanks(cycle))
+        // 2026-09-26 是周六 → 前导 5 格；区间 9/26–10/25 共 30 天
+        val prev = CycleCalculator.calendarRange(YearMonth.of(2026, 9), 26, byCycle = true)
+        assertEquals(30, prev.days)
+        assertEquals(5, CycleCalculator.leadingBlanks(prev))
+        // 自然月口径：2026-08-01 周六、8 月 31 天
+        val aug = CycleCalculator.calendarRange(YearMonth.of(2026, 8), 26, byCycle = false)
+        assertEquals(31, aug.days)
+        assertEquals(5, CycleCalculator.leadingBlanks(aug))
+    }
+
+    @Test
+    fun `月历展示月上限 周期视图取含今天的周期的锚点月`() {
+        val today = LocalDate.parse("2026-10-16")
+        // 起始日 26：10/16 仍属 9/26–10/25 那一期 ⇒ 上限是 9 月（**不是**今天所在自然月）
+        assertEquals(YearMonth.of(2026, 9), CycleCalculator.displayAnchorCap(today, 26, byCycle = true))
+        // 踩在起始日当天就进入新周期
+        assertEquals(
+            YearMonth.of(2026, 10),
+            CycleCalculator.displayAnchorCap(LocalDate.parse("2026-10-26"), 26, byCycle = true),
+        )
+        // 自然月视角与起始日无关；起始日 1 = 自然月
+        assertEquals(YearMonth.of(2026, 10), CycleCalculator.displayAnchorCap(today, 26, byCycle = false))
+        assertEquals(YearMonth.of(2026, 10), CycleCalculator.displayAnchorCap(today, 1, byCycle = true))
+    }
+
+    @Test
+    fun `月历展示月收敛 超上限取上限且不动过去`() {
+        val today = LocalDate.parse("2026-10-16")
+        // 切到周期视图时页面手里的月份是「今天所在自然月」10 月 → 必须收敛到 9 月，
+        // 否则首屏整段是 10/26 起的未来日期（全置灰、一条也点不动）
+        assertEquals(
+            YearMonth.of(2026, 9),
+            CycleCalculator.clampDisplayMonth(YearMonth.of(2026, 10), today, 26, byCycle = true),
+        )
+        // 往过去浏览不受影响
+        assertEquals(
+            YearMonth.of(2026, 7),
+            CycleCalculator.clampDisplayMonth(YearMonth.of(2026, 7), today, 26, byCycle = true),
+        )
+        // 自然月视图的上限就是今天所在自然月
+        assertEquals(
+            YearMonth.of(2026, 10),
+            CycleCalculator.clampDisplayMonth(YearMonth.of(2026, 12), today, 26, byCycle = false),
+        )
+    }
+
+    @Test
+    fun `月历首屏即今天所在的一期`() {
+        // 收敛后的展示月 + 区间必须**包含今天**——「一进来就看到本期」的可执行判据
+        listOf(
+            LocalDate.parse("2026-10-16") to 26, // 月中：本期始于上月
+            LocalDate.parse("2026-10-25") to 26, // 期末最后一天
+            LocalDate.parse("2026-10-26") to 26, // 起始日当天
+            LocalDate.parse("2026-02-28") to 29, // 短月回退月末
+            LocalDate.parse("2027-01-01") to 15, // 跨年
+        ).forEach { (today, anchor) ->
+            val shown = CycleCalculator.clampDisplayMonth(
+                YearMonth.from(today), today, anchor, byCycle = true,
+            )
+            val range = CycleCalculator.calendarRange(shown, anchor, byCycle = true)
+            assertTrue(
+                "today=$today anchor=$anchor shown=$shown range=$range 不含今天",
+                range.contains(today),
+            )
+        }
     }
 }

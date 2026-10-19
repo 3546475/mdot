@@ -71,12 +71,19 @@
     <string name="ds_palette_rose">玫红</string>
     <string name="ds_palette_lake">湖蓝</string>
     <string name="ds_palette_graphite">石墨</string>
-    <string name="ds_topbar_switch_cd">切换工时制度</string>
+    <!-- 一级页固定顶栏的无障碍标签（用户 2026-10-16 统一术语：左侧按钮 =「切换工时」，右侧齿轮 =「制度设定」，
+         与「我的 → 关于与设置」里的「设置」页签区分开） -->
+    <string name="ds_topbar_switch_cd">切换工时</string>
     <string name="ds_topbar_appearance_cd">外观</string>
-    <string name="ds_topbar_settings_cd">设置</string>
+    <string name="ds_topbar_settings_cd">制度设定</string>
     <string name="crash_dialog_title">上次异常退出</string>
     <string name="crash_dialog_text">上次意外退出，错误日志已存本机（不会自动上传）</string>
     <string name="crash_export_log">导出日志</string>
     <string name="crash_clear">清除</string>
     <string name="nav_fab_cd">补记/编辑</string>
+
+    <!-- 「没加班，只记班次」（v0.7.9.0，用户 2026-10-17）：0 时长记录，保存要求带班次或备注 -->
+    <string name="record_no_ot_chip">没加班，只记班次</string>
+    <string name="record_no_ot_hint">0 小时：需选班次或填备注</string>
+    <string name="record_no_ot_value">未加班</string>
 </resources>

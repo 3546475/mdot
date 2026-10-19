@@ -10,6 +10,7 @@ import com.mdot.app.core.util.AppResult
 import com.mdot.app.core.util.rethrowIfCancellation
 import com.mdot.app.core.util.AppResult.Failure
 import com.mdot.app.core.util.AppResult.Success
+import com.mdot.app.domain.RecordRules
 import com.mdot.app.domain.model.CompAdjustment
 import com.mdot.app.domain.model.DailyRecord
 import com.mdot.app.domain.model.LeaveDraft
@@ -52,7 +53,13 @@ class RecordRepository @Inject constructor(
 
     suspend fun saveOt(draft: OtDraft): AppResult<Unit> {
         if (draft.date.isAfter(LocalDate.now())) return Failure(AppError.FutureDate)
-        if (draft.durationMinutes !in 1..MAX_MINUTES) return Failure(AppError.InvalidDuration)
+        // 0 时长（只记班次）必须带班次或备注；其余必须 1..24h —— 规则住 domain，弹层按钮同口径
+        if (!RecordRules.canSaveOt(draft.durationMinutes, draft.shiftName, draft.note)) {
+            return Failure(
+                if (draft.durationMinutes == 0) AppError.MissingShiftOrNote
+                else AppError.InvalidDuration
+            )
+        }
         if (draft.toCompMinutes !in 0..draft.durationMinutes) return Failure(AppError.InvalidComp)
         val workSystem = settings.salaryFlow.first().workSystem.name
         val existing = recordDao.getByDateAndType(draft.date, RecordType.OT.name, workSystem)
@@ -85,7 +92,8 @@ class RecordRepository @Inject constructor(
 
     suspend fun saveLeave(draft: LeaveDraft): AppResult<Unit> {
         if (draft.date.isAfter(LocalDate.now())) return Failure(AppError.FutureDate)
-        if (draft.durationMinutes !in 1..MAX_MINUTES) return Failure(AppError.InvalidDuration)
+        // 请假不放宽：0 小时请假没有意义（与「只记班次」的 0 时长加班区分开）
+        if (!RecordRules.canSaveLeave(draft.durationMinutes)) return Failure(AppError.InvalidDuration)
         val workSystem = settings.salaryFlow.first().workSystem.name
         val existing = recordDao.getByDateAndType(draft.date, RecordType.LEAVE.name, workSystem)
         val now = System.currentTimeMillis()
@@ -207,7 +215,8 @@ class RecordRepository @Inject constructor(
     }
 
     companion object {
-        const val MAX_MINUTES = 1440
+        /** 保留旧引用（日历批量写入等处用）；口径唯一出处是 [RecordRules.MAX_MINUTES] */
+        const val MAX_MINUTES = RecordRules.MAX_MINUTES
     }
 }
 

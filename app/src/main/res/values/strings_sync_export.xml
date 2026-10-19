@@ -19,7 +19,7 @@
     <string name="sync_auto_backup_title">自动备份</string>
     <string name="sync_auto_backup_desc">数据变更 30 秒后自动上传</string>
     <string name="sync_local_backup_title">本地文件备份</string>
-    <string name="sync_local_backup_desc">把全部记录与设置存成一个文件，可存手机或网盘</string>
+    <string name="sync_local_backup_desc">全部记录与设置存成一个文件</string>
     <string name="sync_local_export">导出备份文件</string>
     <string name="sync_local_restore">从文件恢复…</string>
     <string name="sync_restore_confirm_title">从云端恢复？</string>
@@ -56,7 +56,7 @@
     <string name="sync_storage_disconnect_confirm_btn">断开</string>
     <string name="sync_storage_tip">备份包是明文 ZIP（不含账号等凭据）；自动备份建议只在一台设备开启</string>
     <string name="sync_storage_trust_title">信任自签名证书</string>
-    <string name="sync_storage_trust_desc">仅自建服务（NAS/MinIO）证书无法验证时开启：首次连接记录证书指纹，之后只信任该证书；换证后需删掉存储源重加</string>
+    <string name="sync_storage_trust_desc">证书无法验证时开启；换证后需删掉存储源重加</string>
     <string name="sync_storage_webdav_url_label">服务器地址</string>
     <string name="sync_storage_username_label">账号</string>
     <string name="sync_storage_password_label">密码（坚果云请用应用密码）</string>
@@ -69,7 +69,6 @@
 
     <!-- feature/export/ExportScreen.kt / ExportViewModel.kt(ExportDimension) -->
     <string name="export_screen_title">导入导出</string>
-    <string name="export_hint">CSV 用 Excel/WPS 打开，工资单长图适合发微信核对；点按钮先预览再保存或分享</string>
     <string name="export_dim_cycle">考勤周期</string>
     <string name="export_dim_month">自然月</string>
     <string name="export_dim_custom">自定义</string>
@@ -77,15 +76,18 @@
     <string name="export_custom_from_default">本月1日</string>
     <string name="export_custom_to_label">结束：%1$s</string>
     <string name="export_custom_to_default">今天</string>
-    <string name="export_range_invalid">请选择有效区间</string>
-    <string name="export_import_csv">导入 CSV（从备份明细恢复）</string>
-    <string name="export_csv_detail">导出 CSV 明细</string>
-    <!-- v0.7.4 工资单长图数据源（docs/20 P0-1） -->
-    <string name="export_payslip_source_label">长图数据源</string>
-    <string name="export_payslip_source_sheet">记月单据</string>
-    <string name="export_payslip_source_attendance">考勤计算</string>
-    <string name="export_payslip_sheet_empty">该月记月单据还没填，已按考勤计算生成</string>
+    <string name="export_range_invalid">请选择有效区间</string>    <!-- v0.7.9.0 导出页重做（用户 2026-10-20）：一个数据源（记月单据）+ 两种产物（图给人看 / CSV 给机器）。
+         小字只留「不看会误解」的那一句（用户 2026-10-20：小字说明能去就去、能精简就精简） -->
+    <string name="export_card_payslip_title">工资单</string>
+    <string name="export_card_payslip_hint">只显示有金额的项目</string>
+    <string name="export_card_settlement_title">结算单</string>
     <string name="export_payslip_generate">生成工资单长图</string>
+    <string name="export_payslip_generate_site">生成结算单长图</string>
+    <string name="export_card_csv_title">CSV</string>
+    <string name="export_card_csv_hint">考勤 + 工资单，可再导入</string>
+    <string name="export_csv_export">导出 CSV</string>
+    <string name="export_csv_import">导入 CSV</string>
+    <string name="export_sheet_empty">该月还没有工资单数据</string>
     <string name="export_preview_payslip_title">工资单预览</string>
     <string name="export_preview_csv_title">CSV 预览</string>
     <string name="export_preview_payslip_cd">工资单长图</string>

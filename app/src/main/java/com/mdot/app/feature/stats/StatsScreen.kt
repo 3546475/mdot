@@ -194,6 +194,8 @@ data class SiteDetailRow(
     val amountCents: Long = 0,
     val itemName: String = "",
     val purpose: AdvancePurpose? = null,
+    /** 留证照片（v0.7.9.0）：明细行上显示张数，点开看大图——照片以前只在编辑弹层里能看到 */
+    val photos: List<String> = emptyList(),
 ) {
     /** LazyColumn 稳定 key：跨表自增 id 会撞，必须带 kind 段前缀（同 11 文档 005 教训） */
     val stableKey: String get() = "${kind}_$id"
@@ -308,17 +310,26 @@ class StatsViewModel @Inject constructor(
 
     /**
      * 统计页区间弹窗：月份网格点选 → 换算成步进偏移。
-     * 换算逻辑住 domain（[CycleCalculator.cycleOffsetToMonth] / `ChronoUnit.MONTHS`），VM 只做分发。
-     * 考勤周期按**锚点月之差**反解（同明细页），故 anchor 26 时点「8 月」得到 8/26–9/25 那一期。
+     * 换算逻辑住 domain，VM 只做分发。**两个维度的基准月不同，别共用一套**：
+     * - 考勤周期：[CycleCalculator.cycleOffsetToMonth]，基准 = **今天所在周期的锚点月**
+     *   （anchor 26 时点「8 月」得到 8/26–9/25 那一期）；
+     * - 自然月：[CycleCalculator.monthOffsetTo]，基准 = **今天所在自然月**（点 8 月就是 8 月）。
+     *   ⚠️ 此前两者共用了周期那套基准 ⇒ 起始日 ≠ 1 时**整体后移一个月**（点 1 月跳 2 月，
+     *   2026-10-20 用户报，见 docs/11 092）；起始日 = 1 时两者恰好相同，所以一直没被发现。
      */
     fun onPickMonth(month: java.time.YearMonth) {
         viewModelScope.launch {
-            val anchor = settings.cycleAnchorDayFlow.first()
-            val base = CycleCalculator.cycleStartMonth(today, anchor)
             rangeOffset.value = when (dimension.value) {
                 StatsDimension.YEAR ->
                     (month.year - today.year).coerceAtMost(0)
-                else -> CycleCalculator.cycleOffsetToMonth(base, month)
+                StatsDimension.MONTH ->
+                    CycleCalculator.monthOffsetTo(java.time.YearMonth.from(today), month)
+                else -> {
+                    val anchor = settings.cycleAnchorDayFlow.first()
+                    CycleCalculator.cycleOffsetToMonth(
+                        CycleCalculator.cycleStartMonth(today, anchor), month,
+                    )
+                }
             }
         }
     }
@@ -483,6 +494,8 @@ class StatsViewModel @Inject constructor(
             val pieShift = records.filter { it.type == RecordType.OT }
                 .groupBy { it.shiftName ?: "未选班次" }
                 .map { (name, list) -> PieSlice(name, list.sumOf { it.durationMinutes }.toFloat()) }
+                // 「只记班次」的 0 时长记录（v0.7.9.0）不贡献时长 ⇒ 过滤掉，别画出 0 值扇区
+                .filter { it.value > 0f }
                 .sortedByDescending { it.value }
             val pieLeave = records.filter { it.type == RecordType.LEAVE }
                 .groupBy { it.leaveType?.displayName ?: "其他" }
@@ -589,6 +602,31 @@ fun StatsScreen(
     // 摘要条/空态点「明细」时切页签用（pager 由本页持有）
     val scope = rememberCoroutineScope()
 
+    // 区间弹窗状态提升到这一层（**全页一份**）：两页（统计/明细）点胶囊开的都是它，改的也是同一份状态。
+    // ⚠️ 别下放回页内：头部住在 LazyColumn 的 item 里，弹窗状态留在 item 内会被列表回收带走。
+    var showRangeDialog by remember { mutableStateOf(false) }
+    var showSiteRangeDialog by remember { mutableStateOf(false) }
+
+    // 区间头（统计/明细两页**同一个 lambda**：同一份状态 + 同一套交互）——两页因此不可能显示不同区间
+    val rangeHeader: @Composable () -> Unit = {
+        StatsRangeHeader(
+            vm = vm,
+            state = state,
+            onOpenPicker = { showRangeDialog = true },
+            onOpenSiteDialog = { showSiteRangeDialog = true },
+        )
+    }
+
+    // 明细页签的宿主：区间与统计页同源（v0.7.9.0 用户拍板「明细也要能切考勤周期/自然月」）。
+    // 取数区间直接用统计页算好的 [StatsUiState.rangeFrom]/[StatsUiState.rangeTo]。
+    val detailHost = com.mdot.app.feature.detail.DetailPaneHost(
+        header = rangeHeader,
+        range = state.rangeFrom?.let { f ->
+            state.rangeTo?.let { t -> CycleCalculator.Period(f, t) }
+        },
+        rangeKind = state.dimension.rangeKind,
+    )
+
     Column(
         Modifier
             .fillMaxSize()
@@ -633,6 +671,7 @@ fun StatsScreen(
                     selectedBar = selectedBar,
                     showBottomBar = !canBack,
                     onChartDay = onChartDay,
+                    header = rangeHeader,
                 )
                 1 -> if (monthTab) {
                     // 摘要条/空态点「明细」：切到末位页签（pager 由本页持有）
@@ -642,12 +681,22 @@ fun StatsScreen(
                         showBottomBar = !canBack,
                     )
                 } else {
-                    DetailPane(showBottomBar = !canBack)
+                    DetailPane(showBottomBar = !canBack, host = detailHost)
                 }
-                else -> DetailPane(showBottomBar = !canBack)
+                else -> DetailPane(showBottomBar = !canBack, host = detailHost)
             }
         }
     }
+
+    // 区间弹窗（全页一份，pager 之外）：统计/明细两页点胶囊都开它，改的都是同一份区间状态
+    StatsRangeDialogs(
+        vm = vm,
+        state = state,
+        showRangeDialog = showRangeDialog,
+        showSiteRangeDialog = showSiteRangeDialog,
+        onDismissRange = { showRangeDialog = false },
+        onDismissSite = { showSiteRangeDialog = false },
+    )
 }
 
 /** 统计页第 0 页：原统计内容（维度行→汇总→热点图→柱状→饼图） */
@@ -659,10 +708,11 @@ private fun StatsContent(
     selectedBar: String?,
     showBottomBar: Boolean,
     onChartDay: (LocalDate) -> Unit,
+    /** 区间头（统计/明细两页共用的那一个 lambda，由 StatsScreen 传入） */
+    header: @Composable () -> Unit,
 ) {
-    // 方案 C：区间胶囊 → 本弹窗（选维度 / 跳月跳年 / 框自定义）
-    var showRangeDialog by remember { mutableStateOf(false) }
-    var showSiteRangeDialog by remember { mutableStateOf(false) } // 工地：胶囊 → 口径/自定义起止
+    // 方案 C：区间胶囊 → 弹窗（选维度 / 跳月跳年 / 框自定义）；工地则是指挥口径弹窗。
+    // 两个弹窗的开关状态与渲染都在共用组件 [StatsRangeHeader] 里——明细页签也渲染它。
     LazyColumn(
         Modifier
             .fillMaxSize()
@@ -675,37 +725,9 @@ private fun StatsContent(
         // 非工地=方案 C——不再常驻四 chip，改由「区间胶囊 → 弹窗选维度」承担
         val isSite = state.workSystem == WorkSystem.SITE
         item {
-            // 顶部不加 Spacer：宿主页签条（SegmentBar 撑满 64dp 顶栏）下方已有天然留白，
-            // 再叠一层只会把胶囊推得太低。下方留白用 StatsRangeSpacing 与上方对齐（见该常量注释）。
-
-            if (isSite) {
-                // 工地：**胶囊 = 唯一入口**，口径切换与自定义起止都收进弹窗
-                // （与明细页工地分支同款，共用 RangePill + SiteRangeDialog）
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    com.mdot.app.feature.detail.RangePill(
-                        label = state.rangeLabel,
-                        onClick = { showSiteRangeDialog = true },
-                    )
-                }
-            } else {
-                // 方案 C：胶囊 = 唯一入口（点开弹窗选维度/跳月/框自定义）；
-                // 工地不支持步进（区间随结算滚动），故只在非工地给 ‹ ›
-                MonthStepper(
-                    label = statsRangeLabel(state.dimension.rangeKind, state.picker?.current),
-                    onPrev = vm::stepBack,
-                    onNext = vm::stepForward,
-                    // 胶囊**始终可点**：弹窗里既能换维度、也能改自定义起止。
-                    // ⚠️ 别按维度把它置为不可点（曾让「自定义」维度下胶囊变成死路——
-                    // 页面已无常驻 chip 行，用户就再也换不回周期/月/年了，只能切页签绕）
-                    onOpenPicker = { showRangeDialog = true },
-                    nextEnabled = state.rangeOffset < 0 && state.maxForwardSteps > 0,
-                    onBackToCurrent = if (state.rangeOffset < 0) vm::backToCurrentRange else null,
-                    backToCurrentLabel = statsBackToCurrentLabel(state.dimension.rangeKind),
-                    prevContentDescription = statsStepDescription(forward = false, kind = state.dimension.rangeKind),
-                    nextContentDescription = statsStepDescription(forward = true, kind = state.dimension.rangeKind),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+            // 区间头（v0.7.9.0 起**统计页与明细页签共用同一个 lambda**）——见 StatsScreen 里的 rangeHeader。
+            // 顶部不加 Spacer：宿主页签条（SegmentBar 撑满 64dp 顶栏）下方已有天然留白。
+            header()
             // 下方留白补到与上方（宿主页签条链路给的 126px）相等：三页统一用同一个值，
             // 改这里请同步改记月页/明细页。实测对齐目标 = 42dp。
             Spacer(Modifier.height(StatsRangeSpacing))
@@ -783,7 +805,65 @@ private fun StatsContent(
             }
         }
     }
+}
 
+/**
+ * 区间头（**统计页与明细页签共用**，v0.7.9.0）：非工地 = `MonthStepper`；工地 = `RangePill`。
+ * 点胶囊开的弹窗**不在这里**——两个弹窗的状态提升到 [StatsScreen] 那一层（见 [StatsRangeDialogs]）：
+ * ① 两页各组合一份头部实例，但弹窗只能有一份，否则会叠出两个；② 头部住在 LazyColumn 的 item 里，
+ * 弹窗状态若留在 item 内会被列表回收带走（页面滚动即可复现）。
+ */
+@Composable
+private fun StatsRangeHeader(
+    vm: StatsViewModel,
+    state: StatsUiState,
+    onOpenPicker: () -> Unit,
+    onOpenSiteDialog: () -> Unit,
+) {
+    if (state.workSystem == WorkSystem.SITE) {
+        // 工地：**胶囊 = 唯一入口**，口径切换与自定义起止都收进弹窗
+        // （与明细页工地分支同款，共用 RangePill + SiteRangeDialog）
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            com.mdot.app.feature.detail.RangePill(
+                label = state.rangeLabel,
+                onClick = onOpenSiteDialog,
+            )
+        }
+    } else {
+        // 方案 C：胶囊 = 唯一入口（点开弹窗选维度/跳月/框自定义）；
+        // 工地不支持步进（区间随结算滚动），故只在非工地给 ‹ ›
+        MonthStepper(
+            label = statsRangeLabel(state.dimension.rangeKind, state.picker?.current),
+            onPrev = vm::stepBack,
+            onNext = vm::stepForward,
+            // 胶囊**始终可点**：弹窗里既能换维度、也能改自定义起止。
+            // ⚠️ 别按维度把它置为不可点（曾让「自定义」维度下胶囊变成死路——
+            // 页面已无常驻 chip 行，用户就再也换不回周期/月/年了，只能切页签绕）
+            onOpenPicker = onOpenPicker,
+            nextEnabled = state.rangeOffset < 0 && state.maxForwardSteps > 0,
+            onBackToCurrent = if (state.rangeOffset < 0) vm::backToCurrentRange else null,
+            backToCurrentLabel = statsBackToCurrentLabel(state.dimension.rangeKind),
+            prevContentDescription = statsStepDescription(forward = false, kind = state.dimension.rangeKind),
+            nextContentDescription = statsStepDescription(forward = true, kind = state.dimension.rangeKind),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/**
+ * 区间弹窗（**全页一份**，v0.7.9.0）：非工地 = [StatsRangeDialog]（维度 + 跳月跳年 + 自定义起止），
+ * 工地 = [com.mdot.app.feature.detail.SiteRangeDialog]（口径三选一 + 自定义起止）。
+ * 由 [StatsScreen] 在 pager **之外**渲染一次：两页（统计/明细）点胶囊开的都是它，改的也是同一份状态。
+ */
+@Composable
+private fun StatsRangeDialogs(
+    vm: StatsViewModel,
+    state: StatsUiState,
+    showRangeDialog: Boolean,
+    showSiteRangeDialog: Boolean,
+    onDismissRange: () -> Unit,
+    onDismissSite: () -> Unit,
+) {
     // 方案 C 的区间选择弹窗（非工地）：维度 + 跳月/跳年 + 自定义起止都在它里面
     if (showRangeDialog) {
         StatsRangeDialog(
@@ -796,7 +876,7 @@ private fun StatsContent(
             onPickYear = vm::onPickYear,
             onCustomFrom = vm::onCustomFrom,
             onCustomTo = vm::onCustomTo,
-            onDismiss = { showRangeDialog = false },
+            onDismiss = onDismissRange,
         )
     }
 
@@ -821,7 +901,7 @@ private fun StatsContent(
             },
             onCustomFrom = vm::onCustomFrom,
             onCustomTo = vm::onCustomTo,
-            onDismiss = { showSiteRangeDialog = false },
+            onDismiss = onDismissSite,
         )
     }
 }
