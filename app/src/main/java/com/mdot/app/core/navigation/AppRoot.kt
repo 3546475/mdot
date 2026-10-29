@@ -336,6 +336,9 @@ private fun AppRootContent(
     val bottomBarSideAction by appVm.bottomBarSideAction.collectAsStateWithLifecycle()
     val bottomBarFixedWidth by appVm.bottomBarFixedWidth.collectAsStateWithLifecycle()
     val bottomBarFrosted by appVm.bottomBarFrosted.collectAsStateWithLifecycle()
+    // 液态玻璃是**交互**、毛玻璃是**材质**，两者独立（2026-10-30 边界重规划）：
+    // 只有毛玻璃需要挂页面玻璃源；液滴读的是底栏自身的录制层，与磨砂无关
+    val bottomBarLiquidGlass by appVm.bottomBarLiquidGlass.collectAsStateWithLifecycle()
     val workSystem by appVm.workSystem.collectAsStateWithLifecycle()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -783,7 +786,7 @@ private fun AppRootContent(
                     onRecord = recordAction,
                     playEntrance = !recordPillEntered,
                     onEntranceDone = { recordPillEntered = true },
-                    // 「按钮右置」布局下与底栏共用同一套毛玻璃源（开关关/API<31 时为 null → 实心主色）
+                    // 「按钮右置」布局下与底栏共用同一套玻璃源（磨砂材质只看毛玻璃开关；关闭/API<31 → 实心主色）
                     backdropBlur = if (bottomBarFrosted) backdropBlurState else null,
                 )
             }
@@ -795,6 +798,9 @@ private fun AppRootContent(
                 centerAction = if (bottomBarSideAction) null else recordPill,
                 sideAction = if (bottomBarSideAction) recordCircle else null,
                 backdropBlur = if (bottomBarFrosted) backdropBlurState else null,
+                liquidGlass = bottomBarLiquidGlass,
+                // 液态玻璃开时：拖动到中央「记加班」按钮上松手由补记入口接管（拖动期间 clickable 已被消费）
+                onCenterAction = if (bottomBarSideAction) null else recordAction,
                 fixedCells = if (bottomBarFixedWidth) BottomBarSpec.fixedCellCount else 0,
                 onSlotClick = { spec ->
                     // 点击底栏：按目标相对当前位置设置左右平移方向

@@ -87,6 +87,10 @@ class AppViewModel @Inject constructor(
     val bottomBarFrosted: StateFlow<Boolean> = settings.bottomBarFrostedFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    /** 底栏液态玻璃（**交互**：按压液滴透镜；与毛玻璃材质互相独立，默认关闭） */
+    val bottomBarLiquidGlass: StateFlow<Boolean> = settings.bottomBarLiquidGlassFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     /** 当前工时制度（顶栏标签、记录弹层文案等使用） */
     val workSystem: StateFlow<WorkSystem> = settings.salaryFlow
         .map { it.workSystem }

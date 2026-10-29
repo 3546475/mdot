@@ -315,10 +315,16 @@ class SettingsDataSource @Inject constructor(
     suspend fun setBottomBarFixedWidth(value: Boolean) =
         dataStore.edit { it[BOTTOM_BAR_FIXED_WIDTH] = value }
 
-    // ---- 底栏毛玻璃（v0.6.21 起**默认关闭**：用户定为出厂关；半透明 + 模糊身后内容，API<31 回退仅半透明）----
+    // ---- 底栏玻璃质感（v0.6.21 起**默认关闭**；2026-10-30 起两个开关**互相独立**）----
+    // 毛玻璃 = **材质**（半透明 + 模糊身后内容；API<31 回退仅半透明）
+    // 液态玻璃 = **交互**（按压时放大该处底栏的液滴透镜；不动静止材质，RuntimeShader 需 API 33+）
+    // 四象限：毛玻璃开+液态开=磨砂底栏+液滴；只开毛玻璃=磨砂底栏；只开液态=实色底栏+液滴；都关=实色底栏。
+    // ⚠️ 两者不是同级选项，别再做成互斥（否则「实色底栏 + 液滴交互」这个组合永远选不到）
     val bottomBarFrostedFlow: Flow<Boolean> = dataStore.data.map { it[BOTTOM_BAR_FROSTED] ?: false }
-    suspend fun setBottomBarFrosted(value: Boolean) =
-        dataStore.edit { it[BOTTOM_BAR_FROSTED] = value }
+    suspend fun setBottomBarFrosted(value: Boolean) = dataStore.edit { it[BOTTOM_BAR_FROSTED] = value }
+
+    val bottomBarLiquidGlassFlow: Flow<Boolean> = dataStore.data.map { it[BOTTOM_BAR_LIQUID_GLASS] ?: false }
+    suspend fun setBottomBarLiquidGlass(value: Boolean) = dataStore.edit { it[BOTTOM_BAR_LIQUID_GLASS] = value }
 
     // ---- SQLCipher raw key 迁移标记（旧库完成一次 byte[]→raw key 的 rekey 后置 true；
     //       新装/空库直接置 true）。未置 true 时按 byte[]（PBKDF2）打开，可正常打开旧库。 ----
@@ -375,6 +381,7 @@ class SettingsDataSource @Inject constructor(
         private val BOTTOM_BAR_SIDE_ACTION = booleanPreferencesKey("bottom_bar_side_action")
         private val BOTTOM_BAR_FIXED_WIDTH = booleanPreferencesKey("bottom_bar_fixed_width")
         private val BOTTOM_BAR_FROSTED = booleanPreferencesKey("bottom_bar_frosted")
+        private val BOTTOM_BAR_LIQUID_GLASS = booleanPreferencesKey("bottom_bar_liquid_glass")
 
         const val DEFAULT_NICKNAME = "即兴生长"
 

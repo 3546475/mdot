@@ -112,7 +112,9 @@ fun MdJiabanApp(appVm: AppViewModel = hiltViewModel()) {
     }
 
     val appearance by appVm.appearance.collectAsStateWithLifecycle()
-    val glassEnabled by appVm.bottomBarFrosted.collectAsStateWithLifecycle()
+    // 玻璃源只服务**材质**（毛玻璃）：液态玻璃的液滴读的是底栏自身的录制层，不需要页面源
+    val frostedOn by appVm.bottomBarFrosted.collectAsStateWithLifecycle()
+    val glassEnabled = frostedOn
     // 玻璃共享源（底栏/圆钮/底部悬浮提示共用采样；MainActivity 创建供全局下发）
     val backdropBlurState = com.mdot.app.core.designsystem.component.rememberBackdropBlurState()
     val backdropFullState = com.mdot.app.core.designsystem.component.rememberBackdropBlurState()

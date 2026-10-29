@@ -249,8 +249,12 @@ class BottomBarViewModel @Inject constructor(
     val fixedWidth: StateFlow<Boolean> = settings.bottomBarFixedWidthFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    /** 底栏毛玻璃（半透明 + 模糊身后内容；v0.6.21 起默认关闭） */
+    /** 底栏毛玻璃（**材质**：半透明 + 模糊身后内容；v0.6.21 起默认关闭） */
     val frosted: StateFlow<Boolean> = settings.bottomBarFrostedFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** 底栏液态玻璃（**交互**：按压时的液滴透镜；不动静止材质，与毛玻璃互相独立，默认关闭） */
+    val liquidGlass: StateFlow<Boolean> = settings.bottomBarLiquidGlassFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     fun setIconOnly(value: Boolean) = viewModelScope.launch {
@@ -267,6 +271,11 @@ class BottomBarViewModel @Inject constructor(
 
     fun setFrosted(value: Boolean) = viewModelScope.launch {
         settings.setBottomBarFrosted(value)
+    }
+
+    /** 液态玻璃（交互开关，与毛玻璃材质互相独立） */
+    fun setLiquidGlass(value: Boolean) = viewModelScope.launch {
+        settings.setBottomBarLiquidGlass(value)
     }
 
     /** 打开/关闭某个槽位：**只改 disabled，不动 order**（开关不影响顺序，对齐班次卡片） */

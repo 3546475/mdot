@@ -5,6 +5,7 @@
     <string name="profile_pick_from_gallery">从相册选择</string>
     <string name="profile_reset_avatar">恢复默认头像</string>
     <string name="profile_edit_nickname">修改昵称</string>
+    <string name="profile_edit_title">编辑资料</string>
     <string name="profile_nickname_label">昵称</string>
     <string name="profile_nickname_limit">昵称最多 24 个字</string>
     <string name="profile_motto">记录每一次努力，看见每一份成长</string>

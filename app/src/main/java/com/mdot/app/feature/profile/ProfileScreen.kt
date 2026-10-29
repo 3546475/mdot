@@ -7,9 +7,7 @@ import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +17,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,8 +28,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -56,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -72,13 +70,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.mdot.app.core.designsystem.Radius
-import com.mdot.app.core.designsystem.IconSpec
+import com.mdot.app.core.designsystem.ProfileSpec
 
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.KeyValue
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.SettingRow
 import com.mdot.app.core.designsystem.component.pressScale
+import com.mdot.app.core.designsystem.component.rememberHomeDataAreaHeight
 import com.mdot.app.core.designsystem.component.TopBarHeight
 import com.mdot.app.core.navigation.Routes
 import com.mdot.app.core.navigation.contentBottomPadding
@@ -119,8 +118,10 @@ fun ProfileScreen(
     val appearance by hub.appearance.collectAsStateWithLifecycle()
     val syncStatus by hub.syncStatus.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    // 资料区的唯一编辑入口 = 「编辑资料」弹窗（头像/昵称/签名都在里面）；
+    // 两引擎同一套版式（铺在页面背景上、与首页数据区同高，docs/03 §5.5）
+    var editProfile by remember { mutableStateOf(false) }
 
-    var avatarMenu by remember { mutableStateOf(false) }
     // T2-2：长按重置头像触觉（docs/15）
     val saveHaptic = rememberSaveWithHaptic()
     val motto by vm.motto.collectAsStateWithLifecycle()
@@ -160,118 +161,53 @@ fun ProfileScreen(
             .contentBottomPadding(showBottomBar = !canBack)
             .padding(horizontal = Spacing.page),
     ) {
-        Spacer(Modifier.height(statusBar + TopBarHeight + Spacing.m))
+        // 顶部避让与首页完全一致（statusBar + 56dp + Spacing.s），这样下面的资料区与首页
+        // 「数据区」同一块区域、后面的卡片才能与首页「收入卡」同 y（docs/03 §5.5）
+        Spacer(Modifier.height(statusBar + TopBarHeight + Spacing.s))
 
-        // ---- 资料卡 ----
-        SectionCard {
-            Column(
-                Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Spacer(Modifier.height(Spacing.s))
-
-                // 头像：点击弹更换菜单；长按直接恢复默认头像
-                Box {
-                    Box(
-                        modifier = Modifier
-                            .size(96.dp)
-                            .clip(CircleShape)
-                            .border(2.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
-                            .combinedClickable(
-                                onClick = { avatarMenu = true },
-                                onLongClick = {
-                                    if (avatarPath != null) {
-                                        saveHaptic()
-                                        vm.resetAvatar()
-                                    }
-                                },
-                            ),
-                    ) {
-                        Image(
-                            painter = avatarPainter,
-                            contentDescription = stringResource(R.string.profile_avatar_desc),
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
-                    // 右下角小相机角标提示可换
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .size(26.dp)
-                            .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape),
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                painterResource(R.drawable.ic_ms_photo_camera), contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(IconSpec.inline),
-                            )
-                        }
-                    }
-                    DropdownMenu(
-                        expanded = avatarMenu,
-                        onDismissRequest = { avatarMenu = false },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.profile_pick_from_gallery)) },
-                            onClick = {
-                                avatarMenu = false
-                                pickImage.launch("image/*")
-                            },
-                        )
-                        if (avatarPath != null) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.profile_reset_avatar)) },
-                                onClick = {
-                                    avatarMenu = false
-                                    vm.resetAvatar()
-                                },
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(Spacing.m))
-
-                // 昵称：点击可编辑
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { editingName = true },
-                ) {
-                    Text(
-                        nickname,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Icon(
-                        painterResource(R.drawable.ic_ms_edit), contentDescription = stringResource(R.string.profile_edit_nickname),
-                        tint = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(IconSpec.inline),
-                    )
-                }
+        // ---- 资料区（铺在页面背景上，高度对齐首页数据区；整块可点 → 编辑资料）----
+        // 不加行尾箭头（用户 2026-10-23 定）：整块仍可点，但视觉上与首页数据区一致、不加可点暗示
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = rememberHomeDataAreaHeight())
+                // 涟漪跟着**卡片圆角**走（`Radius.card`：MD3 24dp / MIUIX 16dp）——资料区虽不包卡片，
+                // 但它的容器与下面那几张卡是同一套圆角，点下去的涟漪不该是直角矩形。
+                // ⚠️ `clip` 必须在 `clickable` **之前**（否则涟漪不被裁）；这里区高 ≈130dp ≫ 半径 24dp，
+                // 不会像 docs/11 088 那样把内容切掉（那里的判定是「区高 ≫ 圆角半径」，本条满足）。
+                .clip(engineShape(Radius.card))
+                .clickable { editProfile = true }
+                .padding(vertical = Spacing.s),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Image(
+                painter = avatarPainter,
+                contentDescription = stringResource(R.string.profile_avatar_desc),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(ProfileSpec.heroAvatar).clip(CircleShape),
+            )
+            Spacer(Modifier.width(Spacing.l))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    nickname,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Spacer(Modifier.height(Spacing.xs))
-                // 个性签名：可点改（与昵称同款交互；**不带箭头**——用户定「能点就行，不用引导」）
-                val mottoInteraction = remember { MutableInteractionSource() }
                 Text(
                     motto,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .pressScale(mottoInteraction)
-                        .clickable(interactionSource = mottoInteraction, indication = null) {
-                            editingMotto = true
-                        },
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(Spacing.s))
             }
         }
 
-        Spacer(Modifier.height(Spacing.m))
+        // 与首页「数据区 → 收入卡」的间距一致（l）：本年数据卡因此落在收入卡的同一高度
+        Spacer(Modifier.height(Spacing.l))
 
         // ---- 本年数据（按工时制度切换：工地记工=工天/完工项目/工钱，其余=加班/天数/调休） ----
         SectionCard {
@@ -353,6 +289,30 @@ fun ProfileScreen(
         Spacer(Modifier.height(Spacing.xl))
     }
 
+    // ---- 编辑资料（MIUIX 行式资料卡的唯一入口）----
+    if (editProfile) {
+        ProfileEditDialog(
+            hasCustomAvatar = avatarPath != null,
+            onPickAvatar = {
+                editProfile = false
+                pickImage.launch("image/*")
+            },
+            onResetAvatar = {
+                saveHaptic()
+                vm.resetAvatar()
+            },
+            onEditNickname = {
+                editProfile = false
+                editingName = true
+            },
+            onEditMotto = {
+                editProfile = false
+                editingMotto = true
+            },
+            onDismiss = { editProfile = false },
+        )
+    }
+
     // ---- 昵称编辑对话框 ----
     if (editingMotto) {
         MottoDialog(
@@ -413,6 +373,62 @@ fun ProfileScreen(
             vm = vm,
         )
     }
+}
+
+/**
+ * 「编辑资料」弹窗（MIUIX 行式资料卡的入口）：把头像/昵称/签名三个入口收进一个弹层。
+ *
+ * 行用共享 [SettingRow]（两引擎同一结构：MIUIX = 库 ArrowPreference、MD3 = 自绘行）；
+ * 弹窗走页内模态覆盖层（硬规则 14）。本弹窗**没有确认键** ⇒ `confirmButton = null`
+ * （不能传空 lambda：MIUIX 卡片会按「槽在不在」排版，空槽会留出半格空白 + 孤立竖线）。
+ */
+@Composable
+private fun ProfileEditDialog(
+    hasCustomAvatar: Boolean,
+    onPickAvatar: () -> Unit,
+    onResetAvatar: () -> Unit,
+    onEditNickname: () -> Unit,
+    onEditMotto: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    JiabanAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.profile_edit_title)) },
+        text = {
+            Column(Modifier.fillMaxWidth()) {
+                SettingRow(
+                    stringResource(R.string.profile_pick_from_gallery),
+                    icon = painterResource(R.drawable.ic_ms_photo_camera),
+                    onClick = onPickAvatar,
+                )
+                if (hasCustomAvatar) {
+                    SettingRow(
+                        stringResource(R.string.profile_reset_avatar),
+                        icon = painterResource(R.drawable.ic_ms_person),
+                        onClick = onResetAvatar,
+                    )
+                }
+                SettingRow(
+                    stringResource(R.string.profile_edit_nickname),
+                    icon = painterResource(R.drawable.ic_ms_edit),
+                    onClick = onEditNickname,
+                )
+                SettingRow(
+                    stringResource(R.string.profile_motto_title),
+                    icon = painterResource(R.drawable.ic_ms_auto_awesome),
+                    onClick = onEditMotto,
+                )
+            }
+        },
+        confirmButton = null,
+        dismissButton = {
+            JiabanButton(
+                text = stringResource(R.string.profile_close),
+                onClick = onDismiss,
+                role = JiabanButtonRole.GHOST,
+            )
+        },
+    )
 }
 
 /**

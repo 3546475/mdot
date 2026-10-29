@@ -84,6 +84,7 @@ fun BottomBarPane(
     val sideAction by vm.sideAction.collectAsStateWithLifecycle()
     val fixedWidth by vm.fixedWidth.collectAsStateWithLifecycle()
     val frosted by vm.frosted.collectAsStateWithLifecycle()
+    val liquidGlass by vm.liquidGlass.collectAsStateWithLifecycle()
 
     // 本地编辑草稿（**完整顺序**，含已关闭项）：拖动实时换位先改草稿，松手一次性持久化
     var draft by remember { mutableStateOf(config.order) }
@@ -111,6 +112,7 @@ fun BottomBarPane(
             sideAction = sideAction,
             fixedWidth = fixedWidth,
             frosted = frosted,
+            liquidGlass = liquidGlass,
         )
         Spacer(Modifier.height(Spacing.l))
 
@@ -132,9 +134,11 @@ fun BottomBarPane(
         // 形态移植自 Bencho 的 Assignees 组件（数值/令牌映射/每个数字的理由见 OptionPillSpec）。
         // 药丸**就是读数**：左侧叠放已开启项的圆形图标，全关时写「More」；点开后在下方就地撑出列表卡。
         // ⚠️ **不包分区卡、也不加分区标题**（用户定）；曾经把它放最上方并居中试过（“方案 C”），
-        // 用户看真机样张后改为**放最下方**：它是这一页最细的调参（四项开关），
+        // 用户看真机样张后改为**放最下方**：它是这一页最细的调参（五项开关），
         // 排在「预览」与「槽位列表」之后不打断主流程的阅读；收起/展开的动效不变。
         // 出厂默认**折叠**（用户定，2026-09-20），由组件内部 rememberSaveable 保存。
+        // ⚠️ 毛玻璃是**材质**、液态玻璃是**交互**（2026-10-30 边界重规划）：两者互相独立、可同时开，
+        // 四象限见 docs/03 §4.4；别再做成互斥
         OptionPillCard(
             title = stringResource(R.string.appearance_options),
             items = listOf(
@@ -143,6 +147,12 @@ fun BottomBarPane(
                     iconRes = R.drawable.ic_ms_blur_on,
                     label = stringResource(R.string.appearance_frosted),
                     checked = frosted,
+                ),
+                OptionPillItem(
+                    id = "liquidGlass",
+                    iconRes = R.drawable.ic_ms_water_drop,
+                    label = stringResource(R.string.appearance_liquid_glass),
+                    checked = liquidGlass,
                 ),
                 OptionPillItem(
                     id = "iconOnly",
@@ -166,6 +176,7 @@ fun BottomBarPane(
             onToggle = { id, enabled ->
                 when (id) {
                     "frosted" -> vm.setFrosted(enabled)
+                    "liquidGlass" -> vm.setLiquidGlass(enabled)
                     "iconOnly" -> vm.setIconOnly(enabled)
                     "sideAction" -> vm.setSideAction(enabled)
                     "fixedWidth" -> vm.setFixedWidth(enabled)
@@ -195,12 +206,14 @@ private fun BottomBarPreview(
     sideAction: Boolean,
     fixedWidth: Boolean,
     frosted: Boolean,
+    liquidGlass: Boolean,
 ) {
     val density = LocalDensity.current
     val slotSpecs = slots.mapNotNull { SlotRegistry.resolve(it) }
     // JiabanBottomBar 内部有 bottomMargin padding，预览中向上偏移抵消
     val offsetY = with(density) { -BottomBarSpec.bottomMargin.toPx() }
-    // 毛玻璃源（空源：只走玻璃样式，不采样）
+    // 玻璃源（空源：只走玻璃样式，不采样）。磨砂材质只看毛玻璃开关；
+    // 液态玻璃是**交互**，预览不可交互 → 预览里看不到液滴（与真实底栏静止时一致）
     val previewBlurState = rememberBackdropBlurState()
     val blurState = if (frosted) previewBlurState else null
     // 记加班按钮：与真实底栏同一实现（不播放入场动画）；onRecord = null → 预览中纯展示、不可点
@@ -241,6 +254,7 @@ private fun BottomBarPreview(
                 centerAction = if (sideAction) null else recordPill,
                 sideAction = if (sideAction) recordCircle else null,
                 backdropBlur = blurState,
+                liquidGlass = liquidGlass,
                 fixedCells = if (fixedWidth) BottomBarSpec.fixedCellCount else 0,
                 modifier = Modifier.graphicsLayer { translationY = offsetY },
             )
