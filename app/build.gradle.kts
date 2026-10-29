@@ -131,6 +131,13 @@ dependencies {
     implementation("top.yukonga.miuix.kmp:miuix-ui:0.9.4")
     implementation("top.yukonga.miuix.kmp:miuix-preference:0.9.4")
     implementation("top.yukonga.miuix.kmp:miuix-nav:0.9.4")
+
+    // 液态玻璃（AndroidLiquidGlass / Kyant0「Backdrop」2.0.1，Apache-2.0）：底栏液滴透镜的
+    // layerBackdrop / drawBackdrop / runtimeShaderEffect。构建于 Kotlin 2.4.10 / CMP 1.12
+    // （与 miuix 库同一条重定向线），Android 变体为 backdrop-android.aar，
+    // RenderEffect≥31 / RuntimeShader≥33 由库内与调用方各自判断。
+    implementation(libs.kyant.backdrop)
+
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)
