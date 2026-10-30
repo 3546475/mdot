@@ -1,21 +1,22 @@
 // 仓库源：CI（GitHub Actions 等海外 runner）直连官方源；本地国内开发走阿里云镜像加速。
 // 注意：pluginManagement {} 块由 Gradle 独立提前编译，看不到脚本顶层变量，故判断写在块内。
 pluginManagement {
-    val onCi = System.getenv("CI")?.isNotBlank() == true
+    // ⚠️ 与下方 dependencyResolutionManagement **同口径**（v0.7.9.1 修）：CNB 容器里 `CI` **未必为空**
+    // （yml 里写 `CI: ""` 清不掉，见 docs/11 042 v0.6.18 事故）。旧逻辑只看 `CI` ⇒ 容器里判定成"海外" ⇒
+    // 走 google()/mavenCentral()/gradlePluginPortal() ⇒ 国内拉不动 ⇒ 插件解析在**配置期**失败
+    // （报 `org.jetbrains.kotlin.plugin.serialization ... was not found`，v0.7.9.1 CNB 单测门禁 41s 挂死）。
+    // 现在显式 `MDOT_MIRROR=1`（.cnb.yml env 已置）也算"国内"，阿里云优先、官方兜底。
+    val useMirror = System.getenv("MDOT_MIRROR") == "1" || System.getenv("CI").isNullOrBlank()
     repositories {
-        if (onCi) {
-            google()
-            mavenCentral()
-            gradlePluginPortal()
-        } else {
+        if (useMirror) {
             // 阿里云镜像优先，官方源兜底
             maven("https://maven.aliyun.com/repository/gradle-plugin")
             maven("https://maven.aliyun.com/repository/google")
             maven("https://maven.aliyun.com/repository/public")
-            google()
-            mavenCentral()
-            gradlePluginPortal()
         }
+        google()
+        mavenCentral()
+        gradlePluginPortal()
     }
 }
 
