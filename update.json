@@ -1,16 +1,16 @@
 {
-  "versionName": "0.7.10.0",
-  "versionCode": 69,
-  "tag": "v0.7.10.0",
-  "releaseNotes": "## 更新内容\n\n**新增**\n\n- **加班费可以分段算了**：工资设定 → 工资 → 加班倍率卡片底部新增「加班分段计价」。默认仍是原来的单档；\n  可以切成「时长阶梯」（比如前 2 小时 1.5 倍、超过 2 小时按 2 倍）或「钟点时段」（比如 17:00–19:00 一档、\n  19:00 以后另一档）。每段既能填倍率，也能直接填元/小时；还能选只对哪些加班档位生效。配置页内可以\n  直接试算，记加班弹层也会按规则列出每一段的金额\n- **钟点时段可以逐条改开始时间**：选了钟点规则后，记加班时能指定当天从几点开始算（默认 17:00）。\n  以前记下的旧记录没有开始时间，仍按原来的单档计算，不会悄悄改掉历史账\n- **夜班补贴能跟着夜班走了**：班次设置里的内置「夜班」名称固定，避免记录里的班次名对不上；记月补贴里的\n  「夜班补贴」行新增「与夜班记录联动」，打开后只数班次为夜班的记录日——0 小时只记班次也算，同一天多条\n  只算一天。行模板跨月继承，备份恢复也保留这个设置\n\n**修复**\n\n- **含「只记班次」记录的备份无法恢复**：备份校验误把 0 分钟加班当成非法时长；现在加班允许 0 分钟，\n  请假仍然至少要 1 分钟\n\n**说明**\n\n- 分段计价与夜班补贴目前只对标准工时生效；小时工、综合工时仍按原口径\n- 历史记录会按当前规则重算；切换计价方式前请确认\n\n\n系统要求：Android 10（API 29）及以上。",
+  "versionName": "0.7.11.0",
+  "versionCode": 70,
+  "tag": "v0.7.11.0",
+  "releaseNotes": "## 更新内容\n\n**新增**\n\n- **App 里能看更新日志了**：设置 → 关于 → 「更新日志」。以前想知道这次更新改了什么，得去网页翻；\n  现在在 App 里就能一页页往下看，按版本从新到旧排。内容从线上取，断网时显示上一次拉到的内容并标注一下\n- **升级后第一次打开，会看到「本次更新」**：装上新版第一次启动，会弹一张卡片，把这次的改动列出来，\n  看完点「知道了」就行；同一个版本只弹一次，下次启动不再打扰\n\n**说明**\n\n- 更新日志的内容来自网上的 CHANGELOG.md；第一次打开没网会看到「拉取失败」，连上再点重试即可\n\n\n系统要求：Android 10（API 29）及以上。",
   "apkUrl": {
-    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.7.10.0/MDOT-RELEASE-0.7.10.0-v8a.apk",
-    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.7.10.0/MDOT-RELEASE-0.7.10.0-v7a.apk",
-    "universal": "https://github.com/3546475/mdot/releases/download/v0.7.10.0/MDOT-RELEASE-0.7.10.0-dual.apk"
+    "arm64-v8a": "https://github.com/3546475/mdot/releases/download/v0.7.11.0/MDOT-RELEASE-0.7.11.0-v8a.apk",
+    "armeabi-v7a": "https://github.com/3546475/mdot/releases/download/v0.7.11.0/MDOT-RELEASE-0.7.11.0-v7a.apk",
+    "universal": "https://github.com/3546475/mdot/releases/download/v0.7.11.0/MDOT-RELEASE-0.7.11.0-dual.apk"
   },
   "apkSha256": {
-    "arm64-v8a": "817620bbc4794049cd93017face0c3879e01a4b363262d01c13ad1ceef547ac9",
-    "armeabi-v7a": "ca2ccb083d631d60272a449db4cc978b62f65ba323e808f4551a26d8fedb365e",
-    "universal": "58143104ff2fe7a888e74a031a326dd9e514a4c6a8123a5355befa3608ee4755"
+    "arm64-v8a": "f8aa68d7a1c11ae59f8868561a9281e46884783d24d1f5eaa67710d50be42a02",
+    "armeabi-v7a": "bbb858d87b30d4a6bb844f2a7c4931942265e90134a601e1ef963767e92e430b",
+    "universal": "a05cfa8569e4567c64d8682fd4ffaedde0d683fd2f1b83bd43767b62be50c464"
   }
 }
