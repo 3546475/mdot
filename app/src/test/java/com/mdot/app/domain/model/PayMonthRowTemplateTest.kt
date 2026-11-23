@@ -151,6 +151,39 @@ class PayMonthRowTemplateTest {
         assertTrue(tpl.rows.any { it.name == "餐补" })   // 模板里本来还有
     }
 
+    // ---- 夜班补贴联动（2026-11-22 用户定）----
+
+    @Test
+    fun `夜班联动 - 旧行读取时按名称补成联动_明确关闭不复活`() {
+        val base = PayMonthSheet.default()
+        val old = PayMonthItem(id = 1000, name = "夜班补贴")
+        val sheet = base.copy(subsidy = base.subsidy + old)
+        val normalized = sheet.withBuiltinRows().subsidy.single { it.name == "夜班补贴" }
+        assertEquals(true, normalized.nightShiftLinked)
+        assertEquals(com.mdot.app.domain.PayMonthDayBasis.RECORD, normalized.dayBasis)
+
+        val off = old.copy(nightShiftLinked = false)
+        val kept = sheet.copy(subsidy = base.subsidy + off).withBuiltinRows()
+            .subsidy.single { it.name == "夜班补贴" }
+        assertEquals(false, kept.nightShiftLinked)
+    }
+
+    @Test
+    fun `夜班联动 - 模板跨月继承`() {
+        val base = PayMonthSheet.default()
+        val row = PayMonthItem(
+            id = 1000, name = "夜班补贴", dayRateCents = 5_000,
+            dayBasis = com.mdot.app.domain.PayMonthDayBasis.RECORD,
+            nightShiftLinked = true,
+        )
+        val tpl = PayMonthTemplates().of(base.copy(subsidy = base.subsidy + row))
+        assertEquals(true, tpl.rows.single { it.name == "夜班补贴" }.nightShiftLinked)
+        val fresh = PayMonthSheet.default().withTemplateRows(tpl)
+        val hit = fresh.subsidy.single { it.name == "夜班补贴" }
+        assertEquals(true, hit.nightShiftLinked)
+        assertEquals(5_000L, hit.dayRateCents)
+    }
+
     // ---- id 不撞车 ----
 
     @Test

@@ -15,6 +15,7 @@ import com.mdot.app.domain.model.DailyRecord
 import com.mdot.app.domain.model.LeaveDraft
 import com.mdot.app.domain.model.LeaveType
 import com.mdot.app.domain.model.OtDraft
+import com.mdot.app.domain.model.OtPricingMode
 import com.mdot.app.domain.model.RateTier
 import com.mdot.app.domain.model.RecordType
 import com.mdot.app.domain.model.Shift
@@ -66,6 +67,8 @@ data class SheetUiState(
     /** 该日期的自动判定档位 */
     val autoTier: RateTier = RateTier.WEEKDAY,
     val toCompMinutes: Int = 0,
+    /** 钟点时段计价的开始时间（当天分钟数）；null = 该条记录按单档计算 */
+    val otStartMinute: Int? = null,
     val leaveType: LeaveType = LeaveType.PERSONAL,
     val note: String = "",
     val editing: Boolean = false,
@@ -132,6 +135,7 @@ class RecordSheetViewModel @Inject constructor(
         boundToken = request.token
         viewModelScope.launch {
             val workdays = settings.workdaysFlow.first()
+            val salary = settings.salaryFlow.first()
             val autoTier = holidayRepo.tierFor(request.date, workdays)
             val records = recordRepo.observeByDate(request.date).first()
             existingRecord = records.firstOrNull { it.type == request.tab }
@@ -155,10 +159,11 @@ class RecordSheetViewModel @Inject constructor(
                     tierManual = existing.tierSource == TierSource.MANUAL,
                     autoTier = autoTier,
                     toCompMinutes = existing.toCompMinutes,
+                    otStartMinute = existing.otStartMinute,
                     leaveType = existing.leaveType ?: LeaveType.PERSONAL,
                     note = existing.note ?: "",
                     editing = true,
-                    salary = _state.value.salary,
+                    salary = salary,
                 )
             } else {
                 // 新记录：预选**默认班次**（班次管理里排第一个的可见班次，见 ShiftDefaults）——
@@ -174,7 +179,10 @@ class RecordSheetViewModel @Inject constructor(
                     tier = autoTier,
                     tierManual = false,
                     autoTier = autoTier,
-                    salary = _state.value.salary,
+                    otStartMinute = salary.otPricing
+                        .takeIf { it.mode == OtPricingMode.CLOCK_BANDS && it.appliesTo(autoTier) }
+                        ?.defaultStartMinute,
+                    salary = salary,
                 )
             }
         }
@@ -203,6 +211,11 @@ class RecordSheetViewModel @Inject constructor(
     }
 
     fun onTabChange(tab: RecordType) = _state.update { it.copy(tab = tab) }
+
+    /** 钟点时段计价：本条加班的开始时间（当天分钟数） */
+    fun onOtStartMinute(minute: Int) = _state.update {
+        it.copy(otStartMinute = minute.coerceIn(0, 1439))
+    }
 
     /** 切换时长输入模式：进入分钟模式时把当前时长同步给滚轮暂存值 */
     fun onDurationModeChange(mode: DurationInputMode) = _state.update {
@@ -315,6 +328,10 @@ class RecordSheetViewModel @Inject constructor(
                         tier = s.tier,
                         tierSource = if (s.tierManual) TierSource.MANUAL else TierSource.AUTO,
                         toCompMinutes = s.toCompMinutes.coerceAtMost(minutes),
+                        otStartMinute = s.otStartMinute.takeIf {
+                            s.salary.otPricing.mode == OtPricingMode.CLOCK_BANDS &&
+                                s.salary.otPricing.appliesTo(s.tier)
+                        },
                         note = s.note.takeIf { it.isNotBlank() },
                     )
                 )
@@ -366,6 +383,7 @@ class RecordSheetViewModel @Inject constructor(
                         tier = rec.tier ?: RateTier.WEEKDAY,
                         tierSource = rec.tierSource ?: TierSource.AUTO,
                         toCompMinutes = rec.toCompMinutes,
+                        otStartMinute = rec.otStartMinute,
                         note = rec.note,
                     )
                 )

@@ -69,27 +69,13 @@ object Routes {
 
     fun systemTab(tab: String): String = "settings/system?tab=$tab"
     const val SYSTEM_SWITCH = "settings/system/switch"
+    /** 加班分段计价（C1 时长阶梯 / C2 钟点时段） */
+    const val OT_PRICING = "settings/system/otpricing"
     const val APPEARANCE = "settings/appearance"
-    const val DATASOURCE = "settings/datasource"
     const val ABOUT = "settings/about"
+    /** 更新与数据源（关于页版本卡下方入口）：节假日库版本/刷新 + 更新源管理 */
+    const val DATASOURCE = "settings/datasource"
 
     fun calendar(month: String? = null): String =
         if (month == null) "calendar" else "calendar?month=$month"
-
-    /**
-     * 一级页面（底栏功能池路由，路由 pattern 去掉查询参数后比对）：
-     * 一级页面显示底栏、Tab 式切换；其余路由均为二级/次级页面（无底栏 + 顶栏）。
-     * 注意：设置是二级页面（从首页 ⚙ / 我的 进入）。
-     */
-    val TOP_LEVEL_BASE_ROUTES = setOf(
-        HOME, "calendar", STATS, EXPORT, SYNC, PROFILE,
-    )
-
-    /** 当前路由（destination.route，可含 ?query）是否一级页面 */
-    fun isTopLevel(destinationRoute: String?): Boolean =
-        destinationRoute?.substringBefore('?') in TOP_LEVEL_BASE_ROUTES
-
-    /** 导航目标路由是否一级页面 */
-    fun isTopLevelTarget(route: String): Boolean =
-        route.substringBefore('?') in TOP_LEVEL_BASE_ROUTES
 }

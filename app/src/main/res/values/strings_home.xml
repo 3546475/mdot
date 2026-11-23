@@ -14,9 +14,6 @@
     <string name="home_entry_paymonth">记月</string>
     <string name="home_entry_detail">明细</string>
     <string name="home_entry_profile">我的</string>
-    <string name="home_record_hourly">记工作</string>
-    <string name="home_record_comprehensive">记上班</string>
-    <string name="home_record_standard">记加班</string>
     <string name="home_income_hourly">工作收入</string>
     <string name="home_income_ot">加班收入</string>
     <string name="home_income_month">本月收入</string>

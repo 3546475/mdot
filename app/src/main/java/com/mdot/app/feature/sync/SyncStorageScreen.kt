@@ -3,7 +3,6 @@ package com.mdot.app.feature.sync
 import com.mdot.app.core.designsystem.component.JiabanAlertDialog
 import com.mdot.app.core.designsystem.component.JiabanSwitch
 import com.mdot.app.core.designsystem.dialogContainerColor
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,17 +12,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,8 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.ConfirmDialog
@@ -51,9 +44,7 @@ import com.mdot.app.core.designsystem.component.SegmentBar
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.sync.ProviderKind
 import com.mdot.app.core.sync.S3Creds
-import com.mdot.app.core.sync.S3Source
 import com.mdot.app.core.sync.WebDavCreds
-import com.mdot.app.core.sync.WebDavSource
 import kotlinx.coroutines.launch
 import com.mdot.app.core.designsystem.component.JiabanCircularProgress
 

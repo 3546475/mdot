@@ -171,10 +171,16 @@ fun Modifier.capsuleAmbientShadow(
  *
  * **必须挂在 `.clip()` 之后**（跟着胶囊形状裁），且由本修饰符保证「先内容、后描边」
  * （见文件头 ⚠️②）——调用方把它放在链尾即可。
+ *
+ * @param inset 亮线/内晕整体向内缩进的距离。默认 0 = 贴着节点边缘；液滴浅色档传描边宽度，
+ *   让最外 1dp 让给深色描边（`Modifier.border` 也是从边缘向内画），否则深色描边会把白亮线整条盖掉。
  */
-fun Modifier.capsuleEdgeHighlight(style: CapsuleLiftStyle): Modifier = drawWithContent {
+fun Modifier.capsuleEdgeHighlight(
+    style: CapsuleLiftStyle,
+    inset: Dp = 0.dp,
+): Modifier = drawWithContent {
     drawContent()
-    drawCapsuleEdge(style.edgeBrush, style.glowBrush)
+    drawCapsuleEdge(style.edgeBrush, style.glowBrush, inset.toPx())
 }
 
 /**
@@ -204,25 +210,25 @@ private fun DrawScope.drawCapsuleShadow(
 }
 
 /** 外缘亮线（1dp）+ 内晕（2dp）（配方卡 §4）：都是**内缩半线宽的描边**，半径随内缩量收小 */
-private fun DrawScope.drawCapsuleEdge(edgeBrush: Brush, glowBrush: Brush) {
+private fun DrawScope.drawCapsuleEdge(edgeBrush: Brush, glowBrush: Brush, shift: Float = 0f) {
     val glow = GlassLiftSpec.glowWidth.toPx()
     val edge = GlassLiftSpec.edgeWidth.toPx()
     // 尺寸过小（布局首帧/极端宽度）时不描，否则内缩后出现负尺寸
-    if (size.width <= glow * 2f || size.height <= glow * 2f) return
+    if (size.width <= (glow + shift) * 2f || size.height <= (glow + shift) * 2f) return
     // 内晕：紧贴外缘内侧的一圈白，往外渐隐
     drawRoundRect(
         brush = glowBrush,
-        topLeft = Offset(glow / 2f, glow / 2f),
-        size = Size(size.width - glow, size.height - glow),
-        cornerRadius = CornerRadius((size.height - glow) / 2f),
+        topLeft = Offset(shift + glow / 2f, shift + glow / 2f),
+        size = Size(size.width - shift * 2f - glow, size.height - shift * 2f - glow),
+        cornerRadius = CornerRadius((size.height - shift * 2f - glow) / 2f),
         style = Stroke(glow),
     )
     // 外缘亮线：压在晕上，1dp 白（上缘最亮）
     drawRoundRect(
         brush = edgeBrush,
-        topLeft = Offset(edge / 2f, edge / 2f),
-        size = Size(size.width - edge, size.height - edge),
-        cornerRadius = CornerRadius((size.height - edge) / 2f),
+        topLeft = Offset(shift + edge / 2f, shift + edge / 2f),
+        size = Size(size.width - shift * 2f - edge, size.height - shift * 2f - edge),
+        cornerRadius = CornerRadius((size.height - shift * 2f - edge) / 2f),
         style = Stroke(edge),
     )
 }

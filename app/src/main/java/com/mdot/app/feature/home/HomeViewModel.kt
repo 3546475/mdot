@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.LocalDate
@@ -167,6 +166,7 @@ class HomeViewModel @Inject constructor(
                     .filter { it.type == com.mdot.app.domain.model.RecordType.OT }
                     .map { it.date },
                 leaveMinutes = monthOut.leaveMinutes,
+                nightRecordDates = com.mdot.app.domain.PayMonthDaily.nightDates(monthRecords),
             )
         }
         val liveSheet = if (isSite) sheetBase else livePreviewSheet(

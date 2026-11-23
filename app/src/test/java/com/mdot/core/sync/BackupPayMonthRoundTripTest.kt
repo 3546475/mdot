@@ -1,6 +1,5 @@
 package com.mdot.core.sync
 
-import com.mdot.app.core.sync.BackupFile
 import com.mdot.app.core.sync.SettingsDto
 import com.mdot.app.domain.PayMonthDayBasis
 import com.mdot.app.domain.model.PayGroup
@@ -37,6 +36,7 @@ class BackupPayMonthRoundTripTest {
                 dayRateCents = 5_000,
                 dayBasis = PayMonthDayBasis.RECORD,
                 dayDeductLeave = true,
+                nightShiftLinked = true,
                 derivationDays = 21.0,
                 derivationUnitCents = 5_000,
             ),
@@ -66,6 +66,7 @@ class BackupPayMonthRoundTripTest {
         assertEquals(5_000L, row.dayRateCents)
         assertEquals(PayMonthDayBasis.RECORD, row.dayBasis)
         assertTrue(row.dayDeductLeave)
+        assertEquals(true, row.nightShiftLinked)
         assertEquals(21.0, row.derivationDays!!, 1e-9)
         assertEquals(5_000L, row.derivationUnitCents)
         assertEquals(105_000L, row.amountCents)
@@ -80,6 +81,7 @@ class BackupPayMonthRoundTripTest {
                 PayMonthRowTemplate(
                     "SUBSIDY", "全勤奖", builtinId = PayMonthSheet.FULL_ATTENDANCE_ROW_ID,
                     dayRateCents = 3_000, dayBasis = PayMonthDayBasis.CALENDAR, dayDeductLeave = true,
+                    nightShiftLinked = true,
                 ),
             )
         )

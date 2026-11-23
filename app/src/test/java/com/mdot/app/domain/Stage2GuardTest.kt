@@ -68,8 +68,8 @@ class Stage2GuardTest {
 
     // ---- B4-03 备份不变量 ----
 
-    private fun record(duration: Int = 120, toComp: Int = 0) = RecordDto(
-        date = "2026-09-14", type = "OT", durationMinutes = duration,
+    private fun record(duration: Int = 120, toComp: Int = 0, type: String = "OT") = RecordDto(
+        date = "2026-09-14", type = type, durationMinutes = duration,
         toCompMinutes = toComp, createdAt = 0, updatedAt = 0,
     )
 
@@ -123,9 +123,17 @@ class Stage2GuardTest {
     }
 
     @Test
+    fun `零时长加班可备份`() {
+        validateBackupInvariants(
+            BackupFile(records = listOf(record(duration = 0)))
+        )
+    }
+
+    @Test
     fun `非法时长与未知出勤状态被拒`() {
         val cases = listOf(
-            BackupFile(records = listOf(record(duration = 0))),
+            // 请假不能是 0 分钟；加班 0 分钟合法（只记班次）
+            BackupFile(records = listOf(record(duration = 0, type = "LEAVE"))),
             BackupFile(records = listOf(record(duration = 1441))),
             BackupFile(siteAttendance = listOf(siteAtt(work = -1))),
             BackupFile(siteAttendance = listOf(siteAtt(dayStatus = "SLEEP"))),

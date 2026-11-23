@@ -74,7 +74,7 @@ private val MinWidth = Spacing.xl * 6
  */
 private val ShellWidth = Spacing.xl * 10
 
-/** 倒计时进度条细高度（3dp）：纯图形装饰、非间距语义，故就地常量（同 InlineLoadingButton 的 18/2dp） */
+/** 倒计时进度条细高度（3dp）：纯图形装饰、非间距语义，故就地常量 */
 private val BurnBarHeight = 3.dp
 
 /**

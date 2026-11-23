@@ -1,20 +1,12 @@
 package com.mdot.app.feature.home
 
 import com.mdot.app.core.designsystem.engineShape
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,11 +15,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.WindowInsets
@@ -41,46 +30,31 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.wrapContentWidth
-import com.mdot.app.R
 import com.mdot.app.core.designsystem.IconBoxSpec
 import com.mdot.app.core.designsystem.AdaptiveSpecs
 import com.mdot.app.core.designsystem.LocalWindowSpec
 import com.mdot.app.core.designsystem.Radius
-import com.mdot.app.core.designsystem.SiteMoneyColors
-import com.mdot.app.feature.stats.pieColor
-import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.WindowSpec
-import com.mdot.app.core.designsystem.component.AnimatedMoneyText
-import com.mdot.app.core.designsystem.component.AnimatedNumberText
 import com.mdot.app.core.designsystem.component.HomeCardContentRegistry
 import com.mdot.app.core.designsystem.component.SectionCard
-import com.mdot.app.core.designsystem.component.WorkHeatmap
 import com.mdot.app.core.designsystem.component.TopBarHeight
-import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.domain.model.HomeCardContents
 import com.mdot.app.domain.model.WorkSystem
-import com.mdot.app.domain.util.Money
 import com.mdot.app.domain.util.TimeUtils
 import java.time.LocalDate
-import kotlin.math.roundToInt
 import com.mdot.app.core.designsystem.engineIsMiuix
-import com.mdot.app.core.designsystem.emphasisCardInk
 
 /** 首页（03 文档 §5.1 线框）；顶栏由 AppRoot 的固定一级顶栏统一提供。
  *  响应式（docs 03 §3.2）：EXPANDED（≥840dp）双栏——左数据（大数字/收入）| 右操作（入口卡/记加班主按钮），
@@ -325,176 +299,37 @@ private fun HomeCardContent(
     else -> null
 }
 
-/** 数据区：工时制度标签 + 本期大数字 + 综合工时副行 + 今日加班胶囊 + 考勤周期行（SITE 形态另见 SiteDataContent） */
+/** 首页骨架屏：标题 + 大数字 + 收入胶囊 + 两张卡片的占位，透明度呼吸闪烁 */
 @Composable
-private fun DataSection(state: HomeUiState, onOpenStats: () -> Unit, onOpenRecord: () -> Unit) {
-    Row(verticalAlignment = Alignment.Bottom) {
-        Column(Modifier.weight(1f)) {
-            // 考勤周期胶囊（点击进统计），取代原「本期加班时长」标签行
-            val periodInteraction = remember { MutableInteractionSource() }
-            Row(
-                modifier = Modifier
-                    .clip(engineShape(Radius.pill))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .clickable(
-                        interactionSource = periodInteraction,
-                        indication = LocalIndication.current,
-                        onClick = onOpenStats,
-                    )
-                    .padding(horizontal = Spacing.m, vertical = Spacing.xs),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_ms_calendar_month), null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(IconSpec.inline),
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    state.period?.let { period ->
-                        stringResource(R.string.home_cycle_period, "${TimeUtils.mdCn(period.from)} – ${TimeUtils.mdCn(period.to)}")
-                    } ?: "",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(Modifier.height(6.dp))
-            // hero 数字：**显示什么由用户在「首页卡片 → 数据区」里选**（卡片内容自定义）。
-            // 时长走 AnimatedNumberText（与工地记工工钱同款滚动反馈），金额走 AnimatedMoneyText。
-            when (state.dataContent) {
-                HomeCardContents.DATA_NET_PAY -> DataMoneyHero(state.netPayCents, label = "netPayBigNumber")
-                else -> {
-                    // 数值变化时滚动滑入（与工地记工工钱同款滑动动画，docs/15 统一数字反馈）
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        AnimatedNumberText(
-                            value = state.cycleOtMinutes,
-                            text = { TimeUtils.hoursDecimal(it) },
-                            style = MaterialTheme.typography.displayLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Bold,
-                            label = "otBigNumber",
-                        )
-                        Text(
-                            stringResource(R.string.detail_worked_hours_unit),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(bottom = Spacing.s, start = Spacing.xs),
-                        )
-                    }
-                }
-            }
-            // 综合工时副行：超时部分 primary 强调（10 文档 F-Z5；月中为预演值）。
-            // 它解释的是**上面那个时长数字**（超时 X · 标准 Y），hero 被换成金额时就不再适用
-            if (state.dataContent == HomeCardContents.DATA_OT_HOURS &&
-                state.salary.workSystem == WorkSystem.COMPREHENSIVE && state.cycleOtMinutes > 0
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        stringResource(R.string.home_overtime_prefix),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        stringResource(R.string.home_overtime_hours, TimeUtils.hoursDecimal(state.overtimeMinutes)),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        stringResource(R.string.home_overtime_standard_suffix, TimeUtils.hoursDecimal(state.periodStandardMinutes)),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            // 今日胶囊两态：已记 → 「今日 Xh」；没记 → 「今日还没记」可点直达记加班。
-            // hero 被换成金额（实发工资）后时长不再是大数字 → 旁边补一颗**同款**「总 Xh」把时长留住
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (state.todayOtMinutes > 0) {
-                    TodayPill(
-                        text = stringResource(R.string.home_today_ot, TimeUtils.hoursDecimal(state.todayOtMinutes)),
-                        filled = true,
-                        onRecord = onOpenRecord,
-                    )
-                } else {
-                    TodayPill(text = stringResource(R.string.home_today_empty), filled = false, onRecord = onOpenRecord)
-                }
-                if (state.dataContent != HomeCardContents.DATA_OT_HOURS) {
-                    Spacer(Modifier.width(Spacing.s))
-                    // 同款填充胶囊（filled 态本身不可点，故不接记录动作）
-                    TodayPill(
-                        text = stringResource(R.string.home_total_ot, TimeUtils.hoursDecimal(state.cycleOtMinutes)),
-                        filled = true,
-                        onRecord = {},
-                    )
-                }
-            }
-        }
+private fun HomeSkeleton() {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val alpha by transition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0.85f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(700),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "shimmerAlpha",
+    )
+    @Composable
+    fun SkeletonBlock(mod: Modifier) {
+        Surface(
+            shape = engineShape(Radius.button),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = mod.alpha(alpha),
+        ) { Box(Modifier) }
     }
-}
-
-/** 数据区的金额型 hero（实发工资 / 本月收入）：金额未配置或实时预览全 0（单据与引擎皆空）时给 "-"（同收入卡口径，不显 ¥0.00） */
-@Composable
-private fun DataMoneyHero(cents: Long?, label: String) {
-    val style = MaterialTheme.typography.displaySmall
-    val color = MaterialTheme.colorScheme.onSurface
-    if (cents == null) {
-        Text("-", style = style, color = color, fontWeight = FontWeight.Bold)
-    } else {
-        AnimatedMoneyText(
-            cents,
-            style = style,
-            color = color,
-            fontWeight = FontWeight.Bold,
-            label = label,
-        )
-    }
-}
-
-/** 今日胶囊两态：已记（primaryContainer 填充「今日 Xh/N 工」）/ 未记（描边「今日还没记」，点击直达记加班/记工） */
-@Composable
-private fun TodayPill(text: String, filled: Boolean, onRecord: () -> Unit) {
-    // 记一笔后「今日还没记」→「今日 Xh」切换：新状态从上方淡入下滑（T4-2b，motionScheme specs）
-    val pillFade = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-    val pillSlide = MaterialTheme.motionScheme.fastSpatialSpec<androidx.compose.ui.unit.IntOffset>()
-    AnimatedContent(
-        targetState = text,
-        transitionSpec = {
-            (fadeIn(pillFade) + slideInVertically(pillSlide) { -it / 2 })
-                .togetherWith(fadeOut(pillFade))
-        },
-        label = "todayPill",
-    ) { t ->
-        if (filled) {
-            Text(
-                text = t,
-                style = MaterialTheme.typography.labelLarge,
-                color = if (engineIsMiuix) MaterialTheme.colorScheme.primary else emphasisCardInk(),
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier
-                    .padding(top = Spacing.s)
-                    .clip(engineShape(Radius.pill))
-                    .background(
-                        if (engineIsMiuix) MaterialTheme.colorScheme.surfaceContainerHigh
-                        else MaterialTheme.colorScheme.primaryContainer,
-                    )
-                    .padding(horizontal = Spacing.m, vertical = Spacing.xs),
-            )
-        } else {
-            val interaction = remember { MutableInteractionSource() }
-            Text(
-                text = t,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier
-                    .padding(top = Spacing.s)
-                    .pressScale(interaction, pressedScale = 0.93f)
-                    .clip(engineShape(Radius.pill))
-                    .border(1.dp, MaterialTheme.colorScheme.primary, engineShape(Radius.pill))
-                    .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onRecord)
-                    .padding(horizontal = Spacing.m, vertical = Spacing.xs),
-            )
+    Column {
+        SkeletonBlock(Modifier.fillMaxWidth(0.32f).height(16.dp))
+        Spacer(Modifier.height(Spacing.s))
+        SkeletonBlock(Modifier.fillMaxWidth(0.5f).height(56.dp))
+        Spacer(Modifier.height(Spacing.l))
+        SkeletonBlock(Modifier.fillMaxWidth().height(72.dp))
+        Spacer(Modifier.height(Spacing.m))
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
+            SkeletonBlock(Modifier.weight(1f).height(120.dp))
+            SkeletonBlock(Modifier.weight(1f).height(120.dp))
         }
     }
 }
@@ -534,355 +369,5 @@ private fun EntryCard(
             Spacer(Modifier.height(Spacing.s))
             Text(stringResource(labelRes), style = MaterialTheme.typography.titleMedium)
         }
-    }
-}
-
-/** 首页骨架屏：标题 + 大数字 + 收入胶囊 + 两张卡片的占位，透明度呼吸闪烁 */
-@Composable
-private fun HomeSkeleton() {
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val alpha by transition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.85f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(700),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "shimmerAlpha",
-    )
-    @Composable
-    fun SkeletonBlock(mod: Modifier) {
-        Surface(
-            shape = engineShape(Radius.button),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            modifier = mod.alpha(alpha),
-        ) { Box(Modifier) }
-    }
-    Column {
-        SkeletonBlock(Modifier.fillMaxWidth(0.32f).height(16.dp))
-        Spacer(Modifier.height(Spacing.s))
-        SkeletonBlock(Modifier.fillMaxWidth(0.5f).height(56.dp))
-        Spacer(Modifier.height(Spacing.l))
-        SkeletonBlock(Modifier.fillMaxWidth().height(72.dp))
-        Spacer(Modifier.height(Spacing.m))
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
-            SkeletonBlock(Modifier.weight(1f).height(120.dp))
-            SkeletonBlock(Modifier.weight(1f).height(120.dp))
-        }
-    }
-}
-
-/** 记加班大按钮：全宽 primary 胶囊，首页醒目主操作入口 */
-@Composable
-private fun RecordHeroButton(workSystem: WorkSystem, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    Surface(
-        shape = engineShape(Radius.pill),
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(72.dp)
-            .pressScale(interaction, pressedScale = 0.96f)
-            .clip(engineShape(Radius.pill))
-            .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                painterResource(R.drawable.ic_ms_more_time), contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(28.dp),
-            )
-            Spacer(Modifier.width(10.dp))
-            Text(
-                when (workSystem) {
-                    WorkSystem.HOURLY -> stringResource(R.string.home_record_hourly)
-                    WorkSystem.COMPREHENSIVE -> stringResource(R.string.home_record_comprehensive)
-                    WorkSystem.STANDARD -> stringResource(R.string.home_record_standard)
-                    WorkSystem.SITE -> stringResource(R.string.site_record_hero)
-                },
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onPrimary,
-                fontWeight = FontWeight.Bold,
-            )
-        }
-    }
-}
-
-@Composable
-private fun IncomeCard(
-    workSystem: WorkSystem,
-    cycleOtPay: Long?,
-    monthIncome: Long?,
-    onOpenDetail: () -> Unit,
-) {
-    // hero 卡（primaryContainer，与统计/明细页同视觉体系）；整卡与右端「明细 ›」小字均进入明细页
-    SectionCard(
-        onClick = onOpenDetail,
-        // 首页收色（2026-09-30 用户口径）：MIUIX 卡底走中性（强调整色只留给数字/链接）；MD3 保持原强调色底
-        containerColor = if (engineIsMiuix) MaterialTheme.colorScheme.surfaceContainer
-        else MaterialTheme.colorScheme.primaryContainer,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    if (workSystem == WorkSystem.HOURLY) stringResource(R.string.home_income_hourly) else stringResource(R.string.home_income_ot),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = emphasisCardInk().copy(alpha = 0.7f),
-                )
-                if (cycleOtPay != null) {
-                    AnimatedMoneyText(
-                        cycleOtPay,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = emphasisCardInk(),
-                        label = "incomeCyclePay",
-                    )
-                } else {
-                    Text("-", style = MaterialTheme.typography.titleMedium, color = emphasisCardInk())
-                }
-            }
-            Column(Modifier.weight(1.2f)) {
-                Text(
-                    stringResource(R.string.home_income_month),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = emphasisCardInk().copy(alpha = 0.7f),
-                )
-                if (monthIncome != null) {
-                    AnimatedMoneyText(
-                        monthIncome,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = emphasisCardInk(),
-                        label = "incomeMonth",
-                    )
-                } else {
-                    Text("-", style = MaterialTheme.typography.titleMedium, color = emphasisCardInk())
-                }
-            }
-            // 「工资 ›」小字：只有这一小块进入工资设定
-            val interaction = remember { MutableInteractionSource() }
-            Row(
-                modifier = Modifier
-                    .pressScale(interaction, pressedScale = 0.88f)
-                    .clip(engineShape(Radius.button))
-                    .clickable(
-                        interactionSource = interaction,
-                        indication = LocalIndication.current,
-                        onClick = onOpenDetail,
-                    )
-                    .padding(horizontal = Spacing.s, vertical = Spacing.m),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    stringResource(R.string.home_income_detail),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = emphasisCardInk(),
-                )
-                Spacer(Modifier.width(2.dp))
-                Text(
-                    "›",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = emphasisCardInk(),
-                )
-            }
-        }
-    }
-}
-
-
-/** 首页 SITE 数据区（12 文档 F-S6；v0.7.7 起大数字口径=本期待结，21 文档 B1）：本期待结工数大数字 + 加班副行 + 项目名 */
-@Composable
-private fun SiteDataContent(state: HomeUiState, site: SiteHomeUi, onOpenRecord: () -> Unit) {
-    Column {
-        Text(
-            if (state.salary.siteDisplayUnit == "HOUR") stringResource(R.string.site_home_works_label_hour)
-            else stringResource(R.string.site_home_works_label),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        val hourMode = state.salary.siteDisplayUnit == "HOUR"
-        // 数值变化时滚动滑入（与工地记工工钱同款滑动动画）
-        Row(verticalAlignment = Alignment.Bottom) {
-            AnimatedNumberText(
-                value = site.totalWorksMilli,
-                text = { milli ->
-                    if (hourMode) String.format(java.util.Locale.US, "%.1f", milli / 1000.0 * (site.siteBaseMinutes / 60.0))
-                    else String.format(java.util.Locale.US, "%.1f", milli / 1000.0)
-                },
-                style = MaterialTheme.typography.displayLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Bold,
-                label = "siteBigNumber",
-            )
-            Text(
-                if (hourMode) stringResource(R.string.detail_worked_hours_unit)
-                else stringResource(R.string.stats_works_unit),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = Spacing.s, start = Spacing.xs),
-            )
-        }
-        if (site.otMinutes > 0 || site.projectName.isNotEmpty()) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.s),
-            ) {
-                Text(
-                    listOfNotNull(
-                        if (site.otMinutes > 0) stringResource(R.string.home_overtime_hours, TimeUtils.hoursDecimal(site.otMinutes)) else null,
-                    ).joinToString(" · "),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (site.projectName.isNotEmpty()) {
-                    // 项目色点：与统计饼图同一稳定色（projectId 索引）
-                    Box(
-                        Modifier
-                            .size(8.dp)
-                            .background(pieColor((site.projectId % 7).toInt()), androidx.compose.foundation.shape.CircleShape),
-                    )
-                    Text(
-                        site.projectName,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-        // 今日胶囊两态（口径随显示单位偏好）
-        if (site.todayWorksMilli > 0 || site.todayOtMinutes > 0) {
-            TodayPill(
-                text = if (hourMode)
-                    stringResource(R.string.site_home_today_hours, TimeUtils.hoursDecimal(((site.todayWorksMilli * site.siteBaseMinutes / 1000L) + site.todayOtMinutes * 60L).toInt()))
-                else
-                    stringResource(R.string.site_home_today_works, site.todayWorksMilli / 1000L),
-                filled = true,
-                onRecord = onOpenRecord,
-            )
-        } else {
-            TodayPill(text = stringResource(R.string.home_today_empty), filled = false, onRecord = onOpenRecord)
-        }
-    }
-}
-
-/** 首页 SITE 待结卡：应得 / 已借支 / 待结 + 待结区间行 + 「明细 ›」入口（primaryContainer hero；整卡与小字均进明细页）。
- *  数字口径 =「本期待结」（上次结算次日 → 今天，21 文档 B1），与结算页摘要同源逐分一致。 */
-@Composable
-private fun SitePendingCard(site: SiteHomeUi, onOpenDetail: () -> Unit) {
-    SectionCard(
-        onClick = onOpenDetail,
-        // 首页收色（2026-09-30 用户口径）：MIUIX 卡底走中性（强调整色只留给数字/链接）；MD3 保持原强调色底
-        containerColor = if (engineIsMiuix) MaterialTheme.colorScheme.surfaceContainer
-        else MaterialTheme.colorScheme.primaryContainer,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                // 待结区间（M/d – M/d）：口径可见，与结算页「本期待结摘要」对账用（21 文档 B1）
-                if (site.rangeFrom != null && site.rangeTo != null) {
-                    Text(
-                        stringResource(
-                            R.string.site_pending_range,
-                            "${TimeUtils.mdCn(site.rangeFrom)} – ${TimeUtils.mdCn(site.rangeTo)}",
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = emphasisCardInk().copy(alpha = 0.7f),
-                    )
-                }
-                Text(
-                    stringResource(R.string.site_settlement_receivable),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = emphasisCardInk().copy(alpha = 0.7f),
-                )
-                AnimatedMoneyText(
-                    site.workPayCents,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = emphasisCardInk(),
-                    label = "siteReceivable",
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.m)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            stringResource(R.string.site_stat_advance),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = SiteMoneyColors.ReceivedGreen,
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        AnimatedMoneyText(
-                            site.advanceCents,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = SiteMoneyColors.ReceivedGreen,
-                            label = "siteAdvance",
-                        )
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            stringResource(R.string.site_stat_pending),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = SiteMoneyColors.PendingOrange,
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        AnimatedMoneyText(
-                            site.pendingCents,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = SiteMoneyColors.PendingOrange,
-                            label = "sitePending",
-                        )
-                    }
-                }
-            }
-            val interaction = remember { MutableInteractionSource() }
-            Row(
-                modifier = Modifier
-                    .pressScale(interaction, pressedScale = 0.88f)
-                    .clip(engineShape(Radius.button))
-                    .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onOpenDetail)
-                    .padding(horizontal = Spacing.s, vertical = Spacing.m),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(stringResource(R.string.home_income_detail), style = MaterialTheme.typography.labelMedium, color = emphasisCardInk())
-                Text("›", style = MaterialTheme.typography.titleMedium, color = emphasisCardInk())
-            }
-        }
-    }
-}
-
-
-/** 首页本周柱状卡：与统计页同款共享组件与同款接线（点柱出浮窗 / 长按进记加班弹层） */
-@Composable
-private fun HomeWeekBarCard(
-    bars: List<com.mdot.app.core.designsystem.component.WeekBar>,
-    workSystem: WorkSystem,
-    onChartDay: (LocalDate) -> Unit,
-) {
-    var selected by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
-    com.mdot.app.core.designsystem.component.WeekBarCard(
-        bars = bars,
-        // 与统计页同一取值函数（不再自带一套数字格式，避免两页分叉）
-        valueText = { com.mdot.app.core.designsystem.component.modeValueText(workSystem, it) },
-        selectedLabel = selected,
-        onSelect = { selected = if (selected == it) null else it },
-        onDayLongPress = onChartDay,
-        hintValueText = com.mdot.app.core.designsystem.component.chartHintText(workSystem),
-    )
-}
-
-/** 首页热点图卡：与统计页一致（GitHub 贡献图风格、固定六个月窗口）＋同款接线（点击浮窗 / 长按记录） */
-@Composable
-private fun HomeHeatmapCard(
-    heatValues: Map<LocalDate, Float>,
-    workSystem: WorkSystem,
-    onChartDay: (LocalDate) -> Unit,
-) {
-    SectionCard {
-        val today = LocalDate.now()
-        WorkHeatmap(
-            values = heatValues,
-            start = today.withDayOfMonth(1).minusMonths(5),
-            end = today,
-            onDayLongPress = onChartDay,
-            hintValueText = com.mdot.app.core.designsystem.component.chartHintText(workSystem),
-        )
     }
 }

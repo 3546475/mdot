@@ -1,7 +1,6 @@
-package com.mdot.app.feature.record
+package com.mdot.app.core.designsystem.component
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -9,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
@@ -30,8 +30,9 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.flow.distinctUntilChanged
 import com.mdot.app.core.designsystem.Spacing
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlin.math.abs
 
 /**
  * 循环无限滚轮（时分选择器）：
@@ -57,9 +58,9 @@ fun LoopWheel(
 
     val loopCount = 1_000_000 / itemCount
     fun indexOf(value: Int, near: Int): Int {
-        val mod = ((near % itemCount) + itemCount) % itemCount
-        var delta = ((value - mod) % itemCount + itemCount) % itemCount
-        if (delta > itemCount / 2) delta -= itemCount // 选更近的方向
+        val current = Math.floorMod(near, itemCount)
+        val forward = Math.floorMod(value - current, itemCount)
+        val delta = if (forward > itemCount / 2) forward - itemCount else forward // 选更近的方向
         return near + delta
     }
 
@@ -69,10 +70,12 @@ fun LoopWheel(
             val info = listState.layoutInfo
             val viewportCenter = (info.viewportStartOffset + info.viewportEndOffset) / 2
             info.visibleItemsInfo.minByOrNull { item ->
-                kotlin.math.abs((item.offset + item.size / 2) - viewportCenter)
+                abs((item.offset + item.size / 2) - viewportCenter)
             }?.index ?: 0
         }
     }
+
+    fun centerValue(): Int = Math.floorMod(centerIndex, itemCount)
 
     // 首次：定位到中段表示 safeValue 的格（无动画）；后续 value 外部变化：平滑滚动到最近同值格
     var initialized by remember { mutableStateOf(false) }
@@ -81,8 +84,7 @@ fun LoopWheel(
             listState.scrollToItem((loopCount / 2) * itemCount + safeValue)
             initialized = true
         } else {
-            val centerValue = ((centerIndex % itemCount) + itemCount) % itemCount
-            if (centerValue != safeValue) {
+            if (centerValue() != safeValue) {
                 listState.animateScrollToItem(indexOf(safeValue, centerIndex))
             }
         }
@@ -96,7 +98,7 @@ fun LoopWheel(
     // ② 联动另一轮时用过期 totalMinutes 计算，出现自行扫动（实测分钟轮被小时轮
     //    联动后从 30 全轮扫到 00）。
     // 另：初始化定位（scrollToItem）完成前不回调——首帧 layout 未就绪时 centerIndex
-    // 兕底为 0，会把 value=0 误报给外部。
+    // 兜底为 0，会把 value=0 误报给外部。
     val haptic = LocalHapticFeedback.current
     var firstIdle by remember { mutableStateOf(true) }
     val currentSafeValue by rememberUpdatedState(safeValue)
@@ -104,7 +106,7 @@ fun LoopWheel(
     LaunchedEffect(listState) {
         snapshotFlowIsIdle(listState) {
             if (!initialized) return@snapshotFlowIsIdle
-            val v = ((centerIndex % itemCount) + itemCount) % itemCount
+            val v = centerValue()
             if (v != currentSafeValue) currentOnValueChange(v)
             if (firstIdle) firstIdle = false
             else haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -131,7 +133,7 @@ fun LoopWheel(
                 val viewportCenter =
                     (listState.layoutInfo.viewportStartOffset + listState.layoutInfo.viewportEndOffset) / 2
                 val distance = itemInfo?.let {
-                    kotlin.math.abs((it.offset + it.size / 2) - viewportCenter).toFloat() /
+                    abs((it.offset + it.size / 2) - viewportCenter).toFloat() /
                         it.size.toFloat().coerceAtLeast(1f)
                 } ?: 2f
                 // 字号恒定 22sp，大小变化全由 scale 连续驱动（中心 22×1.18≈26sp，
@@ -171,7 +173,7 @@ fun LoopWheel(
 
 /** 滚动停止（吸附完成）时回调一次 */
 private suspend fun snapshotFlowIsIdle(
-    listState: androidx.compose.foundation.lazy.LazyListState,
+    listState: LazyListState,
     onIdle: () -> Unit,
 ) {
     snapshotFlow { listState.isScrollInProgress }

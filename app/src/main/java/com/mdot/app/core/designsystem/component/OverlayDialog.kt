@@ -2,7 +2,6 @@ package com.mdot.app.core.designsystem.component
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,8 +28,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import com.mdot.app.core.designsystem.DialogSpec
-import com.mdot.app.core.designsystem.SheetBackdrop
 import com.mdot.app.core.designsystem.Spacing
+import com.mdot.app.core.designsystem.dialogContainerColor
 import com.mdot.app.core.designsystem.sheetSpatialSpec
 import com.mdot.app.core.designsystem.engineIsMiuix
 import androidx.compose.material3.VerticalDivider
@@ -43,7 +42,7 @@ import androidx.compose.runtime.mutableStateListOf
  *
  * 动机：K80 PRO（Android 16 / HyperOS）上 ROM 给对话框**窗口表面**加了动画，主题的
  * `windowAnimationStyle` / enter/exit 全 `@null`、运行期 `setWindowAnimations(0)`、甚至把系统动画缩放
- * 置 0 都治不住（真机打点证明视图层完全没动，见 `DialogBackdrop.kt` 的探针注释）。**不新开窗**是唯一
+ * 置 0 都治不住（真机打点证明视图层完全没动）。**不新开窗**是唯一
  * 结构上能绕开它的做法。
  *
  * ⚠️ 原型取舍：状态用**全局单例**承载（免去层层 provider）；正式化应改为 AppRoot 持有 + DI 注入。
@@ -77,7 +76,8 @@ class OverlayDialogController {
  * 单例会让 `@Preview`、Robolectric 测试、多窗口/分屏里的多个组合**共用同一个栈**（互相串）。
  * 组合级持有则随 Activity 重建一起换新，语义正确。
  *
- * `null` = 当前组合没有宿主（预览/测试，或弹窗被组合在 App 之外）⇒ 调用方**回退到原来的窗口实现**。
+ * `null` = 当前组合没有宿主（弹窗被组合在 App 之外）⇒ 调用方用 `requireNotNull` **直接报错**，
+ * 不再有窗口实现兜底（缺宿主就是接线错误，见硬规则 14）。
  */
 val LocalOverlayDialogs = androidx.compose.runtime.staticCompositionLocalOf<OverlayDialogController?> { null }
 
@@ -201,11 +201,11 @@ internal fun OverlayDialogCard(
                 }
             }
             if (engineIsMiuix && (confirmButton != null || dismissButton != null)) {
-                // MIUIX：与窗口版 [MiuixDialogCard] 同观感——通栏细分隔线 + 贴底整宽分栏按钮行（左取消/右确认）
+                // MIUIX：通栏细分隔线 + 贴底整宽分栏按钮行（左取消/右确认）
                 // ⚠️ 本块必须在上面 padded Column 的**外面**（2026-10-09 用户报「输入框与分割线贴在一起」根因，
                 // 仅是括号位置）：放进里面 = ① text 槽（输入框）与分隔线 0 间距，24dp 底部 padding 垫到按钮行下方去了；
                 // ② 分隔线/按钮行左右各缩 24dp、离卡片底沿再垫 24dp，与「通栏/贴底」不符。
-                // 放在外面后：输入框→分隔线的间距 = 内容区底部 padding（Spacing.xl = 24dp），与窗口版完全一致。
+                // 放在外面后：输入框→分隔线的间距 = 内容区底部 padding（Spacing.xl = 24dp）。
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 androidx.compose.runtime.CompositionLocalProvider(LocalDialogButtonFlat provides true) {
                     Row(Modifier.fillMaxWidth().height(DialogSpec.buttonRowHeight)) {
@@ -250,5 +250,47 @@ internal fun OverlayDialogCard(
                 }
             }
         }
+    }
+}
+
+/**
+ * 对话框（引擎无关入口，全 App 统一走它）：卡片是 [OverlayDialogCard]，由 [OverlayDialogLayer]
+ * 以**页内模态覆盖层**呈现（不开系统对话框窗口——动机见 [OverlayDialogController]）。
+ * 参数面与 M3 AlertDialog 对齐（title/text/confirmButton/dismissButton/containerColor…）。
+ *
+ * [confirmButton] 传 **null** = 「本弹窗没有确认键」（如单选日期/月份选择：点一下即生效、无需再确认）。
+ * ⚠️ **不要传空 lambda `{}`**——MIUIX 的分栏按钮行只看「槽在不在」，空 lambda 仍会占出半格，
+ * 于是出现「半格空白 + 一条孤立的竖分隔线」（2026-10-09 真机报「日期选择弹窗右下是空的」）。
+ * 传 null 时 MIUIX 会把「取消」铺满整行；两个槽都为 null 时整条按钮行与分隔线都不画。
+ */
+@Composable
+fun JiabanAlertDialog(
+    onDismissRequest: () -> Unit,
+    confirmButton: (@Composable () -> Unit)? = null,
+    dismissButton: @Composable (() -> Unit)? = null,
+    icon: @Composable (() -> Unit)? = null,
+    title: @Composable (() -> Unit)? = null,
+    text: @Composable (() -> Unit)? = null,
+    containerColor: Color = dialogContainerColor(),
+) {
+    val overlayCtl = requireNotNull(LocalOverlayDialogs.current) {
+        "JiabanAlertDialog 需要 LocalOverlayDialogs 宿主（MainActivity 的 setContent 提供）"
+    }
+    DisposableEffect(Unit) {
+        val entry = OverlayEntry(
+            onDismiss = onDismissRequest,
+            content = {
+                OverlayDialogCard(
+                    containerColor = containerColor,
+                    icon = icon,
+                    title = title,
+                    text = text,
+                    confirmButton = confirmButton,
+                    dismissButton = dismissButton,
+                )
+            },
+        )
+        overlayCtl.push(entry)
+        onDispose { overlayCtl.remove(entry) }
     }
 }

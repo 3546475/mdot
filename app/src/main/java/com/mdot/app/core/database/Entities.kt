@@ -39,6 +39,8 @@ data class DailyRecordEntity(
     /** AUTO | MANUAL */
     @ColumnInfo(name = "tier_source") val tierSource: String?,
     @ColumnInfo(name = "to_comp_minutes") val toCompMinutes: Int,
+    /** 钟点时段计价的开始时间（当天分钟数）；null = 该条记录按单档计算 */
+    @ColumnInfo(name = "ot_start_minute") val otStartMinute: Int? = null,
     /** PERSONAL|SICK|ANNUAL|COMP|ABSENT|OTHER（仅 LEAVE） */
     @ColumnInfo(name = "leave_type") val leaveType: String?,
     val note: String?,

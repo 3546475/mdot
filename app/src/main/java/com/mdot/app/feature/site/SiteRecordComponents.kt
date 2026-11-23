@@ -52,7 +52,6 @@ import androidx.compose.ui.unit.dp
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.IconBoxSpec
 import com.mdot.app.core.designsystem.Radius
-import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.pressScale
@@ -405,30 +404,6 @@ internal fun SelectTile(
                     .align(Alignment.TopEnd)
                     .padding(Spacing.xs)
                     .size(14.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun PlannedSegment(text: String) {
-    Box(
-        Modifier
-            .clip(engineShape(Radius.pill))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f))
-            .padding(horizontal = Spacing.l, vertical = Spacing.s),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            )
-            Spacer(Modifier.width(4.dp))
-            BadgePill(
-                stringResource(R.string.site_planned),
-                MaterialTheme.colorScheme.surfaceContainerHighest,
-                MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

@@ -5,7 +5,6 @@
     <string name="site_onboarding_desc">记工天（全天/半天）、加班按小时，借支结算分开记</string>
 
     <!-- 记录/首页制度化文案（when 补齐） -->
-    <string name="site_record_hero">记 工</string>
     <!-- 日历页工地月小结标签（日历=月视图，「本月」语义正确；21 文档 B1 保留） -->
     <string name="site_cycle_label">本月工数</string>
     <!-- 首页数据区大数字标签（v0.7.7 起口径=本期待结，21 文档 B1/Q3 拍板） -->
@@ -108,7 +107,6 @@
     <string name="site_row_date">日期</string>
     <string name="site_today">今天</string>
     <string name="site_sub_day">点工</string>
-    <string name="site_planned">规划中</string>
     <string name="site_work">上班</string>
     <string name="site_one_work">1个工</string>
     <string name="site_pick_days">选工天</string>

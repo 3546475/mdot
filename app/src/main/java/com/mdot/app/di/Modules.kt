@@ -118,7 +118,12 @@ object DatabaseModule {
         }
         val db = Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.NAME)
             .openHelperFactory(SqlcipherFastKdf.factory(passphrase, rawKey))
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
+            .addMigrations(
+                AppDatabase.MIGRATION_1_2,
+                AppDatabase.MIGRATION_2_3,
+                AppDatabase.MIGRATION_3_4,
+                AppDatabase.MIGRATION_4_5,
+            )
             .addCallback(AppDatabase.SEED_CALLBACK)
             .build()
         // 首次注入即后台预热：SQLCipher 打开/KDF/建库都在 IO 线程完成，

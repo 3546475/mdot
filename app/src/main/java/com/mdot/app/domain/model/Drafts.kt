@@ -12,6 +12,8 @@ data class OtDraft(
     val tier: RateTier,
     val tierSource: TierSource,
     val toCompMinutes: Int = 0,
+    /** 钟点时段计价的开始时间（当天分钟数）；null = 该条记录按单档计算 */
+    val otStartMinute: Int? = null,
     val note: String? = null,
 )
 

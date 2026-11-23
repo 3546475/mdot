@@ -67,6 +67,8 @@ data class SalaryConfig(
     val taxAdditionalDeductionCents: Long = 0,
     /** 个税页勾选的专项附加扣除项 key（仅为回显；金额以 [taxAdditionalDeductionCents] 为准） */
     val taxDeductionItemKeys: Set<String> = emptySet(),
+    /** 加班分段计价（时长阶梯 / 钟点时段）；缺省 FLAT，老配置/老备份自动兼容 */
+    val otPricing: OtPricingConfig = OtPricingConfig(),
 ) {
     val hasBaseSalary: Boolean get() = baseSalaryCents > 0
 }

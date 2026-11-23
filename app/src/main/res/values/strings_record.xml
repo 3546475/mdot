@@ -33,6 +33,7 @@
     <string name="ds_confirm_delete">删除</string>
     <string name="ds_cancel">取消</string>
     <string name="ds_pick_confirm">确定</string>
+    <string name="time_pick_title">选择时间</string>
     <!-- v0.7.4 统一日期/月份选择（docs/03 §日期选择） -->
     <string name="ds_pick_date">选择日期</string>
     <string name="ds_pick_start">选择开始日期</string>
@@ -86,4 +87,11 @@
     <string name="record_no_ot_chip">没加班，只记班次</string>
     <string name="record_no_ot_hint">0 小时：需选班次或填备注</string>
     <string name="record_no_ot_value">未加班</string>
+
+    <!-- 钟点时段计价（C2）：本条加班的开始时间 -->
+    <string name="record_ot_start">加班开始时间</string>
+    <string name="record_ot_start_unset">开始时间（未设置）</string>
+    <string name="record_ot_start_unset_hint">未设置开始时间，本条按单档倍率计算</string>
+    <string name="record_ot_segment">%1$s–%2$s · %3$s 元</string>
+    <string name="record_ot_segment_offset">%1$s–%2$s 小时 · %3$s 元</string>
 </resources>

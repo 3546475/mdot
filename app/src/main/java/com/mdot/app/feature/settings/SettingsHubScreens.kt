@@ -34,7 +34,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -332,7 +331,7 @@ fun AboutScreen(
                 beyondViewportPageCount = 1,
             ) { page ->
                 when (page) {
-                    0 -> AboutPane(updateVm = updateVm, dsVm = dsVm, hub = hub)
+                    0 -> AboutPane(updateVm = updateVm, dsVm = dsVm, hub = hub, onOpen = onOpen)
                     else -> SettingsHubPane(hub = hub, onOpen = onOpen)
                 }
             }
@@ -353,6 +352,7 @@ private fun AboutPane(
     updateVm: UpdateViewModel,
     dsVm: DataSourceViewModel,
     hub: SettingsHubViewModel,
+    onOpen: (String) -> Unit,
 ) {
     val context = LocalContext.current
     Column(
@@ -365,6 +365,15 @@ private fun AboutPane(
 
         // hero 版本卡（自更新与数据源页迁入）：当前版本大字 + 检查更新 + from 源选择胶囊
         UpdateHeroCard(updateVm = updateVm, dsVm = dsVm)
+        // 节假日库版本/刷新与更新源管理仍在那页（关于页只留版本卡）
+        Spacer(Modifier.height(Spacing.m))
+        SectionCard {
+            SettingRow(
+                title = stringResource(R.string.datasource_title),
+                icon = painterResource(R.drawable.ic_ms_cloud_sync),
+                onClick = { onOpen(Routes.DATASOURCE) },
+            )
+        }
         Spacer(Modifier.height(Spacing.m))
         SectionCard {
             Column {

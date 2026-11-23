@@ -13,9 +13,11 @@ import com.mdot.app.domain.PayrollCalculator
 import com.mdot.app.domain.livePreviewSheet
 import com.mdot.app.domain.previewSheet
 import com.mdot.app.domain.model.DEFAULT_COLLAPSED_GROUPS
+import com.mdot.app.domain.model.NightSubsidy
 import com.mdot.app.domain.model.PayGroup
 import com.mdot.app.domain.model.PayMonthItem
 import com.mdot.app.domain.model.PayMonthSheet
+import com.mdot.app.domain.PayMonthDayBasis
 import com.mdot.app.domain.model.PayMonthSource
 import com.mdot.app.domain.model.PayMonthCustomPresets
 import com.mdot.app.domain.model.PayMonthTemplates
@@ -222,6 +224,7 @@ class PayMonthViewModel @Inject constructor(
                 // 含「只记班次」的 0 时长记录：用户 2026-10-17 拍板按"有记录"算一天，别按分钟数过滤
                 recordDates = records.filter { it.type == RecordType.OT }.map { it.date },
                 leaveMinutes = 0,   // 由 previewFlow 用引擎值覆盖
+                nightRecordDates = PayMonthDaily.nightDates(records),
             )
         }
     }
@@ -366,7 +369,16 @@ class PayMonthViewModel @Inject constructor(
             // ⚠️ 必须与**已有行**去重（不是只在传入名单内去重就够）：预设里可能与出厂固定行同名，
             // 曾因此把补贴组的「全勤奖」再加一行出来。
             .filterNot { it in existing }
-            .map { name -> PayMonthItem(next++, name, cents) }
+            .map { name ->
+                val linked = group == PayGroup.SUBSIDY && name == NightSubsidy.NAME
+                PayMonthItem(
+                    id = next++,
+                    name = name,
+                    amountCents = cents,
+                    dayBasis = if (linked) PayMonthDayBasis.RECORD else PayMonthDayBasis.STANDARD,
+                    nightShiftLinked = if (linked) true else null,
+                )
+            }
     }
 
     /** 新增单条（[cents] 默认 0；UI 走默认值，金额由用户到列表里逐行填） */

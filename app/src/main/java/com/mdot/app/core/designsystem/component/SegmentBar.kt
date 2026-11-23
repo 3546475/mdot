@@ -22,9 +22,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mdot.app.core.designsystem.Radius
+import com.mdot.app.core.designsystem.textFittedHeight
 
 /**
  * 滑块式分段控件（统计页顶栏 统计/记月、工地记工顶栏 记账/记借支结算、及其子页签共用）：
@@ -61,6 +63,9 @@ fun SegmentBar(
 ) {
     val gap = 4.dp
     val pillShape = engineShape(Radius.pill)
+    // 行高随系统字体缩放（下限 34dp）：`labelLarge` 行高 + 上下各 7dp。
+    // 固定 34dp 时字体放大就会把文字裁掉（本组件嵌在 56dp 顶栏里，1.3 缩放后仍放得下）。
+    val segmentHeight = textFittedHeight(MaterialTheme.typography.labelLarge, 7.dp, 34.dp)
     // 滑块配色随引擎：MD3 = 强调色浮起（用户 2026-09-21 定稿）；MIUIX = 白卡浮起 + 深色字
     // （HyperOS 分段观感：灰凹槽里浮白滑块，对齐 miuix Switch/TabRow 的白件语言）
     val sliderColor = when (Radius.engine) {
@@ -90,17 +95,16 @@ fun SegmentBar(
             } else {
                 segWidth
             }
-            val pillShape = engineShape(Radius.pill)
             Box(
                 Modifier
                     .width(seg)
-                    .height(34.dp)
+                    .height(segmentHeight)
                     .offset(x = (seg + gap) * position)
                     .clip(pillShape)
                     .background(sliderColor),
             )
             Row(
-                Modifier.height(34.dp),
+                Modifier.height(segmentHeight),
                 horizontalArrangement = Arrangement.spacedBy(gap),
             ) {
                 val interactions = remember(labels.size) { List(labels.size) { MutableInteractionSource() } }
@@ -123,6 +127,7 @@ fun SegmentBar(
                             color = if (sel) selectedTextColor
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }

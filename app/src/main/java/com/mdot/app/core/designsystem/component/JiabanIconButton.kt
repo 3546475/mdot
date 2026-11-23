@@ -1,6 +1,5 @@
 package com.mdot.app.core.designsystem.component
 
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier

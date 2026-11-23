@@ -1,20 +1,10 @@
 package com.mdot.app.core.designsystem.component
 
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.BackdropEffectScope
 import com.kyant.backdrop.effects.runtimeShaderEffect
 import com.kyant.backdrop.isRuntimeShaderSupported
-import com.mdot.app.core.designsystem.GlassLiquidSpec
 
 /*
  * 液态玻璃底栏的「液滴透镜」——照抄参考实现 memos-m
@@ -24,7 +14,8 @@ import com.mdot.app.core.designsystem.GlassLiquidSpec
  *  - 内部按 1.14× 放大它覆盖的那部分底栏（图标、磨砂底都在里面）；
  *  - 只有外圈约 24% 高度的环带把取样向内拉（模拟液滴曲面），中段是纯放大；
  *  - 同一环带里红/蓝两路取样沿弯曲方向错开一点（色散），只在边缘出现细彩边。
- * 画出来的边只有两条：1dp 深色细线 + 底栏同款白色高光（见 JiabanBottomBar 的液滴节点）。
+ * 高光两档统一用底栏同款 `capsuleEdgeHighlight`（深色档就这一层）；浅色档再叠 1dp 深色描边
+ * （见 JiabanBottomBar 的液滴节点）。
  *
  * 着色器里的距离场/梯度函数取自 Kyant0/AndroidLiquidGlass（Apache-2.0）。
  * ⚠️ 只在 API 33+（RuntimeShader）才有效果；低版本 [isRuntimeShaderSupported] 直接返回。
@@ -122,85 +113,3 @@ internal fun BackdropEffectScope.liquidDroplet(
     }
 }
 
-private val DropletEdgeWidth = 1.dp
-private val DropletGlowWidth = 2.dp
-
-/**
- * 液滴的玻璃高光——**仅浅色档**（2026-10-30 两轮真机反馈后定）。
- *
- * 浅色底栏上白高光本来就看不清，所以这一档做两件事：把反光做足、再配深色描边（描边在调用方）；
- * 深色档则完全不用本修饰符（白高光在深底上已够明显，再叠会发白），换回底栏同款 `capsuleEdgeHighlight`。
- *
- * 四层，全部按浅色档取值：
- *  ① **顶部反光面**：从上缘往下渐隐的白雾——玻璃被顶光照亮的那一层「面」；
- *  ② **镜面高光点**：偏左上的柔和光斑——玻璃珠在灯下的反光，是「看得出是颗珠子」的关键；
- *  ③ **内晕**（2dp，上缘起渐隐）：沿内缘的一圈白，给厚度；
- *  ④ **外缘亮线**（1dp，上亮下暗）：比底栏那圈更亮（珠子小，不亮就立不住）。
- *
- * ⚠️ 调用方必须已在链上 `clip(药丸)`（本修饰符按整节点矩形铺渐变，靠裁剪收形）；
- * 也**不要**再叠 [capsuleEdgeHighlight]——两圈亮线会重影。
- */
-fun Modifier.liquidDropletGloss(): Modifier = drawWithContent {
-    drawContent()
-    if (size.width <= 0f || size.height <= 0f) return@drawWithContent
-    val radius = size.height / 2f
-
-    // ① 顶部反光面（整块铺，裁剪由调用方的 clip 负责）
-    drawRect(
-        brush = Brush.verticalGradient(
-            0f to Color.White.copy(alpha = GlassLiquidSpec.sheenAlphaLight),
-            0.5f to Color.White.copy(alpha = 0.02f),
-            1f to Color.Transparent,
-        ),
-    )
-
-    // ② 镜面高光点（偏左上）
-    val specularAlpha = GlassLiquidSpec.specularAlphaLight
-    val spot = Offset(
-        size.width * GlassLiquidSpec.specularCenterX,
-        size.height * GlassLiquidSpec.specularCenterY,
-    )
-    val spotRadius = size.height * GlassLiquidSpec.specularRadiusFactor
-    if (specularAlpha > 0f && spotRadius > 0f) {
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(Color.White.copy(alpha = specularAlpha), Color.Transparent),
-                center = spot,
-                radius = spotRadius,
-            ),
-            radius = spotRadius,
-            center = spot,
-        )
-    }
-
-    // ③ 内晕：紧贴外缘内侧的一圈白，上缘最亮
-    val glow = DropletGlowWidth.toPx()
-    if (size.width > glow * 2f && size.height > glow * 2f) {
-        drawRoundRect(
-            brush = Brush.verticalGradient(
-                0f to Color.White.copy(alpha = GlassLiquidSpec.glowAlphaLight),
-                1f to Color.Transparent,
-            ),
-            topLeft = Offset(glow / 2f, glow / 2f),
-            size = Size(size.width - glow, size.height - glow),
-            cornerRadius = CornerRadius((radius - glow / 2f).coerceAtLeast(0f)),
-            style = Stroke(glow),
-        )
-    }
-
-    // ④ 外缘亮线：压在晕上，上缘最亮、下缘收暗
-    val edge = DropletEdgeWidth.toPx()
-    if (size.width > edge * 2f && size.height > edge * 2f) {
-        drawRoundRect(
-            brush = Brush.verticalGradient(
-                0f to Color.White.copy(alpha = GlassLiquidSpec.rimTopLight),
-                0.45f to Color.White.copy(alpha = GlassLiquidSpec.rimMidLight),
-                1f to Color.White.copy(alpha = GlassLiquidSpec.rimBottomLight),
-            ),
-            topLeft = Offset(edge / 2f, edge / 2f),
-            size = Size(size.width - edge, size.height - edge),
-            cornerRadius = CornerRadius((radius - edge / 2f).coerceAtLeast(0f)),
-            style = Stroke(edge),
-        )
-    }
-}

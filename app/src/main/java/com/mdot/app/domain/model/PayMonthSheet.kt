@@ -47,6 +47,12 @@ data class PayMonthItem(
     val derivationDays: Double? = null,
     /** 推导依据：本次用的**日单价（分）**，与天数配对展示 */
     val derivationUnitCents: Long? = null,
+    /**
+     * 按日行是否与「夜班」记录联动：true = 只数班次为 [NightShift.NAME] 的记录日。
+     * null = 未设置（旧数据），读取时按行名补成 true；false = 用户明确关闭。
+     * 不能用非空 Boolean，否则旧单子会被当成「明确关闭」，补不回联动。
+     */
+    val nightShiftLinked: Boolean? = null,
 ) {
     /** 本行是否按日计算（引擎会每月自动填金额） */
     val isDailyComputed: Boolean get() = dayRateCents > 0
@@ -151,7 +157,7 @@ data class PayMonthSheet(
         val d = default()
         return copy(
             basic = basic.withMissingBuiltin(d.basic),
-            subsidy = subsidy.withMissingBuiltin(d.subsidy),
+            subsidy = subsidy.withMissingBuiltin(d.subsidy).map { it.normalizedNightLink() },
             deduction = deduction.withMissingBuiltin(d.deduction),
             other = other.withMissingBuiltin(d.other),
         )
@@ -311,6 +317,8 @@ data class PayMonthRowTemplate(
     val dayRateCents: Long = 0,
     val dayBasis: PayMonthDayBasis = PayMonthDayBasis.STANDARD,
     val dayDeductLeave: Boolean = false,
+    /** 夜班联动（同 [PayMonthItem.nightShiftLinked]）；null = 旧模板未设置 */
+    val nightShiftLinked: Boolean? = null,
 )
 
 /** 全部行模板（跨月持久化；进备份包，换手机/恢复不丢） */
@@ -339,6 +347,7 @@ data class PayMonthTemplates(val rows: List<PayMonthRowTemplate> = emptyList()) 
                     dayRateCents = item.dayRateCents,
                     dayBasis = item.dayBasis,
                     dayDeductLeave = item.dayDeductLeave,
+                    nightShiftLinked = item.nightShiftLinked,
                 )
             }
         }
@@ -432,6 +441,7 @@ fun PayMonthSheet.withTemplateRows(templates: PayMonthTemplates): PayMonthSheet 
                     dayRateCents = t.dayRateCents,
                     dayBasis = t.dayBasis,
                     dayDeductLeave = t.dayDeductLeave,
+                    nightShiftLinked = t.nightShiftLinked ?: old.nightShiftLinked,
                 )
             }
         } else {
@@ -442,12 +452,24 @@ fun PayMonthSheet.withTemplateRows(templates: PayMonthTemplates): PayMonthSheet 
                 dayRateCents = t.dayRateCents,
                 dayBasis = t.dayBasis,
                 dayDeductLeave = t.dayDeductLeave,
+                nightShiftLinked = t.nightShiftLinked,
             )
         }
         sheet = sheet.replaceRows(group, updated)
     }
-    return sheet
+    return sheet.copy(subsidy = sheet.subsidy.map { it.normalizedNightLink() })
 }
+
+/**
+ * 老单子里名为「夜班补贴」的用户行没有 [PayMonthItem.nightShiftLinked]（null），
+ * 读取时按预设语义补成联动；用户明确关掉的 false 保持不动。
+ */
+private fun PayMonthItem.normalizedNightLink(): PayMonthItem =
+    if (!builtin && nightShiftLinked == null && name == NightSubsidy.NAME) {
+        copy(nightShiftLinked = true, dayBasis = PayMonthDayBasis.RECORD)
+    } else {
+        this
+    }
 
 /**
  * 分组折叠状态的**默认值**：四个分组全折叠（v0.7.4 用户要求——进页面先看汇总卡，

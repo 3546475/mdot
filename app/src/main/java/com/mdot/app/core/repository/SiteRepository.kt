@@ -285,13 +285,6 @@ class SiteRepository @Inject constructor(
         return null
     }
 
-    suspend fun deleteAttendance(id: Long): AppResult<Unit> {
-        val deleted = attDao.deleteUnsettled(id)
-        if (deleted == 0) return Failure(AppError.InvalidMessage("该记录已结算，请先撤销结算单"))
-        settings.touch()
-        return Success(Unit)
-    }
-
     // ---- 借支 ----
 
     fun observeAdvances(projectId: Long, from: LocalDate, to: LocalDate): Flow<List<SiteAdvance>> =
@@ -552,8 +545,6 @@ class SiteRepository @Inject constructor(
     /** 区间内部分结算单（明细页流水用） */
     fun observePartialSettlements(projectId: Long, from: LocalDate, to: LocalDate): Flow<List<SiteSettlementEntity>> =
         settlementDao.observePartialsRange(projectId, from, to)
-
-    suspend fun getSettlement(id: Long): SiteSettlementEntity? = settlementDao.getById(id)
 
     // ---- 快照 JSON ----
 

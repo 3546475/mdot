@@ -149,7 +149,12 @@ private fun applyAutoRows(
 ): List<PayMonthItem> = rows.map { item ->
     when {
         item.isDailyComputed -> {
-            val days = counts.days(item.dayBasis, item.dayDeductLeave)
+            // 夜班联动行只数夜班记录日；天数口径/请假开关不参与，避免“按应出勤发夜班补贴”
+            val days = if (item.nightShiftLinked == true) {
+                counts.nightRecordDayCount.toDouble()
+            } else {
+                counts.days(item.dayBasis, item.dayDeductLeave)
+            }
             val cents = PayMonthDaily.dailyCents(item.dayRateCents, days)
             item.copy(
                 amountCents = cents,

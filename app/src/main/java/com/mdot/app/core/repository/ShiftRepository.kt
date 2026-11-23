@@ -8,6 +8,7 @@ import com.mdot.app.core.util.AppResult
 import com.mdot.app.core.util.rethrowIfCancellation
 import com.mdot.app.core.util.AppResult.Failure
 import com.mdot.app.core.util.AppResult.Success
+import com.mdot.app.domain.model.NightShift
 import com.mdot.app.domain.model.Shift
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -75,6 +76,8 @@ class ShiftRepository @Inject constructor(
         val existing = dao.getByName(trimmed)
         if (existing != null && existing.id != id) return Failure(AppError.DuplicateName)
         val target = dao.getById(id) ?: return Failure(AppError.Unexpected)
+        // 夜班补贴按这个名称识别记录，改名会让已有记录与新记录对不上账
+        if (target.builtin && target.name == NightShift.NAME) return Failure(AppError.Unexpected)
         dao.update(target.copy(name = trimmed))
         settings.touch()
         return Success(Unit)

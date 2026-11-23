@@ -61,11 +61,14 @@
          不存在唯一的「本期天数」），文案与实现对齐，见 docs/11 091 / docs/22 F-20261017-3 -->
     <string name="paymonth_daily_basis_calendar">本月天数</string>
     <string name="paymonth_daily_deduct_leave">请假扣减天数</string>
+    <string name="paymonth_daily_night_link">与夜班记录联动</string>
+    <string name="paymonth_daily_night_hint">只数班次为「夜班」的记录日（0 时长也计入）；天数口径与请假开关不参与</string>
     <string name="paymonth_daily_hint_record">只数有加班记录的天，漏记的日期不计入</string>
     <string name="paymonth_daily_hint_calendar">按本月天数固定算，不随请假变化</string>
     <string name="paymonth_daily_hint_standard">按工作日设定推算，不受记不记加班影响</string>
     <!-- 行上的推导依据：21.5 天 × ¥50 -->
     <string name="paymonth_daily_derivation">%1$s 天 × %2$s</string>
+    <string name="paymonth_daily_derivation_night">夜班 · %1$s 天 × %2$s</string>
     <string name="paymonth_daily_amount_locked">金额由「日单价 × 天数」自动算，改上面的日单价即可</string>
     <!-- v0.7.4 记月：实发汇总卡 + 金额来源标记 + 调休折现算法（docs/20 P0-2/P0-3） -->
     <string name="paymonth_net_title">实发工资</string>

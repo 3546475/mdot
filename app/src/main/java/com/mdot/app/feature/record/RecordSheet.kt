@@ -24,7 +24,6 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,15 +35,12 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -53,7 +49,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,23 +75,24 @@ import com.mdot.app.core.designsystem.component.InlineConfirmButton
 import com.mdot.app.core.designsystem.component.InlineConfirmStyle
 import com.mdot.app.core.designsystem.component.SunkenWell
 import com.mdot.app.core.designsystem.component.TierRow
-import com.mdot.app.domain.PayrollCalculator
 import com.mdot.app.domain.HourlyPayrollStrategy
 import com.mdot.app.domain.StandardPayrollStrategy
+import com.mdot.app.domain.OtPricingCalculator
+import com.mdot.app.domain.OtPricingResult
+import com.mdot.app.domain.model.OtPricingMode
 import com.mdot.app.domain.model.RateTier
 import com.mdot.app.domain.model.RecordType
 import com.mdot.app.domain.model.WorkSystem
 import com.mdot.app.domain.util.Money
 import com.mdot.app.domain.util.TimeUtils
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.platform.LocalDensity
 import com.mdot.app.core.designsystem.component.JiabanButton
-import com.mdot.app.core.designsystem.component.JiabanButtonSize
 import java.time.LocalDate
-import java.time.ZoneOffset
 import kotlinx.coroutines.delay
 import com.mdot.app.core.designsystem.component.JiabanButtonRole
 import com.mdot.app.core.designsystem.component.LocalDialogButtonNative
+import com.mdot.app.core.designsystem.component.LoopWheel
+import com.mdot.app.core.designsystem.component.TimeField
+import com.mdot.app.core.designsystem.component.formatMinuteOfDay
 import com.mdot.app.core.designsystem.component.FloatingLabelTextField
 import com.mdot.app.core.designsystem.jiabanFilterChipColors
 
@@ -465,6 +461,63 @@ fun RecordSheet(
                                         }
                                     }
 
+                                    val otPricing = state.salary.otPricing
+                                    if (state.salary.workSystem == WorkSystem.STANDARD &&
+                                        otPricing.appliesTo(state.tier)
+                                    ) {
+                                        val paid = (state.durationMinutes() - state.toCompMinutes)
+                                            .coerceAtLeast(0)
+                                        when (otPricing.mode) {
+                                            OtPricingMode.CLOCK_BANDS -> {
+                                                val configuredStart = state.otStartMinute
+                                                val startMinute = configuredStart ?: otPricing.defaultStartMinute
+                                                Spacer(Modifier.height(Spacing.m))
+                                                TimeField(
+                                                    label = stringResource(
+                                                        if (configuredStart == null) R.string.record_ot_start_unset
+                                                        else R.string.record_ot_start
+                                                    ),
+                                                    minuteOfDay = startMinute,
+                                                    onChange = vm::onOtStartMinute,
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                )
+                                                if (configuredStart == null) {
+                                                    Text(
+                                                        stringResource(R.string.record_ot_start_unset_hint),
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                } else if (paid > 0) {
+                                                    OtSegmentPreview(
+                                                        OtPricingCalculator.compute(
+                                                            salary = state.salary,
+                                                            tier = state.tier,
+                                                            totalMinutes = paid,
+                                                            startMinute = startMinute,
+                                                        ),
+                                                        startMinute,
+                                                    )
+                                                }
+                                            }
+
+                                            OtPricingMode.DURATION_BANDS -> {
+                                                if (paid > 0) {
+                                                    OtSegmentPreview(
+                                                        OtPricingCalculator.compute(
+                                                            salary = state.salary,
+                                                            tier = state.tier,
+                                                            totalMinutes = paid,
+                                                            startMinute = null,
+                                                        ),
+                                                        null,
+                                                    )
+                                                }
+                                            }
+
+                                            OtPricingMode.FLAT -> Unit
+                                        }
+                                    }
+
                                     if (state.salary.workSystem == WorkSystem.STANDARD) {
                                         Spacer(Modifier.height(Spacing.m))
 
@@ -615,10 +668,6 @@ fun RecordSheet(
             initial = state.date,
             onPick = { vm.onDateChange(it); showDatePicker = false },
             onDismiss = { showDatePicker = false },
-            // 两引擎一致（用户 2026-09-30 追加）：本对话框**不画自己的背景效果**——它自带的背景层
-            // （压暗/模糊）会盖掉记加班弹层自己的背景。要求是"弹层无任何背景变化，之前是什么就显示什么"。
-            // 注：backdrop=false 只是把绘制归零，背景窗仍会创建（demand 与入场进度门控都靠它，见 DialogBackdrop.kt）。
-            backdrop = false,
         )
     }
 }
@@ -680,6 +729,33 @@ private fun MinutesWheels(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+@Composable
+private fun OtSegmentPreview(result: OtPricingResult, startMinute: Int?) {
+    if (!result.applied) return
+    val template = stringResource(
+        if (startMinute != null) R.string.record_ot_segment else R.string.record_ot_segment_offset
+    )
+    val formatOffset: (Int) -> String = if (startMinute != null) {
+        { offset -> formatMinuteOfDay(startMinute + offset) }
+    } else {
+        { offset -> TimeUtils.hoursDecimal(offset) }
+    }
+    val segmentText = result.segments.joinToString("  ") { seg ->
+        String.format(
+            template,
+            formatOffset(seg.startOffsetMinute),
+            formatOffset(seg.endOffsetMinute),
+            Money.yuanText(seg.cents),
+        )
+    }
+    Spacer(Modifier.height(Spacing.xs))
+    Text(
+        segmentText,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 private data class ChipOption(val key: String, val label: String, val selected: Boolean)

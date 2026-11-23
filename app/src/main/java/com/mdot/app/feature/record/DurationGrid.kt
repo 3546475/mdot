@@ -2,7 +2,6 @@ package com.mdot.app.feature.record
 
 import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -49,7 +48,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mdot.app.core.designsystem.Spacing
-import com.mdot.app.core.designsystem.Duration
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.component.pressScale
 import kotlinx.coroutines.flow.filter

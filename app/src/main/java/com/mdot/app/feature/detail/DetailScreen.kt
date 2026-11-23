@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,7 +45,6 @@ import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.designsystem.component.AnimatedMoneyText
-import com.mdot.app.core.designsystem.component.DayPickDialog
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.navigation.contentPaddingValues
 import com.mdot.app.core.repository.RecordRepository
@@ -75,15 +73,10 @@ import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
-import com.mdot.app.core.designsystem.component.JiabanButton
-import com.mdot.app.core.designsystem.component.JiabanButtonRole
 import com.mdot.app.core.designsystem.jiabanFilterChipColors
 import com.mdot.app.core.designsystem.emphasisCardSurface
 import com.mdot.app.core.designsystem.emphasisCardInk
@@ -325,14 +318,12 @@ fun DetailPane(
  * [com.mdot.app.core.designsystem.component.MonthStepper] 的胶囊**同款外观**：
  * 日历图标 + 文案 + ▾，点开弹窗换口径。工地在统计页与明细页共用本组件。
  *
- * ⚠️ 本组件**没有箭头**，高度只有胶囊本身（≈24dp）；而 MonthStepper 的行高由两侧
- * 48dp 最小触达的图标按钮撑起、胶囊在其中居中。
- * **2026-10-08 更新（commit 6085792）**：已改为把那侧的行高**锁到 `RangeCapsuleHeight`**，
- * 于是两支胶囊实际落在同一条 y 上（真机实测两制度下胶囊中心同为 y=296）——
- * 换句话说，「对齐」的责任放在**有行的那一侧**（MonthStepper），本组件**仍然不要**补 `minHeight`：
+ * ⚠️ 本组件**没有箭头**，高度只有胶囊本身（`labelMedium` 行高 + 上下各 `Spacing.xs`≈ 24dp）；
+ * MonthStepper 那侧的行高由 `rangeCapsuleHeight()` 按**同一套算式**算出，故两支胶囊恒同 y
+ * （字体放大时一起变高，仍同 y）。
+ * 换句话说，「对齐」的责任放在**有行的那一侧**（MonthStepper），本组件**不要**补 `minHeight`：
  * 它本身就是那颗胶囊（`clip`+`background`+`padding` 挂在同一个 Row 上），
- * 补 `minHeight` 会把胶囊自己撑成 48dp 的胖胶囊、并牵动整页节奏。
- * 用户看过两态后选择保留本形态，要动就动 `RangeCapsuleHeight` 一处。
+ * 补了会把胶囊自己撑成 48dp 的胖胶囊、并牵动整页节奏。
  */
 @Composable
 fun RangePill(
@@ -703,15 +694,6 @@ fun SiteDetailRowItem(row: SiteDetailRow) {
         }
     }
 }
-
-private fun kindIcon(kind: SiteDetailKind): Int = when (kind) {
-    SiteDetailKind.WORK -> R.drawable.ic_ms_more_time
-    SiteDetailKind.REST -> R.drawable.ic_ms_calendar_month
-    SiteDetailKind.PIECE -> R.drawable.ic_ms_dashboard
-    SiteDetailKind.ADVANCE -> R.drawable.ic_ms_paid
-    SiteDetailKind.PARTIAL -> R.drawable.ic_ms_flip
-}
-
 
 /** 档位徽章：平时/周末/法定着色小胶囊 */
 @Composable

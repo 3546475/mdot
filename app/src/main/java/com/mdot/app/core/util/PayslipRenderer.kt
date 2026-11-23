@@ -5,15 +5,11 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
-import androidx.core.content.ContextCompat
 import com.mdot.app.R
 import com.mdot.app.domain.CycleCalculator
-import com.mdot.app.domain.PayrollCalculator
 import com.mdot.app.domain.model.PayMonthItem
 import com.mdot.app.domain.model.PayMonthSheet
 import com.mdot.app.domain.util.Money
-import com.mdot.app.domain.model.WorkSystem
-import com.mdot.app.domain.util.TimeUtils
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter

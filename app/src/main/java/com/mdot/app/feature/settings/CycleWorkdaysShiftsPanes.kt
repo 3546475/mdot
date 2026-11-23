@@ -8,7 +8,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,18 +27,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import com.mdot.app.core.designsystem.component.MessageSnackbarHost
 import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 import androidx.compose.material3.Surface
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -67,7 +61,6 @@ import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
-import com.mdot.app.core.designsystem.Duration
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
@@ -76,6 +69,7 @@ import com.mdot.app.core.designsystem.component.InlineConfirmStyle
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.domain.ShiftDefaults
+import com.mdot.app.domain.model.NightShift
 import com.mdot.app.domain.model.Shift
 import java.time.DayOfWeek
 import com.mdot.app.core.designsystem.component.JiabanButton
@@ -491,13 +485,20 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
                                                 //    左上圆弧恰好切进**名称首字**（用户报「班次名称显示不全，被圆角切割了」，
                                                 //    且「即使没被挤压也会被切割」）。区高远大于圆角时才无感，此处不是。
                                                 //    去掉后涟漪变成直角矩形——该区本就无底色，观感无碍。
-                                                .clickable(
-                                                    interactionSource = bodyInteraction,
-                                                    indication = LocalIndication.current,
-                                                ) {
-                                                    renaming = shift
-                                                    renameText = shift.name
-                                                },
+                                                .then(
+                                                    // 内置夜班名称是「夜班补贴」行的识别依据，改名会让历史记录对不上账
+                                                    if (shift.builtin && shift.name == NightShift.NAME) {
+                                                        Modifier
+                                                    } else {
+                                                        Modifier.clickable(
+                                                            interactionSource = bodyInteraction,
+                                                            indication = LocalIndication.current,
+                                                        ) {
+                                                            renaming = shift
+                                                            renameText = shift.name
+                                                        }
+                                                    },
+                                                ),
                                         ) {
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
@@ -549,7 +550,14 @@ fun ShiftsPane(vm: ShiftsViewModel = hiltViewModel()) {
                                             }
                                             Text(
                                                 buildString {
-                                                    append(if (shift.builtin) stringResource(R.string.shifts_builtin) else stringResource(R.string.shifts_custom))
+                                                    append(
+                                                        when {
+                                                            shift.builtin && shift.name == NightShift.NAME ->
+                                                                stringResource(R.string.shifts_night_locked)
+                                                            shift.builtin -> stringResource(R.string.shifts_builtin)
+                                                            else -> stringResource(R.string.shifts_custom)
+                                                        },
+                                                    )
                                                     if (shift.hidden) append(stringResource(R.string.shifts_hidden_suffix))
                                                 },
                                                 style = MaterialTheme.typography.labelSmall,

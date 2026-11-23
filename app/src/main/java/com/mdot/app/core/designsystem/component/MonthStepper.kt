@@ -33,14 +33,17 @@ import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.engineShape
+import com.mdot.app.core.designsystem.textFittedHeight
 
 /**
- * 区间胶囊的**固定高度** = 24dp（内容 16dp + 上下各 `Spacing.xs` 4dp，真机实测 66px @density2.75）。
+ * 区间胶囊的**基准高度** = 24dp（内容 16dp + 上下各 `Spacing.xs` 4dp，真机实测 66px @density2.75）。
  *
- * ⚠️ 本组件的行**刻意不做自适应高度**：两侧 `JiabanIconButton` 的 48dp 最小触达会把行撑到 48dp，
+ * ⚠️ 本组件的行**不用「最小触达撑高」**：两侧 `JiabanIconButton` 的 48dp 最小触达会把行撑到 48dp，
  * 胶囊在其中居中 ⇒ 比"只有胶囊、没有箭头"的工地口径（`feature/detail/RangePill`）**低 12dp**，
- * 两种口径的胶囊上下留白对不上（用户要求统一）。
- * 故行高锁到本值，两种口径的胶囊便落在同一垂直位置、上下留白完全相同。
+ * 两种口径的胶囊上下留白对不上（用户要求统一）。故行高按本值算，两种口径的胶囊落同一垂直位置。
+ *
+ * 实际行高由 [rangeCapsuleHeight] 给出：= `labelMedium` 行高（已含系统字体缩放）+ 上下各 `Spacing.xs`，
+ * 下限是本值 ⇒ 字体缩放 1.0 时正好 24dp，放大后跟着长（否则放大会把胶囊文字裁掉）。
  *
  * 代价与补偿：箭头按钮的**触达区仍是 48dp**——最小触达尺寸修饰符不受父行高约束，
  * 只是绘制时不裁剪地溢出（按钮本身无底色，视觉上看不出来），无障碍不受影响；
@@ -48,6 +51,11 @@ import com.mdot.app.core.designsystem.engineShape
  */
 val RangeCapsuleHeight: androidx.compose.ui.unit.Dp
     get() = 24.dp
+
+/** 区间胶囊行高：随系统字体缩放，字体缩放 1.0 时等于 [RangeCapsuleHeight]。 */
+@Composable
+fun rangeCapsuleHeight(): androidx.compose.ui.unit.Dp =
+    textFittedHeight(MaterialTheme.typography.labelMedium, Spacing.xs, RangeCapsuleHeight)
 
 /**
  * 时间段切换器（`[‹] (标签 ▾) [回本月] [›]`）——**记月页与明细页共用同一实现**。
@@ -96,7 +104,7 @@ fun MonthStepper(
     Row(
         // 高度锁到胶囊高度（见 RangeCapsuleHeight）：否则箭头按钮的 48dp 最小触达撑高整行、
         // 胶囊被居中而比工地口径低 12dp
-        modifier = modifier.fillMaxWidth().height(RangeCapsuleHeight),
+        modifier = modifier.fillMaxWidth().height(rangeCapsuleHeight()),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         FlexSlot()

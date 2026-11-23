@@ -50,6 +50,7 @@ private enum class SystemTab(val labelRes: Int) {
 fun SystemSettingsScreen(
     onBack: () -> Unit,
     onOpenProject: (Long) -> Unit = {},
+    onOpenOtPricing: () -> Unit = {},
     /** 初始页签（`SystemTab.name`，如 "COMP" = 调休）；空或不匹配则停在第 0 个页签 */
     initialTabKey: String? = null,
     hub: SettingsHubViewModel = hiltViewModel(),
@@ -97,7 +98,7 @@ fun SystemSettingsScreen(
             beyondViewportPageCount = 1,
         ) { page ->
             when (tabs[page]) {
-                SystemTab.SALARY -> PayrollPane()
+                SystemTab.SALARY -> PayrollPane(onOpenOtPricing = onOpenOtPricing)
                 SystemTab.COMP -> CompBalancePane()
                 SystemTab.CYCLE -> CyclePane()
                 SystemTab.WORKDAYS -> WorkdaysPane()

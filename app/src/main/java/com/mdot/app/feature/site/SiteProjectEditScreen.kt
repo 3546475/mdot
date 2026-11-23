@@ -14,19 +14,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -45,8 +39,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -56,12 +48,10 @@ import com.mdot.app.R
 import com.mdot.app.feature.record.toText
 import com.mdot.app.core.designsystem.IconBoxSpec
 import com.mdot.app.core.designsystem.Radius
-import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.InlineConfirmButton
 import com.mdot.app.core.designsystem.component.InlineConfirmStyle
 import com.mdot.app.core.designsystem.component.JiabanTopBar
-import com.mdot.app.core.designsystem.component.LocalSheetBackdropState
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.SheetBackdropLayer
 import com.mdot.app.core.repository.SiteRepository
@@ -72,7 +62,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import com.mdot.app.core.util.AppResult
 import com.mdot.app.core.util.onSuccess
 import com.mdot.app.core.util.onFailure
 import kotlinx.coroutines.launch
@@ -206,114 +195,111 @@ fun SiteProjectEditScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     var showStandard by remember { mutableStateOf(false) }
-    // 弹层背景层：点工标准设置弹层（SiteBottomSheet）是独立窗口的 Dialog，
-    // 状态经 LocalSheetBackdropState 下发与背景层共享、进出场同拍
+    // 弹层背景层：点工标准设置弹层（SiteBottomSheet）出现时背景内容后退
     val sheetVisible = remember { MutableTransitionState(false) }
 
     LaunchedEffect(state.saved) {
         if (state.saved) onBack()
     }
 
-    CompositionLocalProvider(LocalSheetBackdropState provides sheetVisible) {
-        SheetBackdropLayer(visible = sheetVisible.targetState) {
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = Spacing.page),
-            ) {
-                JiabanTopBar(title = stringResource(R.string.site_project_settings), onBack = onBack)
-                Spacer(Modifier.height(Spacing.s))
+    SheetBackdropLayer(visible = sheetVisible.targetState) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.page),
+        ) {
+            JiabanTopBar(title = stringResource(R.string.site_project_settings), onBack = onBack)
+            Spacer(Modifier.height(Spacing.s))
 
-                // ---- 项目名 ----
-                SectionCard {
-                    FloatingLabelTextField(
-                        value = state.name,
-                        onValueChange = vm::onName,
-                        label = stringResource(R.string.site_project_name_label),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShapeField,
-                    )
-                }
-                Spacer(Modifier.height(Spacing.m))
-
-                // ---- 点工标准设置（弹窗编辑） ----
-                SectionCard(onClick = { showStandard = true }) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            Modifier
-                                .size(IconBoxSpec.tile.box)
-                                .background(MaterialTheme.colorScheme.secondaryContainer, engineShape(Radius.small)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                painterResource(R.drawable.ic_ms_paid), null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(IconBoxSpec.tile.icon),
-                            )
-                        }
-                        Spacer(Modifier.width(Spacing.m))
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                stringResource(R.string.site_project_standard_settings),
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium,
-                            )
-                            Spacer(Modifier.height(Spacing.xs))
-                            Text(
-                                standardSummary(state),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Spacer(Modifier.width(Spacing.xs))
-                        Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                Spacer(Modifier.height(Spacing.l))
-
-                JiabanButton(
-                    text = stringResource(R.string.site_save),
-                    onClick = { vm.save(onDone = onBack) },
-                    role = JiabanButtonRole.PRIMARY,
+            // ---- 项目名 ----
+            SectionCard {
+                FloatingLabelTextField(
+                    value = state.name,
+                    onValueChange = vm::onName,
+                    label = stringResource(R.string.site_project_name_label),
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShapeField,
                 )
-
-                Spacer(Modifier.height(Spacing.m))
-                // 删除/归档项目：原地确认（确认后返回列表，归档项可在「已归档区」一键恢复，故无需 toast 撤销）
-                InlineConfirmButton(
-                    idleText = stringResource(R.string.site_project_archive),
-                    confirmText = stringResource(R.string.site_project_archive),
-                    cancelText = stringResource(R.string.site_dialog_cancel),
-                    undoText = stringResource(R.string.site_project_archive),
-                    onConfirm = { vm.archiveOrDelete(onDone = onBack) },
-                    style = InlineConfirmStyle.Compact,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(Spacing.xs))
-                // 归档后果说明：从旧确认弹窗正文改为常驻提示
-                Text(
-                    text = stringResource(R.string.site_project_archive_body),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                state.error?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
-                }
-                Spacer(Modifier.height(Spacing.xl))
             }
-        }
+            Spacer(Modifier.height(Spacing.m))
 
-        if (showStandard) {
-            ProjectStandardDialog(
-                initial = state,
-                onApply = { baseHours, rateYuan, mode, otBaseHours, otHourlyYuan ->
-                    vm.applyStandard(baseHours, rateYuan, mode, otBaseHours, otHourlyYuan)
-                    showStandard = false
-                },
-                onDismiss = { showStandard = false },
+            // ---- 点工标准设置（弹窗编辑） ----
+            SectionCard(onClick = { showStandard = true }) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(IconBoxSpec.tile.box)
+                            .background(MaterialTheme.colorScheme.secondaryContainer, engineShape(Radius.small)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.ic_ms_paid), null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(IconBoxSpec.tile.icon),
+                        )
+                    }
+                    Spacer(Modifier.width(Spacing.m))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.site_project_standard_settings),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Spacer(Modifier.height(Spacing.xs))
+                        Text(
+                            standardSummary(state),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.width(Spacing.xs))
+                    Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(Spacing.l))
+
+            JiabanButton(
+                text = stringResource(R.string.site_save),
+                onClick = { vm.save(onDone = onBack) },
+                role = JiabanButtonRole.PRIMARY,
+                modifier = Modifier.fillMaxWidth(),
             )
+
+            Spacer(Modifier.height(Spacing.m))
+            // 删除/归档项目：原地确认（确认后返回列表，归档项可在「已归档区」一键恢复，故无需 toast 撤销）
+            InlineConfirmButton(
+                idleText = stringResource(R.string.site_project_archive),
+                confirmText = stringResource(R.string.site_project_archive),
+                cancelText = stringResource(R.string.site_dialog_cancel),
+                undoText = stringResource(R.string.site_project_archive),
+                onConfirm = { vm.archiveOrDelete(onDone = onBack) },
+                style = InlineConfirmStyle.Compact,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(Spacing.xs))
+            // 归档后果说明：从旧确认弹窗正文改为常驻提示
+            Text(
+                text = stringResource(R.string.site_project_archive_body),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            state.error?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
+            }
+            Spacer(Modifier.height(Spacing.xl))
         }
+    }
+
+    if (showStandard) {
+        ProjectStandardDialog(
+            initial = state,
+            onApply = { baseHours, rateYuan, mode, otBaseHours, otHourlyYuan ->
+                vm.applyStandard(baseHours, rateYuan, mode, otBaseHours, otHourlyYuan)
+                showStandard = false
+            },
+            onDismiss = { showStandard = false },
+        )
     }
 }
 

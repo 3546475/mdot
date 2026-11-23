@@ -6,7 +6,6 @@ import com.mdot.app.core.designsystem.EngineIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,12 +17,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -89,11 +86,6 @@ fun DayPickDialog(
     onPick: (LocalDate) -> Unit,
     onPickDates: (Set<LocalDate>) -> Unit = {},
     onDismiss: () -> Unit,
-    /** 见 [JiabanAlertDialog]：从底部弹层里打开的对话框传 false，避免盖掉弹层自己的背景 */
-    backdrop: Boolean = true,
-    /** 见 [JiabanAlertDialog]：**独立 Dialog 窗口里的弹层**（如工地弹层）内打开的弹窗必须传 false ——
-     *  否则页内覆盖层会渲染到那个窗口**下面**（看不见）。等该弹层改成页内再一并转过来。 */
-    asOverlay: Boolean = true,
 ) {
     val today = LocalDate.now()
     var month by remember { mutableStateOf(YearMonth.from(initial)) }
@@ -127,10 +119,8 @@ fun DayPickDialog(
         else -> null
     }
 
-    JiabanAlertDialog(containerColor = dialogContainerColor(), 
+    JiabanAlertDialog(containerColor = dialogContainerColor(),
         onDismissRequest = onDismiss,
-        backdrop = backdrop,
-        asOverlay = asOverlay,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(title, modifier = Modifier.weight(1f))

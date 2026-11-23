@@ -234,6 +234,7 @@ class ExportViewModel @Inject constructor(
             // 含「只记班次」的 0 时长记录（用户 2026-10-17 拍板算一天）
             recordDates = records.filter { it.type == com.mdot.app.domain.model.RecordType.OT }.map { it.date },
             leaveMinutes = out.leaveMinutes,
+            nightRecordDates = com.mdot.app.domain.PayMonthDaily.nightDates(records),
         )
         return com.mdot.app.domain.previewSheet(stored, out, salary, counts, today.toString())
     }

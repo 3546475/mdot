@@ -1,6 +1,5 @@
 package com.mdot.app.core.designsystem.component
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color

@@ -4,11 +4,9 @@ import com.mdot.app.core.designsystem.miuix.ConfigRowIcon
 import com.mdot.app.core.designsystem.component.JiabanAlertDialog
 import com.mdot.app.core.designsystem.component.JiabanSwitch
 import com.mdot.app.core.designsystem.dialogContainerColor
-import com.mdot.app.core.designsystem.engineShape
 import com.mdot.app.core.designsystem.EngineIcons
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -31,7 +29,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -43,7 +40,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -57,9 +53,7 @@ import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
-import com.mdot.app.core.designsystem.IconBoxSpec
 import com.mdot.app.core.designsystem.IconSpec
-import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.ChoicePillOption
 import com.mdot.app.core.designsystem.component.ChoicePillRow
@@ -68,7 +62,6 @@ import com.mdot.app.core.designsystem.component.HomeCardContentUi
 import com.mdot.app.core.designsystem.component.HomeCardRegistry
 import com.mdot.app.core.designsystem.component.HomeCardSpec
 import com.mdot.app.core.designsystem.component.SectionCard
-import com.mdot.app.core.designsystem.component.pressScale
 import com.mdot.app.core.navigation.contentBottomPadding
 import com.mdot.app.domain.model.HomeCardContents
 import com.mdot.app.domain.model.HomeCardsConfig

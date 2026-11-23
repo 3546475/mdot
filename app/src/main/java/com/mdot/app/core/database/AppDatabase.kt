@@ -22,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SitePieceWorkEntity::class,
         SiteSettlementEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -173,6 +173,13 @@ abstract class AppDatabase : RoomDatabase() {
                 if ("is_partial" !in columns) {
                     db.execSQL("ALTER TABLE site_settlement ADD COLUMN is_partial INTEGER NOT NULL DEFAULT 0")
                 }
+            }
+        }
+
+        /** v4→v5：daily_record 加 ot_start_minute（钟点时段计价的开始时间，可空）。 */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE daily_record ADD COLUMN ot_start_minute INTEGER")
             }
         }
 

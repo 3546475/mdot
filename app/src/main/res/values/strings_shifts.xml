@@ -8,6 +8,7 @@
     <string name="shifts_default_badge">默认</string>
     <string name="shifts_builtin">预置</string>
     <string name="shifts_custom">自定义</string>
+    <string name="shifts_night_locked">内置夜班 · 名称固定</string>
     <string name="shifts_hidden_suffix">" · 已隐藏"</string>
     <string name="shifts_delete">删除</string>
     <string name="shifts_delete_confirm">确认删除</string>

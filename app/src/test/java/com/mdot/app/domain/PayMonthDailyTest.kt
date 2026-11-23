@@ -1,7 +1,6 @@
 package com.mdot.app.domain
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -208,5 +207,38 @@ class PayMonthDailyTest {
             emptySet(), emptySet(), emptySet(), emptyList(), -600,
         )
         assertEquals(0, c.leaveMinutes)
+    }
+
+    // ---- 夜班补贴联动：只数夜班记录日，0 时长也算 ----
+
+    @Test
+    fun `夜班记录日 - 只认夜班 OT 且同日去重_0 时长也计入`() {
+        val d1 = java.time.LocalDate.parse("2026-10-06")
+        val d2 = java.time.LocalDate.parse("2026-10-08")
+        val records = listOf(
+            com.mdot.app.domain.model.DailyRecord(
+                date = d1, type = com.mdot.app.domain.model.RecordType.OT,
+                shiftName = "夜班", durationMinutes = 0, createdAt = 0, updatedAt = 0,
+            ),
+            com.mdot.app.domain.model.DailyRecord(
+                date = d1, type = com.mdot.app.domain.model.RecordType.OT,
+                shiftName = "夜班", durationMinutes = 120, createdAt = 0, updatedAt = 0,
+            ),
+            com.mdot.app.domain.model.DailyRecord(
+                date = d2, type = com.mdot.app.domain.model.RecordType.OT,
+                shiftName = "白班", durationMinutes = 120, createdAt = 0, updatedAt = 0,
+            ),
+            com.mdot.app.domain.model.DailyRecord(
+                date = d2, type = com.mdot.app.domain.model.RecordType.LEAVE,
+                shiftName = "夜班", durationMinutes = 480, createdAt = 0, updatedAt = 0,
+            ),
+        )
+        val dates = PayMonthDaily.nightDates(records)
+        assertEquals("同日两条夜班都要返回，由 counts 去重", listOf(d1, d1), dates)
+        val c = PayMonthDaily.counts(
+            d1, d2, emptySet(), emptySet(), emptySet(), emptyList(), 0,
+            nightRecordDates = dates,
+        )
+        assertEquals(1, c.nightRecordDayCount)
     }
 }

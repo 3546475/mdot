@@ -138,6 +138,7 @@ class BackupCodec @Inject constructor(
                 tier = it.tier,
                 tierSource = it.tierSource,
                 toCompMinutes = it.toCompMinutes,
+                otStartMinute = it.otStartMinute,
                 leaveType = it.leaveType,
                 note = it.note,
                 createdAt = it.createdAt,
@@ -311,6 +312,7 @@ class BackupCodec @Inject constructor(
                         tier = dto.tier,
                         tierSource = dto.tierSource,
                         toCompMinutes = dto.toCompMinutes,
+                        otStartMinute = dto.otStartMinute,
                         leaveType = dto.leaveType,
                         note = dto.note,
                         createdAt = dto.createdAt,
@@ -429,8 +431,10 @@ internal fun validateBackupWorkSystems(data: BackupFile) {
  */
 internal fun validateBackupInvariants(data: BackupFile) {
     data.records.forEach { r ->
-        if (r.durationMinutes !in 1..1440) {
-            throw IllegalArgumentException("备份包含非法时长的记录（${r.date}：${r.durationMinutes} 分钟，须在 1–1440）")
+        // 加班允许 0 分钟（只记班次，用于夜班补贴等按班次天数算的项）；请假仍必须有正时长
+        val minMinutes = if (r.type == "OT") 0 else 1
+        if (r.durationMinutes !in minMinutes..1440) {
+            throw IllegalArgumentException("备份包含非法时长的记录（${r.date}：${r.durationMinutes} 分钟，须在 $minMinutes–1440）")
         }
         if (r.toCompMinutes !in 0..r.durationMinutes) {
             throw IllegalArgumentException("备份包含转调休超界的记录（${r.date}：转调休 ${r.toCompMinutes} 分钟大于加班时长）")
@@ -601,6 +605,8 @@ data class RecordDto(
     val tier: String? = null,
     val tierSource: String? = null,
     val toCompMinutes: Int = 0,
+    /** 钟点时段计价的开始时间（当天分钟数）；旧备份/非钟点模式为空 */
+    val otStartMinute: Int? = null,
     val leaveType: String? = null,
     val note: String? = null,
     val createdAt: Long,

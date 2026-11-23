@@ -21,8 +21,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import java.io.File
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -249,23 +247,6 @@ class SyncEngine @Inject constructor(
         resetSyncAnchors()
         reloadConfiguration()
         return Success(Unit)
-    }
-
-    /** 用指定源配置测试连接（临时 provider，不影响当前活动源） */
-    suspend fun testSource(id: String): AppResult<Unit> {
-        val sources = vault.loadSources()
-        val candidate = sources.webdav.firstOrNull { it.id == id } ?: sources.s3.firstOrNull { it.id == id }
-            ?: return Failure(AppError.Storage("存储源不存在"))
-        // 临时测试的源也可能是明文 http（用户正在新增/编辑）——同样登记
-        when (candidate) {
-            is WebDavSource -> cleartextGate.allowUrl(candidate.creds.baseUrl)
-            is S3Source -> cleartextGate.allowUrl(candidate.creds.endpoint)
-        }
-        val p = when (candidate) {
-            is WebDavSource -> tempWebDavProvider(candidate)
-            else -> tempS3Provider(candidate as S3Source)
-        }
-        return testProvider(p)
     }
 
     private fun tempWebDavProvider(source: WebDavSource): StorageProvider =

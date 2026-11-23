@@ -1,49 +1,40 @@
 package com.mdot.app.feature.payroll
 
 import com.mdot.app.core.designsystem.component.JiabanSwitch
-import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.graphics.graphicsLayer
 import com.mdot.app.feature.record.rememberSaveWithHaptic
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,11 +42,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -65,20 +53,20 @@ import androidx.lifecycle.viewModelScope
 import com.mdot.app.R
 import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.core.designsystem.ButtonSpec
-import com.mdot.app.core.designsystem.Radius
+import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.AnimatedNumberText
 import com.mdot.app.core.designsystem.component.FloatingLabelTextField
 import com.mdot.app.core.designsystem.component.SectionCard
 import com.mdot.app.core.designsystem.component.pressScale
-import com.mdot.app.core.designsystem.component.SettingRow
 import com.mdot.app.core.designsystem.component.ShrinkFeedbackButton
 import com.mdot.app.domain.CycleCalculator
-import com.mdot.app.domain.HourlyPayrollStrategy
-import com.mdot.app.domain.PayrollCalculator
 import com.mdot.app.domain.StandardPayrollStrategy
 import com.mdot.app.domain.model.LeaveType
+import com.mdot.app.domain.model.OtPricingConfig
+import com.mdot.app.domain.model.OtPricingMode
 import com.mdot.app.domain.model.RateTier
+import com.mdot.app.domain.model.bandCount
 import com.mdot.app.domain.model.SalaryConfig
 import com.mdot.app.domain.model.WorkSystem
 import com.mdot.app.domain.model.SalaryMode
@@ -87,6 +75,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -111,6 +100,7 @@ data class PayrollUiState(
     val autoStandardMinutes: Int = 0,
     val periodLabel: String = "",
     val saved: Boolean = false,
+    val otPricing: OtPricingConfig = OtPricingConfig(),
 )
 
 @HiltViewModel
@@ -147,6 +137,7 @@ class PayrollViewModel @Inject constructor(
                 siteDisplayUnit = salary.siteDisplayUnit,
                 stdHoursText = salary.comprehensiveStandardMinutes.takeIf { it > 0 }
                     ?.let { stdHoursText(it) } ?: "",
+                otPricing = salary.otPricing,
             )
             // 当前周期自动标准工时（提示用，10 文档 F-Z2；权威值在首页装配层注入引擎）
             val anchorDay = settings.cycleAnchorDayFlow.first()
@@ -160,6 +151,12 @@ class PayrollViewModel @Inject constructor(
                     periodLabel = "${period.from.monthValue}/${period.from.dayOfMonth}" +
                         "–${period.to.monthValue}/${period.to.dayOfMonth}",
                 )
+            }
+        }
+        // 分段配置在独立页保存；返回后入口摘要要立即反映，不能等重建 ViewModel
+        viewModelScope.launch {
+            settings.salaryFlow.collect { salary ->
+                _state.update { it.copy(otPricing = salary.otPricing) }
             }
         }
     }
@@ -199,35 +196,29 @@ class PayrollViewModel @Inject constructor(
     fun save(onDone: () -> Unit = {}) {
         val s = _state.value
         val hourlyCents = Money.parseYuanToCents(s.hourlyRateText) ?: 0
-        val salary = SalaryConfig(
-            mode = s.mode,
-            baseSalaryCents = Money.parseYuanToCents(s.baseText) ?: 0,
-            includeBase = s.includeBase,
-            multipliers = RateTier.entries.associateWith { tier ->
-                s.multTexts[tier]?.toDoubleOrNull()?.coerceIn(0.1, 10.0) ?: salaryDefaultMult(tier)
-            },
-            manualRatesCents = RateTier.entries.associateWith { tier ->
-                Money.parseYuanToCents(s.rateTexts[tier] ?: "") ?: 0
-            },
-            hourlyRatesCents = RateTier.entries.associateWith { hourlyCents },
-            leaveCoefficients = LeaveType.entries.associateWith { type ->
-                (s.coefPercents[type] ?: 0) / 100.0
-            },
-            workSystem = s.workSystem,
-            // 空/0 = 自动（应出勤天数 × 8h）；手填覆盖（10 文档 F-Z2）
-            comprehensiveStandardMinutes = s.stdHoursText.trim().toDoubleOrNull()
-                ?.let { (it * 60).toInt().coerceIn(0, 31 * 24 * 60) } ?: 0,
-        )
         viewModelScope.launch {
-            // ⚠️ 社保/公积金已搬到**记月各自行的弹窗**里设置（见 PayMonthContent）——本页保存时必须沿用
-            // 已存的值，否则会把用户在那儿设好的比例/基数重置为 0（它们的 UI 已不在本页）。
+            // 以已存配置为底再覆盖本页字段：社保/公积金/个税/加班分段等本页没有 UI 的字段
+            // 必须原样保留，否则会被重置（docs/11 072 同类数据丢失）。
             val prev = settings.salaryFlow.first()
             settings.setSalary(
-                salary.copy(
-                    socialInsuranceRateBp = prev.socialInsuranceRateBp,
-                    socialInsuranceBaseCents = prev.socialInsuranceBaseCents,
-                    housingFundRateBp = prev.housingFundRateBp,
-                    housingFundBaseCents = prev.housingFundBaseCents,
+                prev.copy(
+                    mode = s.mode,
+                    baseSalaryCents = Money.parseYuanToCents(s.baseText) ?: 0,
+                    includeBase = s.includeBase,
+                    multipliers = RateTier.entries.associateWith { tier ->
+                        s.multTexts[tier]?.toDoubleOrNull()?.coerceIn(0.1, 10.0) ?: salaryDefaultMult(tier)
+                    },
+                    manualRatesCents = RateTier.entries.associateWith { tier ->
+                        Money.parseYuanToCents(s.rateTexts[tier] ?: "") ?: 0
+                    },
+                    hourlyRatesCents = RateTier.entries.associateWith { hourlyCents },
+                    leaveCoefficients = LeaveType.entries.associateWith { type ->
+                        (s.coefPercents[type] ?: 0) / 100.0
+                    },
+                    workSystem = s.workSystem,
+                    // 空/0 = 自动（应出勤天数 × 8h）；手填覆盖（10 文档 F-Z2）
+                    comprehensiveStandardMinutes = s.stdHoursText.trim().toDoubleOrNull()
+                        ?.let { (it * 60).toInt().coerceIn(0, 31 * 24 * 60) } ?: 0,
                 )
             )
             _state.update { it.copy(saved = true) }
@@ -254,6 +245,7 @@ class PayrollViewModel @Inject constructor(
  */
 @Composable
 fun PayrollPane(
+    onOpenOtPricing: () -> Unit = {},
     onSaved: () -> Unit = {},
     vm: PayrollViewModel = hiltViewModel(),
 ) {
@@ -291,7 +283,7 @@ fun PayrollPane(
             Spacer(Modifier.height(Spacing.s))
 
             when (state.workSystem) {
-                WorkSystem.STANDARD -> StandardPayrollContent(state, vm)
+                WorkSystem.STANDARD -> StandardPayrollContent(state, vm, onOpenOtPricing)
                 WorkSystem.HOURLY -> HourlyPayrollContent(state, vm)
                 WorkSystem.COMPREHENSIVE -> ComprehensivePayrollContent(state, vm)
                 // 工地制度没有「工资」页签（制度设定只有 项目/结算）：本分支不会被走到，
@@ -321,7 +313,11 @@ fun PayrollPane(
 }
 
 @Composable
-private fun StandardPayrollContent(state: PayrollUiState, vm: PayrollViewModel) {
+private fun StandardPayrollContent(
+    state: PayrollUiState,
+    vm: PayrollViewModel,
+    onOpenOtPricing: () -> Unit,
+) {
     SalaryModeSection(state, vm)
 
     Spacer(Modifier.height(Spacing.s))
@@ -369,6 +365,19 @@ private fun StandardPayrollContent(state: PayrollUiState, vm: PayrollViewModel) 
                     modifier = Modifier.padding(top = Spacing.xs),
                 )
             }
+            if (state.otPricing.isEnabled) {
+                Text(
+                    stringResource(R.string.payroll_ot_active_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = Spacing.xs),
+                )
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(top = Spacing.s),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+            OtPricingEntryRow(state.otPricing, onOpenOtPricing)
         }
     }
 
@@ -376,6 +385,48 @@ private fun StandardPayrollContent(state: PayrollUiState, vm: PayrollViewModel) 
 
     // ========== 模块3：请假扣薪系数（标准工时/综合工时共用） ==========
     LeaveCoefficientSection(state, vm)
+}
+
+/** 加班倍率卡片底部的分段计价入口：标题 + 当前规则摘要 + 箭头 */
+@Composable
+private fun OtPricingEntryRow(otPricing: OtPricingConfig, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val summary = when {
+        !otPricing.isEnabled -> stringResource(R.string.payroll_ot_pricing_off)
+        otPricing.mode == OtPricingMode.DURATION_BANDS ->
+            stringResource(R.string.payroll_ot_pricing_duration_summary, otPricing.bandCount())
+        else -> stringResource(R.string.payroll_ot_pricing_clock_summary, otPricing.bandCount())
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .pressScale(interaction, pressedScale = 0.98f)
+            .clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                onClick = onClick,
+            )
+            .padding(top = Spacing.s),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            stringResource(R.string.payroll_ot_pricing_entry),
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            summary,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Icon(
+            painter = painterResource(R.drawable.ic_ms_keyboard_arrow_right),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(IconSpec.dense),
+        )
+    }
 }
 
 /** 计薪模式 + 底薪 + 折算时薪（标准工时/综合工时共用，10 文档 §5.1） */
@@ -685,4 +736,5 @@ private fun buildPreviewSalary(state: PayrollUiState, workSystem: WorkSystem): S
     manualRatesCents = RateTier.entries.associateWith { t -> Money.parseYuanToCents(state.rateTexts[t] ?: "") ?: 0 },
     hourlyRatesCents = RateTier.entries.associateWith { Money.parseYuanToCents(state.hourlyRateText) ?: 0 },
     workSystem = workSystem,
+    otPricing = state.otPricing,
 )

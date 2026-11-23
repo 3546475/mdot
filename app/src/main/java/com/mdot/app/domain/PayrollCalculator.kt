@@ -48,6 +48,8 @@ object PayrollCalculator {
         val tier: RateTier?,
         /** OT=加班费；LEAVE=扣款 */
         val amountCents: Long,
+        /** OT 的分段明细（未启用分段计价时为空） */
+        val segments: List<OtSegment> = emptyList(),
     )
 
     data class Output(
@@ -85,6 +87,8 @@ object PayrollCalculator {
         val leaveType: LeaveType? = null,
         val shiftName: String? = null,
         val note: String? = null,
+        /** 钟点时段计价用的加班开始分钟（0..1439）；null = 未填，按单档 */
+        val otStartMinute: Int? = null,
     )
 
     data class CompAdjustmentLite(val deltaMinutes: Int)
@@ -190,11 +194,16 @@ object PayrollCalculator {
         output.breakdowns
             .filter { it.record.type == RecordType.OT && it.record.toCompMinutes > 0 }
             .sumOf {
-                StandardPayrollStrategy.overtimeCents(
-                    salary,
-                    it.tier ?: RateTier.WEEKDAY,
-                    it.record.toCompMinutes,
-                )
+                val total = it.record.durationMinutes
+                val paid = total - it.record.toCompMinutes
+                OtPricingCalculator.computeRange(
+                    salary = salary,
+                    tier = it.tier ?: RateTier.WEEKDAY,
+                    totalMinutes = total,
+                    startMinute = it.record.otStartMinute,
+                    fromMinute = paid,
+                    toMinute = total,
+                ).cents
             }
 }
 
@@ -226,10 +235,17 @@ object StandardPayrollStrategy : PayrollStrategy {
                     compFromOt += r.toCompMinutes
                     val tier = PayrollCalculator.effectiveTier(r, input.tierOf)
                     val payMinutes = r.durationMinutes - r.toCompMinutes
-                    val cents = overtimeCents(input.salary, tier, payMinutes)
+                    val priced = OtPricingCalculator.computeRange(
+                        salary = input.salary,
+                        tier = tier,
+                        totalMinutes = r.durationMinutes,
+                        startMinute = r.otStartMinute,
+                        fromMinute = 0,
+                        toMinute = payMinutes,
+                    )
                     if (payMinutes > 0) paidOtMinutes += payMinutes
-                    otPayByTier.merge(tier, cents, Long::plus)
-                    breakdowns += PayrollCalculator.RecordBreakdown(r, tier, cents)
+                    otPayByTier.merge(tier, priced.cents, Long::plus)
+                    breakdowns += PayrollCalculator.RecordBreakdown(r, tier, priced.cents, priced.segments)
                 }
 
                 RecordType.LEAVE -> {
@@ -264,25 +280,8 @@ object StandardPayrollStrategy : PayrollStrategy {
     }
 
     /** 加班费（分）：BASE=时薪×倍率×小时；MANUAL=三档单价×小时；HALF_UP 到分 */
-    fun overtimeCents(salary: SalaryConfig, tier: RateTier, minutes: Int): Long {
-        if (minutes <= 0) return 0
-        val minutesBd = BigDecimal(minutes)
-        return when (salary.mode) {
-            SalaryMode.BASE -> {
-                val hourly = BigDecimal(salary.baseSalaryCents)
-                    .divide(PayrollCalculator.HOURS_PER_MONTH, 10, RoundingMode.HALF_UP)
-                val mult = BigDecimal.valueOf(salary.multipliers[tier] ?: 1.5)
-                hourly.multiply(mult).multiply(minutesBd)
-                    .divide(BigDecimal(60), 0, RoundingMode.HALF_UP).toLong()
-            }
-
-            SalaryMode.MANUAL -> {
-                val rate = BigDecimal(salary.manualRatesCents[tier] ?: 0L)
-                rate.multiply(minutesBd)
-                    .divide(BigDecimal(60), 0, RoundingMode.HALF_UP).toLong()
-            }
-        }
-    }
+    fun overtimeCents(salary: SalaryConfig, tier: RateTier, minutes: Int): Long =
+        OtPricingCalculator.flatCents(salary, tier, minutes)
 
     /** 请假扣款（分）= 日薪 × 扣薪系数 × 小时/8，HALF_UP 到分 */
     fun leaveDeductCents(salary: SalaryConfig, type: LeaveType, minutes: Int): Long {
@@ -477,6 +476,7 @@ fun DailyRecord.toCalcLite() = PayrollCalculator.DailyRecordLite(
     leaveType = leaveType,
     shiftName = shiftName,
     note = note,
+    otStartMinute = otStartMinute,
 )
 
 fun CompAdjustment.toCalcLite() = PayrollCalculator.CompAdjustmentLite(deltaMinutes)

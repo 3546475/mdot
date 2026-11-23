@@ -44,6 +44,7 @@ class PayMonthAutoRowsTest {
         basis: PayMonthDayBasis = PayMonthDayBasis.STANDARD,
         deductLeave: Boolean = false,
         amount: Long = 0,
+        nightLinked: Boolean? = null,
     ): PayMonthSheet {
         val base = PayMonthSheet.default()
         val row = PayMonthItem(
@@ -53,6 +54,7 @@ class PayMonthAutoRowsTest {
             dayRateCents = rate,
             dayBasis = basis,
             dayDeductLeave = deductLeave,
+            nightShiftLinked = nightLinked,
         )
         return base.copy(subsidy = base.subsidy + row)
     }
@@ -112,6 +114,25 @@ class PayMonthAutoRowsTest {
         assertEquals(22_000L, f.subsidy.first { it.id == 102L }.amountCents)
         assertEquals(22_000L, f.deduction.first { it.id == 103L }.amountCents)
         assertEquals(22_000L, f.other.first { it.id == 104L }.amountCents)
+    }
+
+    @Test
+    fun `按日行 - 夜班联动只数夜班记录日`() {
+        val s = sheetWith(
+            "夜班补贴", 5_000,
+            basis = PayMonthDayBasis.CALENDAR, deductLeave = true, nightLinked = true,
+        )
+        val row = rowOf(fill(s, counts.copy(nightRecordDayCount = 3)), "夜班补贴")
+        // 3 个夜班记录日 × 50 元；天数口径与请假开关都不参与
+        assertEquals(15_000L, row.amountCents)
+        assertEquals(3.0, row.derivationDays!!, 1e-9)
+    }
+
+    @Test
+    fun `按日行 - 未联动时仍走原天数口径`() {
+        val s = sheetWith("夜班补贴", 5_000, basis = PayMonthDayBasis.CALENDAR, nightLinked = false)
+        val row = rowOf(fill(s, counts.copy(nightRecordDayCount = 3)), "夜班补贴")
+        assertEquals(150_000L, row.amountCents)
     }
 
     @Test

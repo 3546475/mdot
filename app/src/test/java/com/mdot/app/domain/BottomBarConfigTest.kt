@@ -2,7 +2,6 @@ package com.mdot.app.domain
 
 import com.mdot.app.domain.model.BottomBarConfig
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** 底栏配置：单列表模型（完整顺序 + 关闭集合；开关不影响顺序）——v0.6.21 起 */

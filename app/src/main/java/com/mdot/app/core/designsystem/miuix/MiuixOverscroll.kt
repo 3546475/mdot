@@ -15,7 +15,6 @@ import androidx.compose.ui.node.LayoutModifierNode
 import androidx.compose.ui.node.currentValueOf
 import androidx.compose.ui.node.invalidatePlacement
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Velocity

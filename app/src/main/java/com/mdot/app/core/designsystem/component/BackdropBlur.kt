@@ -3,7 +3,6 @@ package com.mdot.app.core.designsystem.component
 import android.os.Build
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -104,12 +103,6 @@ class BackdropBlurState internal constructor() {
 
 @Composable
 fun rememberBackdropBlurState(): BackdropBlurState = remember { BackdropBlurState() }
-
-/** 全局玻璃源下发（MainActivity provides；null = 毛玻璃关/不可用）：
- *  底部悬浮提示（MessageSnackbar）等**源之外无自有源**的零散玻璃从这里取共享源采样 */
-val LocalBackdropGlassState = compositionLocalOf<BackdropBlurState?> { null }
-
-
 
 /**
  * 背景模糊源：把自身内容录进共享 [BackdropBlurState.layer] 并上屏。挂在「会被效果方盖住」的内容上（如导航宿主）。

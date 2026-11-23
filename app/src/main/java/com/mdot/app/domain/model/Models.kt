@@ -24,6 +24,8 @@ data class DailyRecord(
     val leaveType: LeaveType? = null,
     /** 备注 ≤200 字 */
     val note: String? = null,
+    /** 钟点时段计价用的加班开始分钟（0..1439）；null = 未填，按单档 */
+    val otStartMinute: Int? = null,
     val createdAt: Long,
     val updatedAt: Long,
 )

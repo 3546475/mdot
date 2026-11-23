@@ -4,7 +4,6 @@ import com.mdot.app.core.designsystem.engineShape
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,24 +62,25 @@ import top.yukonga.miuix.kmp.basic.NavigationBarDefaults
 import com.mdot.app.domain.model.ThemeEngine
 import kotlinx.coroutines.launch
 
-/** 底栏功能池槽位定义（03 文档 §4.2）；MD3E：图标为 Material Symbols Rounded 单色形状，选中态由 tint（onSecondaryContainer/primary）+ 弹性放大区分。label 为资源 id，显示点用 stringResource 解析 */
+/** 底栏功能池槽位定义（03 文档 §4.2）；MD3E：图标为 Material Symbols Rounded 单色形状，选中态 = **填充变体**（`_filled`）+ tint（onSecondaryContainer/primary）+ 弹性放大区分。label 为资源 id，显示点用 stringResource 解析 */
 data class SlotSpec(
     val id: String,
     val labelRes: Int,
     val route: String,
     @DrawableRes val iconRes: Int,
+    /** 选中态用的填充变体（2026-10-30 用户定：选中不再是「线条换色」，而是实心图标） */
     @DrawableRes val iconFilledRes: Int = iconRes,
 )
 
 object SlotRegistry {
     val ALL = mapOf(
-        "home" to SlotSpec("home", R.string.ds_slot_home, "home", R.drawable.ic_ms_home),
-        "calendar" to SlotSpec("calendar", R.string.ds_slot_calendar, "calendar", R.drawable.ic_ms_calendar_month),
-        "stats" to SlotSpec("stats", R.string.ds_slot_stats, "stats", R.drawable.ic_ms_bar_chart),
-        "export" to SlotSpec("export", R.string.ds_slot_export, "export", R.drawable.ic_ms_file_download),
-        "sync" to SlotSpec("sync", R.string.ds_slot_sync, "sync", R.drawable.ic_ms_cloud_sync),
-        "settings" to SlotSpec("settings", R.string.ds_slot_settings, "settings", R.drawable.ic_ms_settings),
-        "profile" to SlotSpec("profile", R.string.ds_slot_profile, "profile", R.drawable.ic_ms_person),
+        "home" to SlotSpec("home", R.string.ds_slot_home, "home", R.drawable.ic_ms_home, R.drawable.ic_ms_home_filled),
+        "calendar" to SlotSpec("calendar", R.string.ds_slot_calendar, "calendar", R.drawable.ic_ms_calendar_month, R.drawable.ic_ms_calendar_month_filled),
+        "stats" to SlotSpec("stats", R.string.ds_slot_stats, "stats", R.drawable.ic_ms_bar_chart, R.drawable.ic_ms_bar_chart_filled),
+        "export" to SlotSpec("export", R.string.ds_slot_export, "export", R.drawable.ic_ms_file_download, R.drawable.ic_ms_file_download_filled),
+        "sync" to SlotSpec("sync", R.string.ds_slot_sync, "sync", R.drawable.ic_ms_cloud_sync, R.drawable.ic_ms_cloud_sync_filled),
+        "settings" to SlotSpec("settings", R.string.ds_slot_settings, "settings", R.drawable.ic_ms_settings, R.drawable.ic_ms_settings_filled),
+        "profile" to SlotSpec("profile", R.string.ds_slot_profile, "profile", R.drawable.ic_ms_person, R.drawable.ic_ms_person_filled),
     )
 
     fun resolve(id: String): SlotSpec? = ALL[id]
@@ -191,10 +191,29 @@ fun JiabanBottomBar(
     // 显隐/尺寸共用一个 Animatable；珠心 x 用普通 state：手势里同步写，只有滑行用 animate 写
     val press = remember { Animatable(0f) }
     var beadX by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
-    var hovered by remember { androidx.compose.runtime.mutableIntStateOf(-1) }
     // 液滴在场期间选中态整体让位（文档 §8）
     val beadVisible by remember {
         androidx.compose.runtime.derivedStateOf { press.value > 0.01f }
+    }
+    // 珠下的槽位 = 液滴在场时唯一「像选中」的那一项：填充图标 + 主题色；其余（**包括原选中项**）
+    // 退回线条 + 中性色。用户 2026-10-30 定的语义：选中态跟着**珠子**走，不跟原来的 route 走。
+    val hasCenterSlot = centerAction != null
+    val beadSlot by remember(slots, hasCenterSlot) {
+        androidx.compose.runtime.derivedStateOf {
+            val cellsCount = slots.size + if (hasCenterSlot) 1 else 0
+            if (!beadVisible || barWidth <= 0 || cellsCount == 0 || slots.isEmpty()) {
+                -1
+            } else {
+                val leftCount = if (hasCenterSlot) slots.size / 2 else 0
+                val w = barWidth.toFloat() / cellsCount
+                val cell = (beadX / w).toInt().coerceIn(0, cellsCount - 1)
+                when {
+                    hasCenterSlot && cell == leftCount -> -1
+                    hasCenterSlot && cell > leftCount -> (cell - 1).coerceIn(0, slots.size - 1)
+                    else -> cell.coerceIn(0, slots.size - 1)
+                }
+            }
+        }
     }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     // 底栏自身录一份：液滴放大的是「玻璃 + 图标」，不是页面（文档 §3）
@@ -238,7 +257,6 @@ fun JiabanBottomBar(
                 // 液滴从「当前选中项」长出，而不是手指位置：点击切换才画得成「选中从 A 滑到 B」
                 val downOnCenter = overCenter(fingerX)
                 beadX = if (downOnCenter) centerX() else slotCenter(selectedIndex.coerceAtLeast(0))
-                hovered = if (downOnCenter) -1 else slotAt(fingerX)
                 scope.launch { press.animateTo(1f, GlassLiquidSpec.pressSpec) }
                 var dragged = false
                 while (true) {
@@ -255,10 +273,8 @@ fun JiabanBottomBar(
                         change.consume()
                         fingerX = change.position.x
                         beadX = change.position.x
-                        hovered = if (overCenter(change.position.x)) -1 else slotAt(change.position.x)
                     }
                 }
-                hovered = -1
                 if (dragged) {
                     // 拖动松手不滑行：珠子已在落点上，直接淡出；落点导航由这里补（clickable 已被消费）
                     if (centerAction != null && overCenter(fingerX)) {
@@ -406,10 +422,14 @@ fun JiabanBottomBar(
                         animationSpec = pillSpec,
                         label = "navPillSlide",
                     )
-                    // 液滴让位：选中态在液滴在场时淡出、液滴消失后淡入（文档 §8 的「180ms 渐显」）
+                    // 液滴让位：选中态在液滴在场时淡出、液滴消失后淡入。
+                    // 渐显时长与**液滴淡出同长**（80ms，BottomBarSpec.selectedFadeInMs）——
+                    // 珠子刚走，高亮就要接上；用 motionScheme 的 effects 档（~300ms）会明显慢半拍。
                     val pillAlpha by animateFloatAsState(
                         targetValue = if (beadVisible) 0f else 1f,
-                        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
+                        animationSpec = androidx.compose.animation.core.tween(
+                            durationMillis = BottomBarSpec.selectedFadeInMs,
+                        ),
                         label = "navPillAlpha",
                     )
                     Box(
@@ -432,7 +452,10 @@ fun JiabanBottomBar(
                         SlotCell(
                             slot = slot,
                             selected = idx == selectedIndex && !beadVisible,
-                            hovered = beadVisible && hovered == idx,
+                            // 液滴在场：只有**珠子底下**那项是「选中样」（填充 + 主题色），
+                            // 原选中项退回线条 + 中性色；珠子不在场时照常按 selectedIndex
+                            filledIcon = idx == (if (beadVisible) beadSlot else selectedIndex),
+                            hovered = beadVisible && beadSlot == idx,
                             iconOnly = iconOnly,
                             onClick = onSlotClick,
                         )
@@ -446,10 +469,12 @@ fun JiabanBottomBar(
                         ) { centerAction() }
                     }
                     slots.drop(leftCount).forEachIndexed { idx, slot ->
+                        val index = leftCount + idx
                         SlotCell(
                             slot = slot,
-                            selected = leftCount + idx == selectedIndex && !beadVisible,
-                            hovered = beadVisible && hovered == leftCount + idx,
+                            selected = index == selectedIndex && !beadVisible,
+                            filledIcon = index == (if (beadVisible) beadSlot else selectedIndex),
+                            hovered = beadVisible && beadSlot == index,
                             iconOnly = iconOnly,
                             onClick = onSlotClick,
                         )
@@ -493,6 +518,9 @@ fun JiabanBottomBar(
 private fun androidx.compose.foundation.layout.RowScope.SlotCell(
     slot: SlotSpec,
     selected: Boolean,
+    /** 图标是否用填充变体。液滴在场时它跟**珠子底下那一项**走（`beadSlot`），不在场时跟 selectedIndex；
+     *  与 [selected]（高亮：tint / 弹性放大）分开传，两者语义不同，见 [SlotBody] 的 [filled] */
+    filledIcon: Boolean,
     iconOnly: Boolean,
     /** null = 不可点（配置页预览）：不挂 clickable、也不播按压缩放 */
     onClick: ((SlotSpec) -> Unit)?,
@@ -512,7 +540,7 @@ private fun androidx.compose.foundation.layout.RowScope.SlotCell(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        SlotBody(slot, selected = selected, hovered = hovered, iconOnly = iconOnly)
+        SlotBody(slot, selected = selected, filled = filledIcon, hovered = hovered, iconOnly = iconOnly)
     }
 }
 
@@ -521,6 +549,9 @@ private fun androidx.compose.foundation.layout.RowScope.SlotCell(
 private fun SlotBody(
     slot: SlotSpec,
     selected: Boolean,
+    /** 填充变体开关：与 [selected] 分离。液滴在场时「像选中」的是**珠子底下那一项**
+     *  （填充 + 主题色），原选中项退回线条 + 中性色——用户 2026-10-30 定，见 `beadSlot` */
+    filled: Boolean,
     hovered: Boolean = false,
     iconOnly: Boolean,
 ) {
@@ -538,7 +569,11 @@ private fun SlotBody(
             selected -> MaterialTheme.colorScheme.onSecondaryContainer
             else -> MaterialTheme.colorScheme.onSurfaceVariant
         },
-        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
+        // 选中态渐显：与液滴淡出同长（80ms）——珠子走了高亮就得接上，别慢半拍。
+        // motionScheme 的 effects 档（~300ms）在这里跟 80ms 的液滴淡出对不上（03 文档 §7 短档例外）。
+        animationSpec = androidx.compose.animation.core.tween(
+            durationMillis = BottomBarSpec.selectedFadeInMs,
+        ),
         label = "slotTint",
     )
     // MD3E：图标放大走 motionScheme 空间 spec
@@ -554,7 +589,7 @@ private fun SlotBody(
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(
-            painterResource(if (selected) slot.iconFilledRes else slot.iconRes),
+            painterResource(if (filled) slot.iconFilledRes else slot.iconRes),
             contentDescription = stringResource(slot.labelRes),
             tint = tint,
             modifier = Modifier
@@ -608,12 +643,12 @@ private fun LiquidDropletLayer(
     val beadWidth = GlassLiquidSpec.dropletWidth * scale
     val beadHeight = GlassLiquidSpec.dropletHeight * scale
     val barHeight = BottomBarSpec.height
-    // 高光按明暗分两档（用户 2026-10-30 真机反馈）：
-    // - 浅色：白高光在浅底上看不清 → 用「专用玻璃高光 + 深色描边」把边界立住；
-    // - 深色：白高光本身够清楚，但之前那版（capsuleEdgeHighlight）更好看 → 换回，且**不加描边**。
+    // 高光：两档统一用底栏同款 capsuleEdgeHighlight（2026-10-30 用户二次定稿——浅色档不再用
+    // 专用的 liquidDropletGloss，直接对齐深色档观感）。浅色档只多一圈 1dp 深色描边（黑 0.35）：
+    // 描边从边缘向内画，所以高光整体内缩一格让位，否则白亮线会被描边整条盖掉、等于高光没改。
     val gloss: Modifier = if (liftStyle.isLight) {
         Modifier
-            .liquidDropletGloss()
+            .capsuleEdgeHighlight(liftStyle, inset = GlassLiquidSpec.borderWidth)
             .border(
                 GlassLiquidSpec.borderWidth,
                 androidx.compose.ui.graphics.Color.Black.copy(alpha = GlassLiquidSpec.borderAlphaLight),

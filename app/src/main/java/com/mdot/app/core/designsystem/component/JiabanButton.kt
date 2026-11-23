@@ -13,7 +13,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,7 +21,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -41,10 +39,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.mdot.app.R
 import com.mdot.app.core.designsystem.ButtonSpec
 import com.mdot.app.core.designsystem.Radius
 import androidx.compose.foundation.layout.PaddingValues
@@ -59,7 +55,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 enum class JiabanButtonRole { PRIMARY, SECONDARY, GHOST }
 
 /**
- * 对话框按钮行「扁平化」下发（MIUIX 对话框卡片提供，见 DialogBackdrop.MiuixDialogCard）：
+ * 对话框按钮行「扁平化」下发（MIUIX 对话框卡片提供，见 `OverlayDialog.kt` 的 OverlayDialogCard）：
  * 为 true 时 [JiabanButtonRole.PRIMARY] 降级为 [JiabanButtonRole.GHOST]——
  * HyperOS 的对话框按钮行是**整宽纯文字格**，不该在文字下再垫一层圆角主题色底。
  * ⚠️ 只在 MIUIX 的对话框卡片里 provide，故 MD3 侧与其它场景一律不受影响。
@@ -102,7 +98,7 @@ enum class JiabanButtonSize { L, M }
  * - **按压反馈**：pressScale + 涟漪叠加（工资设置保存按钮基准，共用同一
  *   interactionSource，规则 7）；
  * - **加载/成功反馈**：[loading] 时**收缩到 ✓ 的内容自然宽、完成后展开回文案**
- *   （工资页保存 / 关于页检查更新同款动画，原 InlineLoadingButton 圆环形态废弃）。
+ *   （工资页保存 / 关于页检查更新同款动画）。
  *
  * 实现为自绘胶囊（不再套 M3 Button）：宽度动画需要「外壳固定 + 内容无界测量 +
  * 居中」的自控布局（docs/11 034 同族坑：禁 `animateContentSize`，位置必须是宽度的

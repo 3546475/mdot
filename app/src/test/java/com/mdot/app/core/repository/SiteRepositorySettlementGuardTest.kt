@@ -4,8 +4,6 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.mdot.app.core.database.AppDatabase
-import com.mdot.app.core.database.SiteAttendanceEntity
-import com.mdot.app.core.database.SiteSettlementEntity
 import com.mdot.app.core.util.AppResult
 import com.mdot.app.domain.model.AdvancePurpose
 import com.mdot.app.domain.model.SiteAttendance

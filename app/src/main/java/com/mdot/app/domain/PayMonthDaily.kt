@@ -1,5 +1,8 @@
 package com.mdot.app.domain
 
+import com.mdot.app.domain.model.DailyRecord
+import com.mdot.app.domain.model.NightShift
+import com.mdot.app.domain.model.RecordType
 import java.math.BigDecimal
 import java.math.RoundingMode
 
@@ -26,7 +29,7 @@ enum class PayMonthDayBasis {
 }
 
 /**
- * 记月一个周期内的**四个计数字段**（纯数据，无行为）。
+ * 记月一个周期内的**计数字段**（纯数据，无行为）。
  *
  * 天数一律以"分钟 ÷ 480"换算，保留小数——用户 2026-10-08 定：**半天请假算 0.5 天**。
  * 金额侧由 [PayMonthDaily.dailyCents] 逐行 HALF_UP 到分（硬规则 1）。
@@ -35,12 +38,14 @@ enum class PayMonthDayBasis {
  * @property recordDayCount 区间内有加班记录的**去重日期数**
  * @property calendarDayCount 区间自然日数（含首尾）；记月传自然月 ⇒ 即**本月天数**
  * @property leaveMinutes 请假总分钟（事假 + 病假）
+ * @property nightRecordDayCount 区间内班次为「夜班」的记录日（去重）；0 时长也计入
  */
 data class PayMonthDayCounts(
     val standardMinutes: Int = 0,
     val recordDayCount: Int = 0,
     val calendarDayCount: Int = 0,
     val leaveMinutes: Int = 0,
+    val nightRecordDayCount: Int = 0,
 ) {
     /** 请假日数（可为小数：半天 = 0.5） */
     val leaveDays: Double get() = leaveMinutes.toDouble() / CycleCalculator.MINUTES_PER_ATTENDANCE_DAY
@@ -70,16 +75,17 @@ data class PayMonthDayCounts(
 object PayMonthDaily {
 
     /**
-     * 组装一个区间的四个天数计数（**两个 ViewModel 共用这一处推导**）。
+     * 组装一个区间的天数计数（**各调用方共用这一处推导**）。
      *
-     * 记月页（[com.mdot.app.feature.stats.PayMonthViewModel]）与首页数据区
-     * （[com.mdot.app.feature.home.HomeViewModel]）都要给 [livePreviewSheet] 传同一份计数——
+     * 记月页（[com.mdot.app.feature.stats.PayMonthViewModel]）、首页数据区
+     * （[com.mdot.app.feature.home.HomeViewModel]）与导出都要给 [livePreviewSheet] 传同一份计数——
      * 各写一套必然漂移，首页 hero 与记月页汇总卡就会对不上账（硬规则 12）。
      *
      * @param from/to 这张工资单覆盖的区间（记月 = **自然月**：单据按月存，
      *   `previewFlow` 也是按 `atDay(1)..atEndOfMonth()` 取数的，故这里同款，不用考勤周期）
      * @param recordDates 有**加班记录**的日期（可重复，函数内去重）
      * @param leaveMinutes 请假总分钟，取**引擎算出来的** `Output.leaveMinutes`，别在这里重数一遍
+     * @param nightRecordDates 班次为「夜班」的记录日期（可重复，函数内去重）
      */
     fun counts(
         from: java.time.LocalDate,
@@ -89,13 +95,20 @@ object PayMonthDaily {
         makeupDays: Set<java.time.LocalDate>,
         recordDates: List<java.time.LocalDate>,
         leaveMinutes: Int,
+        nightRecordDates: List<java.time.LocalDate> = emptyList(),
     ): PayMonthDayCounts = PayMonthDayCounts(
         standardMinutes = CycleCalculator.standardMinutesFor(from, to, workdays, holidays, makeupDays),
         recordDayCount = recordDates.distinct().size,
         calendarDayCount = if (from.isAfter(to)) 0
         else (java.time.temporal.ChronoUnit.DAYS.between(from, to) + 1).toInt(),
         leaveMinutes = leaveMinutes.coerceAtLeast(0),
+        nightRecordDayCount = nightRecordDates.distinct().size,
     )
+
+    /** 夜班记录日（只认班次名为 [NightShift.NAME] 的 OT 记录；0 时长也算，重复日期由 [counts] 去重） */
+    fun nightDates(records: List<DailyRecord>): List<java.time.LocalDate> =
+        records.filter { it.type == RecordType.OT && it.shiftName == NightShift.NAME }
+            .map { it.date }
 
     /**
      * 按日金额（分）= 日单价 × 天数。
