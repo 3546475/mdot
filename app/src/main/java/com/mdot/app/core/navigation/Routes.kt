@@ -73,8 +73,9 @@ object Routes {
     const val OT_PRICING = "settings/system/otpricing"
     const val APPEARANCE = "settings/appearance"
     const val ABOUT = "settings/about"
-    /** 更新与数据源（关于页版本卡下方入口）：节假日库版本/刷新 + 更新源管理 */
-    const val DATASOURCE = "settings/datasource"
+
+    /** 更新日志页（内容只从线上 CHANGELOG.md 拉） */
+    const val CHANGELOG = "settings/changelog"
 
     fun calendar(month: String? = null): String =
         if (month == null) "calendar" else "calendar?month=$month"

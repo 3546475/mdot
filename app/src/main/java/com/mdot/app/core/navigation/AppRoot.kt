@@ -74,7 +74,6 @@ import com.mdot.app.feature.record.RecordSheet
 import com.mdot.app.feature.record.RecordSheetViewModel
 import com.mdot.app.feature.payroll.OtPricingScreen
 import com.mdot.app.feature.settings.AboutScreen
-import com.mdot.app.feature.settings.DataSourceScreen
 import com.mdot.app.feature.settings.SystemSettingsScreen
 import com.mdot.app.feature.settings.SystemSwitchScreen
 import com.mdot.app.feature.stats.StatsScreen
@@ -92,6 +91,9 @@ import com.mdot.app.core.designsystem.SheetBackdrop
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.blur
 import com.mdot.app.core.designsystem.component.LocalOverlayDialogs
+import com.mdot.app.core.designsystem.component.FullscreenOverlay
+import com.mdot.app.feature.settings.ChangelogGuideContent
+import com.mdot.app.feature.settings.ChangelogScreen
 
 @Composable
 fun AppRoot(firstLaunchDone: Boolean, appVm: AppViewModel, backdropBlurState: BackdropBlurState, backdropFullState: BackdropBlurState) {
@@ -135,6 +137,8 @@ private fun AppRootContent(
     // 只有毛玻璃需要挂页面玻璃源；液滴读的是底栏自身的录制层，与磨砂无关
     val bottomBarLiquidGlass by appVm.bottomBarLiquidGlass.collectAsStateWithLifecycle()
     val workSystem by appVm.workSystem.collectAsStateWithLifecycle()
+    // 升级后首次启动的「本次更新」引导（一次性全屏卡片，内容只从线上拉）
+    val changelogGuide by appVm.changelogGuide.collectAsStateWithLifecycle()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     // 去掉 ?month 等查询参数后比对
@@ -466,9 +470,9 @@ private fun AppRootContent(
                         )
                     }
                 }
-                composable(Routes.DATASOURCE) {
+                composable(Routes.CHANGELOG) {
                     AdaptiveContainer {
-                        DataSourceScreen(onBack = { navController.popBackStack() })
+                        ChangelogScreen(onBack = { navController.popBackStack() })
                     }
                 }
             }
@@ -667,6 +671,13 @@ private fun AppRootContent(
                 )
             }
         }
+    // 首启「本次更新」引导：一次性**全屏卡片**，走页内覆盖层栈（不开系统窗口）。
+    // 内容在 OverlayDialogLayer 里渲染（根 Box 最后一个子节点 ⇒ 叠在记录弹层/提示窗之上）。
+    changelogGuide?.let { guide ->
+        FullscreenOverlay(onDismissRequest = { appVm.dismissChangelogGuide() }) {
+            ChangelogGuideContent(entry = guide, onClose = { appVm.dismissChangelogGuide() })
+        }
+    }
     // 页内模态覆盖层（所有弹窗都在这里渲染）——**必须是根 Box 的最后一个子节点**：
     // ① 要在 SheetBackdropLayer **之外**（否则会被连带着模糊/压暗/缩放）；
     // ② 要在 RecordSheet / 全局提示窗**之后**（否则"从弹层里打开的日期选择"会被弹层盖住）。

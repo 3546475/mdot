@@ -153,6 +153,19 @@ fun emphasisCardInk() = if (engineIsMiuix) MaterialTheme.colorScheme.onSurface
 else MaterialTheme.colorScheme.onPrimaryContainer
 
 /**
+ * 次级强调卡（如关于页「节假日库」）的卡底：比 [emphasisCardSurface] 低一档。
+ * MIUIX 用低一层的 surface 档，MD3 用 secondaryContainer（version card 的 primaryContainer 降一级）。
+ */
+@Composable
+fun secondaryCardSurface() = if (engineIsMiuix) MaterialTheme.colorScheme.surfaceContainerLow
+else MaterialTheme.colorScheme.secondaryContainer
+
+/** 次级强调卡的文字色，与 [secondaryCardSurface] 成对使用 */
+@Composable
+fun secondaryCardInk() = if (engineIsMiuix) MaterialTheme.colorScheme.onSurface
+else MaterialTheme.colorScheme.onSecondaryContainer
+
+/**
  * hero 卡内**浅层胶囊**（信息胶囊）的底色——本口径的**唯一出处**。
  *
  * = `surface` α0.6 叠在卡底上 ⇒ 卡面上的一层**亮**色薄片；配 [emphasisCardInk] 全不透明文字。

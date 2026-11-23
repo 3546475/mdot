@@ -91,6 +91,9 @@ internal enum class OverlayKind {
 
     /** 底部弹层：自下而上滑入（不缩放、不渐显），内容自带面板圆角与标题 */
     SHEET,
+
+    /** 全屏覆盖层：只渐显（不缩放），内容自带整屏底色（一次性引导/说明页） */
+    FULLSCREEN,
 }
 
 internal data class OverlayEntry(
@@ -133,22 +136,30 @@ fun OverlayDialogLayer(controller: OverlayDialogController) {
                     if (entry != null) detectTapGestures { entry.onDismiss() }
                 },
         )
-        // 面板/卡片：形态决定进场方式 —— 卡片缩放+渐显（原口径），弹层自下而上滑入（不缩放）
+        // 面板/卡片：形态决定进场方式 —— 卡片缩放+渐显（原口径），弹层自下而上滑入（不缩放），
+        // 全屏覆盖层只渐显（整屏底色由内容自带，缩放会看到边缘露底）
         val isSheet = shown.kind == OverlayKind.SHEET
+        val isFullScreen = shown.kind == OverlayKind.FULLSCREEN
         Box(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
                     val p = progress.value
-                    if (isSheet) {
-                        translationY = (1f - p) * size.height
-                    } else {
-                        scaleX = 0.92f + 0.08f * p
-                        scaleY = 0.92f + 0.08f * p
-                        alpha = p
+                    when {
+                        isSheet -> translationY = (1f - p) * size.height
+                        isFullScreen -> alpha = p
+                        else -> {
+                            scaleX = 0.92f + 0.08f * p
+                            scaleY = 0.92f + 0.08f * p
+                            alpha = p
+                        }
                     }
                 },
-            contentAlignment = if (isSheet) Alignment.BottomCenter else Alignment.Center,
+            contentAlignment = when {
+                isSheet -> Alignment.BottomCenter
+                isFullScreen -> Alignment.TopStart
+                else -> Alignment.Center
+            },
         ) { shown.content() }
     }
 }
@@ -250,6 +261,32 @@ internal fun OverlayDialogCard(
                 }
             }
         }
+    }
+}
+
+/**
+ * 全屏覆盖层（页内，不开系统窗口）：一次性引导/说明页用。
+ *
+ * 与 [JiabanAlertDialog] 同一条栈（覆盖层层级一致：叠在记录弹层之上）。
+ * 内容自带整屏底色 ⇒ 宿主不压暗；**空白处点击不关闭**由内容自己处理
+ * （内容自己吞掉点击即可；返回键仍会走 [onDismissRequest]）。
+ */
+@Composable
+fun FullscreenOverlay(
+    onDismissRequest: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val overlayCtl = requireNotNull(LocalOverlayDialogs.current) {
+        "FullscreenOverlay 需要 LocalOverlayDialogs 宿主（MainActivity 的 setContent 提供）"
+    }
+    DisposableEffect(Unit) {
+        val entry = OverlayEntry(
+            kind = OverlayKind.FULLSCREEN,
+            onDismiss = onDismissRequest,
+            content = content,
+        )
+        overlayCtl.push(entry)
+        onDispose { overlayCtl.remove(entry) }
     }
 }
 

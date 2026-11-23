@@ -251,6 +251,26 @@ class SettingsDataSource @Inject constructor(
         it.remove(UPDATE_KNOWN_NAME)
     }
 
+    // ---- 更新日志（CHANGELOG.md，只从线上拉）----
+    /** 上次拉到的更新日志**原文**（Markdown）；网络失败时的兜底 */
+    val changelogCacheFlow: Flow<String> = dataStore.data.map { it[CHANGELOG_CACHE] ?: "" }
+
+    /** 更新日志缓存的拉取时间（毫秒）；用于「缓存够新就别再打网络」 */
+    val changelogCacheAtFlow: Flow<Long> = dataStore.data.map { it[CHANGELOG_CACHE_AT] ?: 0L }
+
+    suspend fun setChangelogCache(markdown: String, at: Long) = dataStore.edit {
+        it[CHANGELOG_CACHE] = markdown
+        it[CHANGELOG_CACHE_AT] = at
+    }
+
+    /** 已展示过「本次更新」引导的版本号；版本号变大 ⇒ 又升过级 ⇒ 再展示一次 */
+    val lastShownChangelogVersionCodeFlow: Flow<Int> =
+        dataStore.data.map { it[LAST_SHOWN_CHANGELOG_CODE] ?: 0 }
+
+    suspend fun setLastShownChangelogVersionCode(code: Int) = dataStore.edit {
+        it[LAST_SHOWN_CHANGELOG_CODE] = code
+    }
+
     // ---- 同步 ----
     val lastBackupAtFlow: Flow<Long> = dataStore.data.map { it[LAST_BACKUP_AT] ?: 0 }
     suspend fun setLastBackupAt(at: Long) = dataStore.edit { it[LAST_BACKUP_AT] = at }
@@ -352,6 +372,15 @@ class SettingsDataSource @Inject constructor(
             "https://3546475.github.io/mdot/holidays.json",
         )
 
+        /**
+         * 更新日志（CHANGELOG.md）默认源：**与更新 JSON 同目录**（CNB raw 优先，GitHub Pages 备用）。
+         * 两处线上内容一致（同一份文件发布到两个地方），第一个能解析出内容就用它。
+         */
+        val DEFAULT_CHANGELOG_URLS = listOf(
+            "https://cnb.cool/nulxiel/mdot/-/git/raw/main/CHANGELOG.md",
+            "https://3546475.github.io/mdot/CHANGELOG.md",
+        )
+
         private val SALARY = stringPreferencesKey("salary_config")
         private val CYCLE_ANCHOR_DAY = intPreferencesKey("cycle_anchor_day")
         private val CALENDAR_CYCLE_VIEW = booleanPreferencesKey("calendar_cycle_view")
@@ -368,6 +397,9 @@ class SettingsDataSource @Inject constructor(
         private val LAST_UPDATE_CHECK_AT = longPreferencesKey("last_update_check_at")
         private val UPDATE_KNOWN_CODE = intPreferencesKey("update_known_version_code")
         private val UPDATE_KNOWN_NAME = stringPreferencesKey("update_known_version_name")
+        private val CHANGELOG_CACHE = stringPreferencesKey("changelog_cache")
+        private val CHANGELOG_CACHE_AT = longPreferencesKey("changelog_cache_at")
+        private val LAST_SHOWN_CHANGELOG_CODE = intPreferencesKey("last_shown_changelog_version_code")
         private val AUTO_BACKUP_ENABLED = booleanPreferencesKey("auto_backup_enabled")
         private val LAST_BACKUP_AT = longPreferencesKey("last_backup_at")
         private val LAST_LOCAL_CHANGE_AT = longPreferencesKey("last_local_change_at")

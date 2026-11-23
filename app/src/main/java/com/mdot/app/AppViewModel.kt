@@ -4,10 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mdot.app.core.datastore.SettingsDataSource
 import com.mdot.app.core.holiday.HolidayRepository
+import com.mdot.app.core.update.ChangelogRepository
 import com.mdot.app.core.update.UpdateRepository
 import com.mdot.app.core.update.shouldAutoCheckUpdate
+import com.mdot.app.domain.ChangelogParser
 import com.mdot.app.domain.model.AppearanceConfig
 import com.mdot.app.domain.model.BottomBarConfig
+import com.mdot.app.domain.model.ChangelogEntry
 import com.mdot.app.domain.model.WorkSystem
 import com.mdot.app.feature.record.RecordSheetController
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,6 +32,7 @@ class AppViewModel @Inject constructor(
     val recordSheetController: RecordSheetController,
     private val holidayRepo: HolidayRepository,
     private val updateRepo: UpdateRepository,
+    private val changelogRepo: ChangelogRepository,
 ) : ViewModel() {
 
     /** 已知有新版本未更新时的提示载体（新版 versionName）；null = 无/已处理。
@@ -41,11 +45,53 @@ class AppViewModel @Inject constructor(
         _updateAvailable.value = null
     }
 
+    /**
+     * 首启「本次更新」引导的内容（对应线上 CHANGELOG.md 里**当前版本**的那一段）；null = 不展示。
+     * ⚠️ 声明必须在 init 之前（属性初始化按声明顺序执行）。
+     */
+    private val _changelogGuide = MutableStateFlow<ChangelogEntry?>(null)
+    val changelogGuide: StateFlow<ChangelogEntry?> = _changelogGuide.asStateFlow()
+
+    /** 关闭引导：记下「本版本已展示」，以后冷启动不再打扰 */
+    fun dismissChangelogGuide() {
+        _changelogGuide.value = null
+        viewModelScope.launch {
+            settings.setLastShownChangelogVersionCode(BuildConfig.VERSION_CODE)
+        }
+    }
+
     init {
         // 启动即触发节假日库远程刷新（内置资产/现缓存兜底，失败静默；7 天节流）
         viewModelScope.launch { holidayRepo.refreshIfStale() }
         // 冷启动自动检查更新（v0.7.6）：24h 节流；发现新版**只**走底部悬浮提示，不弹窗
         viewModelScope.launch { autoCheckUpdate() }
+        // 升级后首次启动：一次性「本次更新」引导（版本没变过就不打扰）
+        viewModelScope.launch { maybeShowChangelogGuide() }
+    }
+
+    /**
+     * 决定要不要弹「本次更新」引导：
+     * - 新装（引导流程还没走完）⇒ 不弹（用户还没见过这个 App），并记为已展示（以后升级了再弹）
+     * - 本版本已展示过 ⇒ 不弹
+     * - 线上日志里没有当前版本段（还没发版 / 版本号对不上）⇒ 不弹，但记为已展示（不反复打扰）
+     * - 拉不到内容 ⇒ 不弹、**也不记**（下次冷启动重试）
+     */
+    private suspend fun maybeShowChangelogGuide() {
+        if (!settings.firstLaunchDoneFlow.first()) {
+            // 新装：不是「升级」，不打扰；但记下本版本已处理，以后真升级了才弹
+            settings.setLastShownChangelogVersionCode(BuildConfig.VERSION_CODE)
+            return
+        }
+        val shown = settings.lastShownChangelogVersionCodeFlow.first()
+        if (shown >= BuildConfig.VERSION_CODE) return
+        val result = changelogRepo.load(forceRefresh = true)
+        if (result !is ChangelogRepository.LoadResult.Success) return
+        val entry = ChangelogParser.findByVersion(result.entries, BuildConfig.VERSION_NAME)
+        if (entry == null) {
+            settings.setLastShownChangelogVersionCode(BuildConfig.VERSION_CODE)
+            return
+        }
+        _changelogGuide.value = entry
     }
 
     private suspend fun autoCheckUpdate() {

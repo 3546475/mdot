@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 更新日志页（关于 → 更新日志） -->
+    <string name="changelog_title">更新日志</string>
+    <string name="changelog_entry_desc">看看每次更新改了什么</string>
+    <string name="changelog_failed_title">拉取失败</string>
+    <string name="changelog_retry">重试</string>
+    <string name="changelog_empty_title">暂无更新日志</string>
+    <string name="changelog_empty_hint">联网后再试一次</string>
+    <string name="changelog_cache_hint">当前显示的是本地缓存内容</string>
+
+    <!-- 首启「本次更新」引导（一次性全屏卡片） -->
+    <string name="changelog_guide_title">本次更新</string>
+    <string name="changelog_guide_ok">知道了</string>
+</resources>

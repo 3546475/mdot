@@ -17,11 +17,11 @@ class JsonFetcher @Inject constructor(
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
 
-    /** 返回响应体文本；非 2xx 抛 IOException */
-    suspend fun fetchText(url: String): String = withContext(ioDispatcher) {
+    /** 返回响应体文本；非 2xx 抛 IOException。[acceptHeader] 默认 application/json（更新检查、节假日库都是 JSON）；拉 Markdown（更新日志）传 text/markdown, text/plain。 */
+    suspend fun fetchText(url: String, acceptHeader: String = "application/json"): String = withContext(ioDispatcher) {
         val request = Request.Builder()
             .url(url)
-            .header("Accept", "application/json")
+            .header("Accept", acceptHeader)
             .header("Cache-Control", "no-cache")
             .build()
         client.executeWithBackoff(request, ioDispatcher).use { response ->

@@ -305,6 +305,7 @@ fun AboutScreen(
     val scope = rememberCoroutineScope()
     val updateNotice by updateVm.notice.collectAsStateWithLifecycle()
     val updateNoticeIsError by updateVm.noticeIsError.collectAsStateWithLifecycle()
+    val holidayMessage by dsVm.message.collectAsStateWithLifecycle()
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -336,17 +337,18 @@ fun AboutScreen(
                 }
             }
         }
-        // 检查更新结果提示（已是最新/失败等短提示）走底部 Snackbar，不占 hero 版本卡布局（docs/15 反馈）
+        // 检查更新/节假日刷新结果提示走底部 Snackbar，不占两张卡片的布局（docs/15 反馈）
+        val snackbarMessage = updateNotice ?: holidayMessage
         val (snackbarHostState, snackbarIsError) = rememberMessageSnackbar(
-            message = updateNotice,
-            isError = updateNoticeIsError,
-            onClear = updateVm::clearNotice,
+            message = snackbarMessage,
+            isError = updateNotice != null && updateNoticeIsError,
+            onClear = { if (updateNotice != null) updateVm.clearNotice() else dsVm.clearMessage() },
         )
         MessageSnackbarHost(snackbarHostState, snackbarIsError, Modifier.align(Alignment.BottomCenter))
     }
 }
 
-/** 「关于」页签内容主体：hero 版本卡（自更新+数据源）+ 隐私说明 + 开源许可 + 项目地址 */
+/** 「关于」页签内容主体：版本卡 + 节假日库卡 + 隐私说明 + 开源许可 + 项目地址 */
 @Composable
 private fun AboutPane(
     updateVm: UpdateViewModel,
@@ -363,15 +365,19 @@ private fun AboutPane(
     ) {
         Spacer(Modifier.height(Spacing.m))
 
-        // hero 版本卡（自更新与数据源页迁入）：当前版本大字 + 检查更新 + from 源选择胶囊
+        // hero 版本卡：当前版本大字 + 检查更新 + from 源选择胶囊
         UpdateHeroCard(updateVm = updateVm, dsVm = dsVm)
-        // 节假日库版本/刷新与更新源管理仍在那页（关于页只留版本卡）
         Spacer(Modifier.height(Spacing.m))
+        // 节假日库卡：版式与版本卡对齐，底色/文字低一档
+        HolidayCard(dsVm)
+        Spacer(Modifier.height(Spacing.m))
+        // 更新日志入口：应用内看每次更新改了什么（内容只从线上 CHANGELOG.md 拉）
         SectionCard {
             SettingRow(
-                title = stringResource(R.string.datasource_title),
-                icon = painterResource(R.drawable.ic_ms_cloud_sync),
-                onClick = { onOpen(Routes.DATASOURCE) },
+                stringResource(R.string.changelog_title),
+                stringResource(R.string.changelog_entry_desc),
+                painterResource(R.drawable.ic_ms_auto_awesome),
+                onClick = { onOpen(Routes.CHANGELOG) },
             )
         }
         Spacer(Modifier.height(Spacing.m))

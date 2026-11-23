@@ -4,7 +4,6 @@ import com.mdot.app.core.designsystem.component.JiabanAlertDialog
 import com.mdot.app.core.designsystem.dialogContainerColor
 import com.mdot.app.core.designsystem.engineShape
 import android.net.Uri
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
@@ -22,12 +20,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -55,7 +51,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
@@ -66,18 +61,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mdot.app.R
 import com.mdot.app.core.designsystem.Radius
 import com.mdot.app.core.designsystem.IconSpec
 import com.mdot.app.core.designsystem.Spacing
 import com.mdot.app.core.designsystem.component.SectionCard
-import com.mdot.app.core.navigation.contentBottomPadding
-import com.mdot.app.core.designsystem.component.JiabanTopBar
-import com.mdot.app.core.designsystem.component.SettingRow
-import com.mdot.app.core.designsystem.component.MessageSnackbarHost
-import com.mdot.app.core.designsystem.component.rememberMessageSnackbar
 
 import kotlin.math.max
 import com.mdot.app.core.designsystem.component.JiabanButton
@@ -85,100 +74,125 @@ import com.mdot.app.core.designsystem.component.JiabanButtonRole
 import com.mdot.app.core.designsystem.component.JiabanRadioButton
 import com.mdot.app.core.designsystem.component.JiabanCircularProgress
 import com.mdot.app.core.designsystem.component.FloatingLabelTextField
-import com.mdot.app.core.designsystem.emphasisCardSurface
-import com.mdot.app.core.designsystem.emphasisCardInk
-import com.mdot.app.domain.model.ThemeEngine
 import top.yukonga.miuix.kmp.basic.Button as MiuixButton
 import top.yukonga.miuix.kmp.basic.ButtonColors as MiuixButtonColors
+import com.mdot.app.core.designsystem.emphasisCardSurface
+import com.mdot.app.core.designsystem.emphasisCardInk
+import com.mdot.app.core.designsystem.secondaryCardSurface
+import com.mdot.app.core.designsystem.secondaryCardInk
+import com.mdot.app.domain.model.ThemeEngine
 
-/** 更新与数据源（F7-9 / F8-1）：hero 版本卡（检查更新 + from 源选择胶囊，弹窗内选择/添加更新源）+ 节假日库卡，与首页/统计 hero 同视觉体系 */
+/**
+ * 节假日库卡：版式对齐 [UpdateHeroCard]，卡底与文字用低一档的 [secondaryCardSurface]。
+ * 地址管理收进「from 源」弹窗，不再在页面里铺整列 URL。
+ */
 @Composable
-fun DataSourceScreen(
-    onBack: () -> Unit,
-    vm: DataSourceViewModel = hiltViewModel(),
-    updateVm: UpdateViewModel = hiltViewModel(),
-) {
-    val holidayVersion by vm.holidayVersion.collectAsStateWithLifecycle()
-    val holidayUrl by vm.holidayUrl.collectAsStateWithLifecycle()
-    val holidayUrls by vm.holidayUrls.collectAsStateWithLifecycle()
-    val message by vm.message.collectAsStateWithLifecycle()
-    val updateNotice by updateVm.notice.collectAsStateWithLifecycle()
-    val updateNoticeIsError by updateVm.noticeIsError.collectAsStateWithLifecycle()
+internal fun HolidayCard(vm: DataSourceViewModel) {
+    val version by vm.holidayVersion.collectAsStateWithLifecycle()
+    val url by vm.holidayUrl.collectAsStateWithLifecycle()
+    val urls by vm.holidayUrls.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
+    val ink = secondaryCardInk()
+    var showPicker by remember { mutableStateOf(false) }
 
-    Box(Modifier.fillMaxSize()) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .contentBottomPadding(showBottomBar = false)
-            .padding(horizontal = Spacing.page),
-    ) {
-        JiabanTopBar(title = stringResource(R.string.datasource_title), onBack = onBack)
-        Spacer(Modifier.height(Spacing.m))
-
-        // ---- hero：当前版本 + 检查更新 + from 源选择（与关于页共用，见 UpdateHeroCard） ----
-        UpdateHeroCard(updateVm = updateVm, dsVm = vm)
-
-        Spacer(Modifier.height(Spacing.m))
-
-        // ---- 节假日库 ----
-        SectionCard {
-            Column {
-                Text(stringResource(R.string.datasource_section_holiday), style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.height(Spacing.s))
-                SettingRow(
-                    stringResource(R.string.datasource_current_lib_version),
-                    holidayVersion ?: stringResource(R.string.datasource_builtin_default),
+    SectionCard(containerColor = secondaryCardSurface()) {
+        Column(Modifier.fillMaxWidth()) {
+            Text(
+                stringResource(R.string.datasource_section_holiday),
+                style = MaterialTheme.typography.labelSmall,
+                color = ink.copy(alpha = 0.8f),
+            )
+            Spacer(Modifier.height(Spacing.xs))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    version ?: stringResource(R.string.datasource_builtin_default),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = ink,
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Button(
+                if (busy) {
+                    Spacer(Modifier.width(Spacing.m))
+                    JiabanCircularProgress(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = ink,
+                    )
+                }
+            }
+            Spacer(Modifier.height(Spacing.s))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (Radius.engine == ThemeEngine.MIUIX) {
+                    // MIUIX 下与版本卡「检查更新」同源（库 Button 的 squircle 底色），
+                    // 不套外层 border——边框用药丸圆角会与库按钮的圆角对不上。
+                    MiuixButton(
                         onClick = vm::refreshHoliday,
                         enabled = !busy,
-                        shape = engineShape(Radius.pill),
-                        contentPadding = PaddingValues(horizontal = Spacing.l, vertical = Spacing.s),
+                        colors = MiuixButtonColors(
+                            color = ink.copy(alpha = 0.10f),
+                            disabledColor = ink.copy(alpha = 0.06f),
+                            contentColor = ink,
+                            disabledContentColor = ink.copy(alpha = 0.38f),
+                        ),
                     ) {
-                        if (busy) {
-                            JiabanCircularProgress(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = LocalContentColor.current,
-                            )
-                            Spacer(Modifier.width(Spacing.s))
-                        }
-                        Text(stringResource(R.string.datasource_refresh_now))
+                        Text(
+                            stringResource(R.string.datasource_refresh_now),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
+                } else {
+                    JiabanButton(
+                        text = stringResource(R.string.datasource_refresh_now),
+                        onClick = vm::refreshHoliday,
+                        role = JiabanButtonRole.SECONDARY,
+                        enabled = !busy,
+                        contentColorOverride = ink,
+                    )
+                }
+                if (urls.isNotEmpty()) {
+                    Spacer(Modifier.width(Spacing.s))
+                    Text(
+                        stringResource(R.string.datasource_update_from),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontFamily = FontFamily.Cursive,
+                        color = ink.copy(alpha = 0.75f),
+                    )
+                    Spacer(Modifier.width(Spacing.xs))
+                    Button(
+                        onClick = { showPicker = true },
+                        shape = engineShape(Radius.pill),
+                        contentPadding = PaddingValues(horizontal = Spacing.m, vertical = Spacing.xs),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = ink.copy(alpha = 0.12f),
+                            contentColor = ink,
+                        ),
+                    ) {
+                        Text(
+                            sourceDisplayName(url),
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
-                Text(
-                    stringResource(R.string.datasource_builtin_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = Spacing.xs),
-                )
-                Spacer(Modifier.height(Spacing.s))
-                UrlPicker(
-                    urls = holidayUrls,
-                    selected = holidayUrl,
-                    onSelect = vm::setHolidayUrl,
-                    onRemove = vm::removeHolidayUrl,
-                    onAdd = vm::addHolidayUrl,
-                )
             }
         }
-
     }
-        // 两路消息合并到同一 Snackbar：检查更新提示（updateVm.notice）优先于节假日刷新提示（几乎不会同时出现）
-        val snackbarMsg = updateNotice ?: message
-        val snackbarIsError = updateNotice != null && updateNoticeIsError
-        val (snackbarHostState, snackbarIsErrorFlag) = rememberMessageSnackbar(
-            message = snackbarMsg,
-            isError = snackbarIsError,
-            onClear = { if (updateNotice != null) updateVm.clearNotice() else vm.clearMessage() },
+
+    if (showPicker) {
+        SourcePickerDialog(
+            title = stringResource(R.string.datasource_holiday_source_picker_title),
+            urls = urls,
+            selected = url,
+            onSelect = { picked ->
+                vm.setHolidayUrl(picked)
+                showPicker = false
+            },
+            onAdd = vm::addHolidayUrl,
+            onRemove = vm::removeHolidayUrl,
+            onDismiss = { showPicker = false },
         )
-        MessageSnackbarHost(snackbarHostState, snackbarIsErrorFlag, Modifier.align(Alignment.BottomCenter))
     }
 }
-
 
 /**
  * hero 版本卡外观样式。
@@ -195,8 +209,7 @@ enum class UpdateHeroStyle { Classic, Glass }
 /** 当前生效的 hero 卡样式（改这一行即可切换） */
 private val UPDATE_HERO_STYLE = UpdateHeroStyle.Classic
 
-/** hero 版本卡：当前版本大字 + 检查更新 + 花体 from 当前源胶囊（点开弹窗选择/添加/删除更新源）。
- *  更新与数据源页与关于页共用；样式见 [UpdateHeroStyle] */
+/** hero 版本卡（关于页）：当前版本大字 + 检查更新 + 花体 from 当前源胶囊（点开弹窗选择/添加/删除更新源）。样式见 [UpdateHeroStyle] */
 @Composable
 internal fun UpdateHeroCard(
     updateVm: UpdateViewModel,
@@ -275,7 +288,8 @@ internal fun UpdateHeroCard(
     }
 
     if (showSourcePicker) {
-        UpdateSourcePickerDialog(
+        SourcePickerDialog(
+            title = stringResource(R.string.datasource_source_picker_title),
             urls = updateUrls,
             selected = updateUrl,
             onSelect = { url ->
@@ -627,106 +641,10 @@ private fun ButtonSpinner(
         }
     }
 }
-/** URL 多选一列表：RadioButton 点选即生效；多项时可删除；底部添加（对话框校验 http(s) 前缀与重复） */
+/** 数据源选择弹窗：名称 + 地址点选即生效，行内可删（多项时）、底部可添加新地址（更新/节假日库共用） */
 @Composable
-private fun UrlPicker(
-    urls: List<String>,
-    selected: String,
-    onSelect: (String) -> Unit,
-    onRemove: (String) -> Unit,
-    onAdd: (String) -> Unit,
-) {
-    var showAdd by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth()) {
-        // 候选列表限高（约 3 行），多地址时内部滚动避免整页拉长
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(max = 190.dp)
-                .verticalScroll(rememberScrollState())
-        ) {
-        urls.forEach { url ->
-            val isSel = url == selected
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(engineShape(Radius.small))
-                    .background(
-                        if (isSel) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-                        else Color.Transparent
-                    )
-                    .clickable(onClick = { onSelect(url) })
-                    .padding(horizontal = Spacing.s, vertical = Spacing.xs),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                JiabanRadioButton(selected = isSel, onClick = { onSelect(url) })
-                Text(
-                    url,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                if (urls.size > 1) {
-                    IconButton(onClick = { onRemove(url) }) {
-                        Icon(
-                            painterResource(R.drawable.ic_ms_delete),
-                            contentDescription = stringResource(R.string.ds_confirm_delete),
-                            tint = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-            }
-        }
-        }
-        Spacer(Modifier.height(Spacing.s))
-        OutlinedButton(
-            onClick = { showAdd = true },
-            shape = engineShape(Radius.pill),
-            contentPadding = PaddingValues(horizontal = Spacing.l, vertical = Spacing.s),
-        ) {
-            Icon(painterResource(R.drawable.ic_ms_add), null, Modifier.size(IconSpec.inline))
-            Spacer(Modifier.width(Spacing.s))
-            Text(stringResource(R.string.datasource_add_url), style = MaterialTheme.typography.labelMedium)
-        }
-    }
-    if (showAdd) {
-        var text by remember { mutableStateOf("") }
-        JiabanAlertDialog(containerColor = dialogContainerColor(), 
-            onDismissRequest = { showAdd = false },
-            title = { Text(stringResource(R.string.datasource_add_url)) },
-            text = {
-                FloatingLabelTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    label = stringResource(R.string.datasource_add_url_hint),
-                )
-            },
-            confirmButton = {
-                JiabanButton(
-                    text = stringResource(R.string.datasource_ok),
-                    onClick = {
-                        onAdd(text)
-                        showAdd = false
-                    },
-                    role = JiabanButtonRole.GHOST,
-                    enabled = text.isNotBlank(),
-                )
-            },
-            dismissButton = {
-                JiabanButton(
-                    text = stringResource(R.string.datasource_cancel),
-                    onClick = { showAdd = false },
-                    role = JiabanButtonRole.GHOST,
-                )
-            },
-        )
-    }
-}
-
-/** 更新数据源选择弹窗：名称 + 地址点选即生效，行内可删（多项时）、底部可添加新地址（更新源唯一管理入口） */
-@Composable
-private fun UpdateSourcePickerDialog(
+private fun SourcePickerDialog(
+    title: String,
     urls: List<String>,
     selected: String,
     onSelect: (String) -> Unit,
@@ -737,7 +655,7 @@ private fun UpdateSourcePickerDialog(
     var showAdd by remember { mutableStateOf(false) }
     JiabanAlertDialog(containerColor = dialogContainerColor(), 
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.datasource_source_picker_title)) },
+        title = { Text(title) },
         text = {
             Column(
                 Modifier

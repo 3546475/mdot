@@ -92,7 +92,7 @@ private val BurnBarHeight = 3.dp
  * - 不传 [onUndo]（null）：只保留「原地确认」，确认后直接回 Idle——用于**操作后触发元素会消失**
  *   的场景（列表行删除、菜单项），此时撤销由调用方的**底部信息提示窗（Snackbar）**承担。
  *
- * 宽度动画（**对齐关于页「检查更新」按钮**的做法，见 DataSourceScreen UpdateButton）：
+ * 宽度动画（**对齐关于页「检查更新」按钮**的做法，见 UpdateDataSourceCards 的 UpdateActionButton）：
  * 外壳宽度**固定** [ShellWidth] + `contentAlignment = Center`，胶囊宽度由**单一** [Animatable]
  * 驱动（首次测量 `snapTo` 自然宽，之后相位切换 `animateTo`）；位置 =（外壳 − 胶囊）/2 是宽度的
  * 纯函数，故宽度与位置**每帧同步、左右绝对对称**。

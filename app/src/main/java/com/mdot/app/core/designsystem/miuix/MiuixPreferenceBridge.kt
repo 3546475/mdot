@@ -228,11 +228,9 @@ fun MiuixJiabanButton(
         ) {
             // 2026-09-30 二修：仅传 colors.contentColor **不生效**（实测文字仍为黑 ✗，而 TextButton 那条
             // 的文字色是生效的）⇒ 明确把文字色写在 Text 上，不再依赖库的颜色传递（禁用态沿用本 App 约定）。
-            Text(
-                text,
-                color = if (enabled) MaterialTheme.colorScheme.onPrimary
-                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-            )
+            val contentColor = if (enabled) MaterialTheme.colorScheme.onPrimary
+            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+            Text(text, color = contentColor)
         }
     } else {
         TextButton(
