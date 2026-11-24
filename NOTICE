@@ -1,0 +1,228 @@
+马的加班（mdot）
+Copyright 2026 马的加班（mdot）项目作者
+
+本产品包含以下第三方组件。其著作权归各自作者所有，许可条款见下文与 LICENSE；
+各组件的完整许可文本可在应用的「设置 → 关于 → 开源许可」中查看。
+
+======================================================================
+Apache License 2.0
+======================================================================
+
+--- Compose MIUIX contributors ---
+  MIUIX Blur 0.9.4 (top.yukonga.miuix.kmp:miuix-blur-android)
+  MIUIX Core 0.9.4 (top.yukonga.miuix.kmp:miuix-core-android)
+  MIUIX Icons 0.9.4 (top.yukonga.miuix.kmp:miuix-icons-android)
+  MIUIX Nav 0.9.4 (top.yukonga.miuix.kmp:miuix-nav-android)
+  MIUIX Preference 0.9.4 (top.yukonga.miuix.kmp:miuix-preference-android)
+  MIUIX Shader 0.9.4 (top.yukonga.miuix.kmp:miuix-shader-android)
+  MIUIX Squircle 0.9.4 (top.yukonga.miuix.kmp:miuix-squircle-android)
+  MIUIX UI 0.9.4 (top.yukonga.miuix.kmp:miuix-ui-android)
+
+--- Drew Hamilton ---
+  Poko Annotations 0.23.1 (dev.drewhamilton.poko:poko-annotations-jvm)
+
+--- Google LLC ---
+  Dagger 2.60.1 (com.google.dagger:dagger)
+  Dagger Lint Aar 2.60.1 (com.google.dagger:dagger-lint-aar)
+  Guava ListenableFuture 1.0 (com.google.guava:listenablefuture)
+  Hilt Android 2.60.1 (com.google.dagger:hilt-android)
+  Hilt Core 2.60.1 (com.google.dagger:hilt-core)
+  JSpecify 注解 1.0.0 (org.jspecify:jspecify)
+  Material Icons Rounded（图标素材）  (res/drawable/ic_ms_*.xml)
+
+--- JetBrains s.r.o. ---
+  JetBrains AndroidX Lifecycle Common 2.11.0 (org.jetbrains.androidx.lifecycle:lifecycle-common-jvm)
+  JetBrains AndroidX Lifecycle Runtime 2.11.0 (org.jetbrains.androidx.lifecycle:lifecycle-runtime-android)
+  JetBrains AndroidX Lifecycle Runtime Compose 2.11.0 (org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose-android)
+  JetBrains AndroidX Lifecycle Viewmodel 2.11.0 (org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-android)
+  JetBrains AndroidX Lifecycle Viewmodel Compose 2.11.0 (org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose-android)
+  JetBrains AndroidX Lifecycle Viewmodel Savedstate 2.11.0 (org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-savedstate-android)
+  JetBrains Compose Animation 1.12.0 (org.jetbrains.compose.animation:animation-android)
+  JetBrains Compose Animation Core 1.12.0 (org.jetbrains.compose.animation:animation-core-android)
+  JetBrains Compose Foundation 1.12.0 (org.jetbrains.compose.foundation:foundation-android)
+  JetBrains Compose Foundation Layout 1.12.0 (org.jetbrains.compose.foundation:foundation-layout-android)
+  JetBrains Compose Material3 Window Size Class 1.12.0-alpha03 (org.jetbrains.compose.material3:material3-window-size-class-android)
+  JetBrains Compose Runtime 1.12.0 (org.jetbrains.compose.runtime:runtime-android)
+  JetBrains Compose Runtime Saveable 1.12.0 (org.jetbrains.compose.runtime:runtime-saveable-android)
+  JetBrains Compose UI 1.12.0 (org.jetbrains.compose.ui:ui-android)
+  JetBrains Compose UI Geometry 1.12.0 (org.jetbrains.compose.ui:ui-geometry-android)
+  JetBrains Compose UI Graphics 1.12.0 (org.jetbrains.compose.ui:ui-graphics-android)
+  JetBrains Compose UI Text 1.12.0 (org.jetbrains.compose.ui:ui-text-android)
+  JetBrains Compose UI Unit 1.12.0 (org.jetbrains.compose.ui:ui-unit-android)
+  JetBrains Compose UI Util 1.12.0 (org.jetbrains.compose.ui:ui-util-android)
+  JetBrains 注解 26.1.0 (org.jetbrains:annotations)
+  Kotlin Android Extensions 运行时 2.0.0 (org.jetbrains.kotlin:kotlin-android-extensions-runtime)
+  Kotlin Parcelize 运行时 2.0.0 (org.jetbrains.kotlin:kotlin-parcelize-runtime)
+  Kotlin Stdlib Jdk7 1.9.10 (org.jetbrains.kotlin:kotlin-stdlib-jdk7)
+  Kotlin Stdlib Jdk8 1.9.10 (org.jetbrains.kotlin:kotlin-stdlib-jdk8)
+  Kotlin 标准库 2.4.20 (org.jetbrains.kotlin:kotlin-stdlib)
+  kotlinx.collections-immutable 0.5.1 (org.jetbrains.kotlinx:kotlinx-collections-immutable-jvm)
+  kotlinx.coroutines 1.9.0 (org.jetbrains.kotlinx:kotlinx-coroutines-android)
+  kotlinx.coroutines-core 1.9.0 (org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm)
+  kotlinx.serialization-core 1.11.0 (org.jetbrains.kotlinx:kotlinx-serialization-core-jvm)
+  kotlinx.serialization-json 1.11.0 (org.jetbrains.kotlinx:kotlinx-serialization-json-jvm)
+
+--- Kyant0 ---
+  Backdrop（液态玻璃） 2.0.1 (io.github.kyant0:backdrop-android)
+  Shapes 1.2.1 (io.github.kyant0:shapes-android)
+
+--- Square, Inc. ---
+  OkHttp 4.12.0 (com.squareup.okhttp3:okhttp)
+  Okio 3.6.0 (com.squareup.okio:okio-jvm)
+
+--- The Android Open Source Project ---
+  AndroidX Activity 1.9.3 (androidx.activity:activity)
+  AndroidX Activity Compose 1.9.3 (androidx.activity:activity-compose)
+  AndroidX Activity KTX 1.9.3 (androidx.activity:activity-ktx)
+  AndroidX Annotation 1.9.1 (androidx.annotation:annotation-jvm)
+  AndroidX Annotation Experimental 1.4.1 (androidx.annotation:annotation-experimental)
+  AndroidX Appcompat 1.7.0 (androidx.appcompat:appcompat)
+  AndroidX Appcompat Resources 1.7.0 (androidx.appcompat:appcompat-resources)
+  AndroidX Autofill 1.0.0 (androidx.autofill:autofill)
+  AndroidX Collection 1.5.0 (androidx.collection:collection-jvm)
+  AndroidX Collection KTX 1.5.0 (androidx.collection:collection-ktx)
+  AndroidX Compose Animation 1.12.0 (androidx.compose.animation:animation-android)
+  AndroidX Compose Animation Core 1.12.0 (androidx.compose.animation:animation-core-android)
+  AndroidX Compose Foundation 1.12.0 (androidx.compose.foundation:foundation-android)
+  AndroidX Compose Foundation Layout 1.12.0 (androidx.compose.foundation:foundation-layout-android)
+  AndroidX Compose Material Ripple 1.12.0-alpha03 (androidx.compose.material:material-ripple-android)
+  AndroidX Compose Material3 1.5.0-alpha22 (androidx.compose.material3:material3-android)
+  AndroidX Compose Material3 Window Size Class 1.5.0-alpha22 (androidx.compose.material3:material3-window-size-class-android)
+  AndroidX Compose Runtime 1.12.0 (androidx.compose.runtime:runtime-android)
+  AndroidX Compose Runtime Annotation 1.12.0 (androidx.compose.runtime:runtime-annotation-android)
+  AndroidX Compose Runtime Retain 1.12.0 (androidx.compose.runtime:runtime-retain-android)
+  AndroidX Compose Runtime Saveable 1.12.0 (androidx.compose.runtime:runtime-saveable-android)
+  AndroidX Compose UI 1.12.0 (androidx.compose.ui:ui-android)
+  AndroidX Compose UI Geometry 1.12.0 (androidx.compose.ui:ui-geometry-android)
+  AndroidX Compose UI Graphics 1.12.0 (androidx.compose.ui:ui-graphics-android)
+  AndroidX Compose UI Text 1.12.0 (androidx.compose.ui:ui-text-android)
+  AndroidX Compose UI Tooling Preview 1.12.0 (androidx.compose.ui:ui-tooling-preview-android)
+  AndroidX Compose UI Unit 1.12.0 (androidx.compose.ui:ui-unit-android)
+  AndroidX Compose UI Util 1.12.0 (androidx.compose.ui:ui-util-android)
+  AndroidX Concurrent Futures 1.1.0 (androidx.concurrent:concurrent-futures)
+  AndroidX Core 1.16.0 (androidx.core:core)
+  AndroidX Core Common 2.2.0 (androidx.arch.core:core-common)
+  AndroidX Core KTX 1.16.0 (androidx.core:core-ktx)
+  AndroidX Core Runtime 2.2.0 (androidx.arch.core:core-runtime)
+  AndroidX Core Viewtree 1.0.0 (androidx.core:core-viewtree)
+  AndroidX Cursoradapter 1.0.0 (androidx.cursoradapter:cursoradapter)
+  AndroidX Customview 1.0.0 (androidx.customview:customview)
+  AndroidX Customview Poolingcontainer 1.0.0 (androidx.customview:customview-poolingcontainer)
+  AndroidX Datastore 1.1.1 (androidx.datastore:datastore-android)
+  AndroidX Datastore Core 1.1.1 (androidx.datastore:datastore-core-android)
+  AndroidX Datastore Core Okio 1.1.1 (androidx.datastore:datastore-core-okio-jvm)
+  AndroidX Datastore Preferences 1.1.1 (androidx.datastore:datastore-preferences-android)
+  AndroidX Datastore Preferences Core 1.1.1 (androidx.datastore:datastore-preferences-core-jvm)
+  AndroidX Drawerlayout 1.0.0 (androidx.drawerlayout:drawerlayout)
+  AndroidX Emoji2 1.4.0 (androidx.emoji2:emoji2)
+  AndroidX Emoji2 Views Helper 1.4.0 (androidx.emoji2:emoji2-views-helper)
+  AndroidX Exifinterface 1.3.7 (androidx.exifinterface:exifinterface)
+  AndroidX Fragment 1.5.4 (androidx.fragment:fragment)
+  AndroidX Graphics Path 1.0.1 (androidx.graphics:graphics-path)
+  AndroidX Graphics Shapes 1.0.1 (androidx.graphics:graphics-shapes-android)
+  AndroidX Hilt Navigation 1.2.0 (androidx.hilt:hilt-navigation)
+  AndroidX Hilt Navigation Compose 1.2.0 (androidx.hilt:hilt-navigation-compose)
+  AndroidX Interpolator 1.0.0 (androidx.interpolator:interpolator)
+  AndroidX Lifecycle Common 2.11.0 (androidx.lifecycle:lifecycle-common-jvm)
+  AndroidX Lifecycle Common Java8 2.11.0 (androidx.lifecycle:lifecycle-common-java8)
+  AndroidX Lifecycle Livedata 2.11.0 (androidx.lifecycle:lifecycle-livedata)
+  AndroidX Lifecycle Livedata Core 2.11.0 (androidx.lifecycle:lifecycle-livedata-core)
+  AndroidX Lifecycle Livedata Core KTX 2.11.0 (androidx.lifecycle:lifecycle-livedata-core-ktx)
+  AndroidX Lifecycle Process 2.11.0 (androidx.lifecycle:lifecycle-process)
+  AndroidX Lifecycle Runtime 2.11.0 (androidx.lifecycle:lifecycle-runtime-android)
+  AndroidX Lifecycle Runtime Compose 2.11.0 (androidx.lifecycle:lifecycle-runtime-compose-android)
+  AndroidX Lifecycle Runtime KTX 2.11.0 (androidx.lifecycle:lifecycle-runtime-ktx-android)
+  AndroidX Lifecycle Viewmodel 2.11.0 (androidx.lifecycle:lifecycle-viewmodel)
+  AndroidX Lifecycle Viewmodel Compose 2.11.0 (androidx.lifecycle:lifecycle-viewmodel-compose-android)
+  AndroidX Lifecycle Viewmodel KTX 2.11.0 (androidx.lifecycle:lifecycle-viewmodel-ktx)
+  AndroidX Lifecycle Viewmodel Savedstate 2.11.0 (androidx.lifecycle:lifecycle-viewmodel-savedstate-android)
+  AndroidX Loader 1.0.0 (androidx.loader:loader)
+  AndroidX Navigation Common 2.8.5 (androidx.navigation:navigation-common)
+  AndroidX Navigation Common KTX 2.8.5 (androidx.navigation:navigation-common-ktx)
+  AndroidX Navigation Compose 2.8.5 (androidx.navigation:navigation-compose)
+  AndroidX Navigation Runtime 2.8.5 (androidx.navigation:navigation-runtime)
+  AndroidX Navigation Runtime KTX 2.8.5 (androidx.navigation:navigation-runtime-ktx)
+  AndroidX Navigationevent 1.1.2 (androidx.navigationevent:navigationevent-android)
+  AndroidX Navigationevent Compose 1.1.2 (androidx.navigationevent:navigationevent-compose-android)
+  AndroidX Profileinstaller 1.4.0 (androidx.profileinstaller:profileinstaller)
+  AndroidX Resourceinspection Annotation 1.0.1 (androidx.resourceinspection:resourceinspection-annotation)
+  AndroidX Room Common 2.7.2 (androidx.room:room-common-jvm)
+  AndroidX Room KTX 2.7.2 (androidx.room:room-ktx)
+  AndroidX Room Runtime 2.7.2 (androidx.room:room-runtime-android)
+  AndroidX Savedstate 1.4.0 (androidx.savedstate:savedstate-android)
+  AndroidX Savedstate Compose 1.4.0 (androidx.savedstate:savedstate-compose-android)
+  AndroidX Savedstate KTX 1.4.0 (androidx.savedstate:savedstate-ktx)
+  AndroidX Sqlite 2.6.2 (androidx.sqlite:sqlite-android)
+  AndroidX Sqlite Framework 2.6.2 (androidx.sqlite:sqlite-framework-android)
+  AndroidX Startup Runtime 1.1.1 (androidx.startup:startup-runtime)
+  AndroidX Tracing 1.2.0 (androidx.tracing:tracing)
+  AndroidX Vectordrawable 1.1.0 (androidx.vectordrawable:vectordrawable)
+  AndroidX Vectordrawable Animated 1.1.0 (androidx.vectordrawable:vectordrawable-animated)
+  AndroidX Versionedparcelable 1.1.1 (androidx.versionedparcelable:versionedparcelable)
+  AndroidX Viewbinding 8.5.2 (androidx.databinding:viewbinding)
+  AndroidX Viewpager 1.0.0 (androidx.viewpager:viewpager)
+  AndroidX Window 1.5.0 (androidx.window:window)
+  AndroidX Window Core 1.5.0 (androidx.window:window-core-android)
+
+--- The Eclipse Foundation / Google LLC ---
+  jakarta.inject 2.0.1 (jakarta.inject:jakarta.inject-api)
+  javax.inject 1 (javax.inject:javax.inject)
+
+--- The FindBugs Project ---
+  JSR-305 注解 3.0.2 (com.google.code.findbugs:jsr305)
+
+--- Vannik Tech GmbH ---
+  Android-Image-Cropper（uCrop） 4.7.0 (com.vanniktech:android-image-cropper)
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use these files except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+======================================================================
+MIT License
+======================================================================
+
+com.materialkolor:material-color-utilities
+Copyright (c) 2026 Jordon de Hoog
+https://github.com/jordond/materialkolor
+
+MIT License
+
+Copyright (c) 2026 Jordon de Hoog
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+======================================================================
+SQLCipher Community Edition License
+======================================================================
+
+SQLCipher Community Edition (net.zetetic:sqlcipher-android)
+Copyright (c) 2008-2026, ZETETIC, LLC
+https://www.zetetic.net/sqlcipher/license/
+
+本产品按其 BSD 风格社区版许可分发，并已在应用内展示该许可的版权声明与条款全文。
+

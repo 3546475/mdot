@@ -56,4 +56,7 @@ Navigation Compose · OkHttp（手写 S3 SigV4 签名）· kotlinx.serialization
 
 ## 开源说明
 
-本项目仅供个人记录与学习参考使用。欢迎提 Issue 反馈问题与建议。
+本项目以 [Apache License 2.0](LICENSE) 许可开源；第三方组件的著作权归各自作者所有，
+完整清单见 [NOTICE](NOTICE]，也可在应用内「设置 → 关于 → 开源许可」逐条查看（含各组件许可全文）。
+
+本项目由个人维护，欢迎提 Issue 反馈问题与建议。
