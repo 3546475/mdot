@@ -1,5 +1,9 @@
 # 马的加班
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/3546475/mdot/blob/main/LICENSE)
+[![Android](https://img.shields.io/badge/Android-10%2B-3DDC84.svg)](https://developer.android.com/about/versions/10)
+[![Release](https://img.shields.io/github/v/release/3546475/mdot.svg)](https://github.com/3546475/mdot/releases)
+
 > 一款只属于你自己的加班记账本。
 > 记下每天加班、请假和上班工时，自动算清加班费、扣款和到手收入。
 > **本地优先 · 零数据收集 · 免费无广告。**
@@ -56,7 +60,7 @@ Navigation Compose · OkHttp（手写 S3 SigV4 签名）· kotlinx.serialization
 
 ## 开源说明
 
-本项目以 [Apache License 2.0](LICENSE) 许可开源；第三方组件的著作权归各自作者所有，
-完整清单见 [NOTICE](NOTICE]，也可在应用内「设置 → 关于 → 开源许可」逐条查看（含各组件许可全文）。
+本项目以 [Apache License 2.0](https://github.com/3546475/mdot/blob/main/LICENSE) 许可开源；第三方组件的著作权归各自作者所有，
+完整清单见 [NOTICE](https://github.com/3546475/mdot/blob/main/NOTICE)，也可在应用内「设置 → 关于 → 开源许可」逐条查看（含各组件许可全文）。
 
 本项目由个人维护，欢迎提 Issue 反馈问题与建议。
